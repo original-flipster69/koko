@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/meeseeks/koko/config"
+	"github.com/meeseeks/koko/internal/config"
 )
 
 type Sandbox struct {

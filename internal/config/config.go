@@ -35,6 +35,7 @@ type Config struct {
 	ExecMemoryMB        int          `json:"exec_memory_mb"`
 	ExecMaxFileMB       int          `json:"exec_max_file_mb"`
 	ScrubPII            bool         `json:"scrub_pii"`
+	QuietToolOutputs    []string     `json:"quiet_tool_outputs"`
 }
 
 func DefaultConfig() *Config {
@@ -64,6 +65,7 @@ func DefaultConfig() *Config {
 		ExecMemoryMB:        512,
 		ExecMaxFileMB:       100,
 		ScrubPII:            true,
+		QuietToolOutputs:    []string{"read_file", "search_files"},
 	}
 }
 

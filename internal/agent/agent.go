@@ -14,17 +14,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/meeseeks/koko/audit"
-	"github.com/meeseeks/koko/diff"
-	"github.com/meeseeks/koko/editor"
-	"github.com/meeseeks/koko/ignore"
-	"github.com/meeseeks/koko/memory"
-	"github.com/meeseeks/koko/policy"
-	"github.com/meeseeks/koko/provider"
-	"github.com/meeseeks/koko/sandbox"
-	"github.com/meeseeks/koko/secrets"
-	"github.com/meeseeks/koko/session"
-	"github.com/meeseeks/koko/ui"
+	"github.com/meeseeks/koko/internal/audit"
+	"github.com/meeseeks/koko/internal/diff"
+	"github.com/meeseeks/koko/internal/editor"
+	"github.com/meeseeks/koko/internal/ignore"
+	"github.com/meeseeks/koko/internal/memory"
+	"github.com/meeseeks/koko/internal/policy"
+	"github.com/meeseeks/koko/internal/provider"
+	"github.com/meeseeks/koko/internal/sandbox"
+	"github.com/meeseeks/koko/internal/secrets"
+	"github.com/meeseeks/koko/internal/session"
+	"github.com/meeseeks/koko/internal/ui"
 )
 
 var toolVerbs = map[string]string{
@@ -67,6 +67,7 @@ type Agent struct {
 	maxSessionTokens int
 	toolCallCount    int
 	scrubPII         bool
+	quietTools       map[string]bool
 	execCPUSeconds   int
 	execMemoryMB     int
 	execMaxFileMB    int
@@ -80,6 +81,12 @@ func (a *Agent) SetLimits(maxToolCalls, maxTokens int) {
 	a.maxSessionTokens = maxTokens
 }
 func (a *Agent) SetScrubPII(on bool) { a.scrubPII = on }
+func (a *Agent) SetQuietTools(names []string) {
+	a.quietTools = make(map[string]bool, len(names))
+	for _, n := range names {
+		a.quietTools[n] = true
+	}
+}
 func (a *Agent) SetExecLimits(cpu, memMB, fileMB int) {
 	a.execCPUSeconds = cpu
 	a.execMemoryMB = memMB
@@ -325,7 +332,9 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 			fmt.Fprintf(a.output, "  %s%s%s %s%s%s\n", ui.Dim, ui.DarkPurp, toolVerb(tc.Name), ui.Violet, tc.Name, ui.Reset)
 			result := a.executeTool(ctx, tc)
 			a.auditLog.Record(tc.Name, tc.Args, result)
-			fmt.Fprintln(a.output, ui.FormatToolResult(tc.Name, result))
+			if !a.quietTools[tc.Name] || strings.HasPrefix(result, "error:") {
+				fmt.Fprintln(a.output, ui.FormatToolResult(tc.Name, result))
+			}
 			historyResult := result
 			if len(historyResult) > maxToolResultSize {
 				historyResult = historyResult[:maxToolResultSize] + "\n...(truncated)"

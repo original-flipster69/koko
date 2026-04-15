@@ -13,17 +13,19 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/meeseeks/koko/agent"
-	"github.com/meeseeks/koko/audit"
-	"github.com/meeseeks/koko/config"
-	"github.com/meeseeks/koko/detect"
-	"github.com/meeseeks/koko/memory"
-	"github.com/meeseeks/koko/plays"
-	"github.com/meeseeks/koko/policy"
-	"github.com/meeseeks/koko/provider"
-	"github.com/meeseeks/koko/sandbox"
-	"github.com/meeseeks/koko/ui"
+	"github.com/meeseeks/koko/internal/agent"
+	"github.com/meeseeks/koko/internal/audit"
+	"github.com/meeseeks/koko/internal/config"
+	"github.com/meeseeks/koko/internal/detect"
+	"github.com/meeseeks/koko/internal/memory"
+	"github.com/meeseeks/koko/internal/plays"
+	"github.com/meeseeks/koko/internal/policy"
+	"github.com/meeseeks/koko/internal/provider"
+	"github.com/meeseeks/koko/internal/sandbox"
+	"github.com/meeseeks/koko/internal/ui"
 )
+
+var version = "dev"
 
 func main() {
 	providerFlag := flag.String("provider", "", "LLM provider: anthropic, mistral, ollama")
@@ -142,6 +144,7 @@ func main() {
 	a.SetCommandPolicy(cmdPolicy)
 	a.SetLimits(cfg.MaxToolCalls, cfg.MaxSessionTokens)
 	a.SetScrubPII(cfg.ScrubPII)
+	a.SetQuietTools(cfg.QuietToolOutputs)
 	a.SetExecLimits(cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -165,7 +168,7 @@ func main() {
 	}
 
 	fmt.Println()
-	fmt.Print(ui.Splash(llm.Name(), cfg.Model, cfg.SandboxRoot, project.Languages, project.BuildTools))
+	fmt.Print(ui.Splash(llm.Name(), cfg.Model, cfg.SandboxRoot, version, project.Languages, project.BuildTools))
 	fmt.Println()
 	fmt.Printf("  %stype %sexit%s%s or %sctrl+c%s%s to quit%s\n\n", ui.Gray, ui.Violet, ui.Reset, ui.Gray, ui.Violet, ui.Reset, ui.Gray, ui.Reset)
 

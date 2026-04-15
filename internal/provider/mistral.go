@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/meeseeks/koko/httputil"
+	"github.com/meeseeks/koko/internal/httputil"
 )
 
 func keysOf(m map[string]string) []string {

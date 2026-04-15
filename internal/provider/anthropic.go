@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/meeseeks/koko/httputil"
+	"github.com/meeseeks/koko/internal/httputil"
 )
 
 type AnthropicProvider struct {

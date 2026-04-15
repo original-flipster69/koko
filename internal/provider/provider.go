@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/meeseeks/koko/config"
+	"github.com/meeseeks/koko/internal/config"
 )
 
 type Role string

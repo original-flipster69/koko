@@ -116,7 +116,7 @@ func visibleWidth(s string) int {
 	return w
 }
 
-func Splash(provider, model, sandbox string, languages, tools []string) string {
+func Splash(provider, model, sandbox, version string, languages, tools []string) string {
 	left := strings.Split(strings.TrimRight(Mascot(), "\n"), "\n")
 
 	title := fmt.Sprintf("%s%s k o k o %s", Bold, BrightPurp, Reset)
@@ -127,6 +127,9 @@ func Splash(provider, model, sandbox string, languages, tools []string) string {
 	right = append(right, title)
 	right = append(right, tagline)
 	right = append(right, "")
+	if version != "" {
+		right = append(right, Info("version ", version))
+	}
 	right = append(right, Info("provider", provider))
 	right = append(right, Info("model   ", model))
 	right = append(right, Info("sandbox ", sandbox))
@@ -216,7 +219,7 @@ func Error(text string) string {
 }
 
 func TokenStats(input, output int) string {
-	return fmt.Sprintf("%s%stokens: %d in / %d out%s", Dim, Gray, input, output, Reset)
+	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, Gray, input, output, Reset)
 }
 
 var goodbyeLines = []string{

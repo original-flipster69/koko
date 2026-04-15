@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/meeseeks/koko/provider"
-	"github.com/meeseeks/koko/secrets"
+	"github.com/meeseeks/koko/internal/provider"
+	"github.com/meeseeks/koko/internal/secrets"
 )
 
 type Session struct {
