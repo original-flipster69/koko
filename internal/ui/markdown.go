@@ -3,11 +3,18 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 )
 
 type MarkdownStream struct {
-	buf     strings.Builder
-	inFence bool
+	buf       strings.Builder
+	inFence   bool
+	fenceLang string
+	fenceBuf  strings.Builder
 }
 
 func NewMarkdownStream() *MarkdownStream {
@@ -30,21 +37,61 @@ func (m *MarkdownStream) Write(delta string) string {
 func (m *MarkdownStream) Flush() string {
 	rem := m.buf.String()
 	m.buf.Reset()
-	if rem == "" {
-		return ""
+	out := ""
+	if rem != "" {
+		out = m.renderBlock(rem)
 	}
-	return m.renderBlock(rem)
+	if m.inFence && m.fenceBuf.Len() > 0 {
+		out += highlightCode(m.fenceLang, m.fenceBuf.String())
+		m.fenceBuf.Reset()
+	}
+	m.inFence = false
+	return out
 }
 
-const responseIndent = "  "
+func isFenceMarker(line string) bool {
+	if !strings.HasPrefix(line, "```") {
+		return false
+	}
+	rest := line[3:]
+	for _, r := range rest {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '+' || r == '-' || r == '_' || r == '.':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func fenceLanguage(line string) string {
+	if !strings.HasPrefix(line, "```") {
+		return ""
+	}
+	return strings.TrimSpace(line[3:])
+}
+
+func isHorizontalRule(s string) bool {
+	if len(s) < 3 {
+		return false
+	}
+	ch := s[0]
+	if ch != '-' && ch != '*' && ch != '_' {
+		return false
+	}
+	for _, r := range s {
+		if r != rune(ch) && r != ' ' {
+			return false
+		}
+	}
+	count := strings.Count(s, string(ch))
+	return count >= 3
+}
 
 func (m *MarkdownStream) renderBlock(block string) string {
-	width := diffWidth()
-	wrapAt := width - len(responseIndent)
-	if wrapAt < 20 {
-		wrapAt = 20
-	}
-
 	var out strings.Builder
 	lines := strings.SplitAfter(block, "\n")
 	for _, line := range lines {
@@ -57,87 +104,88 @@ func (m *MarkdownStream) renderBlock(block string) string {
 
 		if body == "" {
 			if hasNL {
-				out.WriteString("\n")
+				if m.inFence {
+					m.fenceBuf.WriteString("\n")
+				} else {
+					out.WriteString("\n")
+				}
 			}
 			continue
 		}
 
-		if strings.HasPrefix(trimmed, "```") {
-			m.inFence = !m.inFence
-			out.WriteString(responseIndent + Gray + body + Reset)
-			if hasNL {
-				out.WriteString("\n")
+		if isFenceMarker(trimmed) {
+			if !m.inFence {
+				m.inFence = true
+				m.fenceLang = fenceLanguage(trimmed)
+				m.fenceBuf.Reset()
+			} else {
+				out.WriteString(highlightCode(m.fenceLang, m.fenceBuf.String()))
+				m.fenceBuf.Reset()
+				m.inFence = false
+				m.fenceLang = ""
 			}
 			continue
 		}
 
 		if m.inFence {
-			out.WriteString(responseIndent + Cyan + body + Reset)
+			m.fenceBuf.WriteString(body)
+			if hasNL {
+				m.fenceBuf.WriteString("\n")
+			}
+			continue
+		}
+
+		if isHorizontalRule(trimmed) {
+			rule := Dim + Gray + strings.Repeat("─", 40) + Reset
+			out.WriteString(rule)
 			if hasNL {
 				out.WriteString("\n")
 			}
 			continue
 		}
 
-		segments := wrapWords(body, wrapAt)
-		for i, seg := range segments {
-			out.WriteString(responseIndent)
-			if i == 0 {
-				out.WriteString(renderLine(seg))
-			} else {
-				out.WriteString(White + renderInline(seg) + Reset)
-			}
-			if i < len(segments)-1 || hasNL {
-				out.WriteString("\n")
-			}
+		out.WriteString(renderLine(body))
+		if hasNL {
+			out.WriteString("\n")
 		}
 	}
 	return out.String()
 }
 
-func wrapWords(s string, limit int) []string {
-	if limit < 1 || runeLen(s) <= limit {
-		return []string{s}
+func highlightCode(lang, code string) string {
+	if strings.TrimSpace(code) == "" {
+		return ""
 	}
-	leading := ""
-	i := 0
-	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
-		i++
+
+	lexer := lexers.Get(lang)
+	if lexer == nil {
+		lexer = lexers.Analyse(code)
 	}
-	if i > 0 {
-		leading = s[:i]
-		s = s[i:]
+	if lexer == nil {
+		lexer = lexers.Fallback
 	}
-	words := strings.Fields(s)
-	if len(words) == 0 {
-		return []string{leading}
+	lexer = chroma.Coalesce(lexer)
+
+	style := styles.Get("monokai")
+	if style == nil {
+		style = styles.Fallback
 	}
-	var lines []string
-	var cur strings.Builder
-	cur.WriteString(leading)
-	curLen := runeLen(leading)
-	for _, w := range words {
-		wLen := runeLen(w)
-		if curLen == runeLen(leading) {
-			cur.WriteString(w)
-			curLen += wLen
-			continue
-		}
-		if curLen+1+wLen > limit {
-			lines = append(lines, cur.String())
-			cur.Reset()
-			cur.WriteString(w)
-			curLen = wLen
-			continue
-		}
-		cur.WriteString(" ")
-		cur.WriteString(w)
-		curLen += 1 + wLen
+
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		formatter = formatters.Fallback
 	}
-	if cur.Len() > 0 {
-		lines = append(lines, cur.String())
+
+	iterator, err := lexer.Tokenise(nil, code)
+	if err != nil {
+		return Amber + code + Reset
 	}
-	return lines
+
+	var buf strings.Builder
+	if err := formatter.Format(&buf, style, iterator); err != nil {
+		return Amber + code + Reset
+	}
+	return buf.String()
 }
 
 func renderLine(line string) string {
@@ -146,6 +194,7 @@ func renderLine(line string) string {
 
 	if h := headingLevel(trimmed); h > 0 {
 		text := strings.TrimSpace(trimmed[h:])
+		text = stripBoldMarkers(text)
 		color := BrightPurp
 		if h >= 2 {
 			color = Purple
@@ -157,8 +206,13 @@ func renderLine(line string) string {
 		return fmt.Sprintf("%s%s•%s %s", indent, Violet, Reset, renderInline(after))
 	}
 
+	if after, ok := trimOrderedMarker(trimmed); ok {
+		return fmt.Sprintf("%s%s%s", indent, renderInline(after), Reset)
+	}
+
 	if strings.HasPrefix(trimmed, "> ") {
-		return fmt.Sprintf("%s%s│ %s%s", indent, Gray, strings.TrimPrefix(trimmed, "> "), Reset)
+		inner := strings.TrimPrefix(trimmed, "> ")
+		return fmt.Sprintf("%s%s│%s %s", indent, Gray, Reset, renderInline(inner))
 	}
 
 	return indent + renderInline(trimmed)
@@ -175,9 +229,30 @@ func headingLevel(s string) int {
 	return 0
 }
 
+func stripBoldMarkers(s string) string {
+	if strings.HasPrefix(s, "**") && strings.HasSuffix(s, "**") && len(s) > 4 {
+		return s[2 : len(s)-2]
+	}
+	if strings.HasPrefix(s, "__") && strings.HasSuffix(s, "__") && len(s) > 4 {
+		return s[2 : len(s)-2]
+	}
+	return s
+}
+
 func trimListMarker(s string) (string, bool) {
 	if len(s) >= 2 && (s[0] == '-' || s[0] == '*' || s[0] == '+') && s[1] == ' ' {
 		return s[2:], true
+	}
+	return "", false
+}
+
+func trimOrderedMarker(s string) (string, bool) {
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i > 0 && i < len(s)-1 && s[i] == '.' && s[i+1] == ' ' {
+		return s[i+2:], true
 	}
 	return "", false
 }
@@ -187,17 +262,18 @@ func renderInline(s string) string {
 	i := 0
 	for i < len(s) {
 		c := s[i]
+
 		if c == '`' {
 			end := strings.IndexByte(s[i+1:], '`')
 			if end >= 0 {
-				out.WriteString(Cyan)
+				out.WriteString(Amber)
 				out.WriteString(s[i+1 : i+1+end])
 				out.WriteString(Reset)
-				out.WriteString(White)
 				i += end + 2
 				continue
 			}
 		}
+
 		if c == '*' && i+1 < len(s) && s[i+1] == '*' {
 			end := strings.Index(s[i+2:], "**")
 			if end >= 0 {
@@ -205,11 +281,22 @@ func renderInline(s string) string {
 				out.WriteString(LightPurp)
 				out.WriteString(s[i+2 : i+2+end])
 				out.WriteString(Reset)
-				out.WriteString(White)
 				i += end + 4
 				continue
 			}
 		}
+
+		if c == '*' && i+1 < len(s) && s[i+1] != '*' && s[i+1] != ' ' {
+			end := strings.IndexByte(s[i+1:], '*')
+			if end > 0 && s[i+end] != ' ' {
+				out.WriteString(Italic)
+				out.WriteString(s[i+1 : i+1+end])
+				out.WriteString(Reset)
+				i += end + 2
+				continue
+			}
+		}
+
 		if c == '_' && i+1 < len(s) && s[i+1] == '_' {
 			end := strings.Index(s[i+2:], "__")
 			if end >= 0 {
@@ -217,13 +304,61 @@ func renderInline(s string) string {
 				out.WriteString(LightPurp)
 				out.WriteString(s[i+2 : i+2+end])
 				out.WriteString(Reset)
-				out.WriteString(White)
 				i += end + 4
 				continue
 			}
 		}
+
+		if c == '_' && i+1 < len(s) && s[i+1] != '_' && s[i+1] != ' ' {
+			end := strings.IndexByte(s[i+1:], '_')
+			if end > 0 && s[i+end] != ' ' {
+				out.WriteString(Italic)
+				out.WriteString(s[i+1 : i+1+end])
+				out.WriteString(Reset)
+				i += end + 2
+				continue
+			}
+		}
+
+		if c == '~' && i+1 < len(s) && s[i+1] == '~' {
+			end := strings.Index(s[i+2:], "~~")
+			if end >= 0 {
+				out.WriteString(Strikethrough)
+				out.WriteString(s[i+2 : i+2+end])
+				out.WriteString(Reset)
+				i += end + 4
+				continue
+			}
+		}
+
+		if c == '[' {
+			closeBracket := strings.IndexByte(s[i+1:], ']')
+			if closeBracket >= 0 {
+				afterBracket := i + 1 + closeBracket + 1
+				if afterBracket < len(s) && s[afterBracket] == '(' {
+					closeParen := strings.IndexByte(s[afterBracket+1:], ')')
+					if closeParen >= 0 {
+						text := s[i+1 : i+1+closeBracket]
+						url := s[afterBracket+1 : afterBracket+1+closeParen]
+						out.WriteString(Underline)
+						out.WriteString(Amber)
+						out.WriteString(text)
+						out.WriteString(Reset)
+						out.WriteString(Dim)
+						out.WriteString(Gray)
+						out.WriteString(" (")
+						out.WriteString(url)
+						out.WriteString(")")
+						out.WriteString(Reset)
+						i = afterBracket + 1 + closeParen + 1
+						continue
+					}
+				}
+			}
+		}
+
 		out.WriteByte(c)
 		i++
 	}
-	return White + out.String() + Reset
+	return out.String()
 }

@@ -1,9 +1,11 @@
 package editor
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -43,10 +45,30 @@ type Editor struct {
 	sandbox   *sandbox.Sandbox
 	mu        sync.Mutex
 	undoStack []undoEntry
+	reads     map[string][32]byte
 }
 
 func New(sb *sandbox.Sandbox) *Editor {
-	return &Editor{sandbox: sb}
+	return &Editor{sandbox: sb, reads: make(map[string][32]byte)}
+}
+
+func (e *Editor) MarkRead(path, content string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.reads[path] = sha256.Sum256([]byte(content))
+}
+
+func (e *Editor) ForgetRead(path string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	delete(e.reads, path)
+}
+
+func (e *Editor) readHash(path string) ([32]byte, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	h, ok := e.reads[path]
+	return h, ok
 }
 
 func (e *Editor) Undo() (string, error) {
@@ -94,38 +116,162 @@ func (e *Editor) WriteFile(path string, content string, overwrite bool) error {
 		return fmt.Errorf("refusing to write %s: file already exists. Use replace_in_file for modifications, or pass overwrite=true ONLY when you explicitly intend a full rewrite", path)
 	}
 	e.saveUndo(path)
-	return e.sandbox.WriteFile(path, content)
+	if err := e.sandbox.WriteFile(path, content); err != nil {
+		return err
+	}
+	e.MarkRead(path, content)
+	return nil
 }
 
 func (e *Editor) ReplaceInFile(path, oldText, newText string) (before string, after string, err error) {
 	if err := lockfileGuard(path); err != nil {
 		return "", "", err
 	}
+	known, ok := e.readHash(path)
+	if !ok {
+		return "", "", fmt.Errorf("refusing to edit %s — file has not been read in this session. Call read_file on this path first (with no offset/limit, so you see the full content), then retry replace_in_file with byte-exact old_text copied from the read output", path)
+	}
 	content, err := e.sandbox.ReadFile(path)
 	if err != nil {
 		return "", "", err
 	}
+	current := sha256.Sum256([]byte(content))
+	if current != known {
+		e.ForgetRead(path)
+		return "", "", fmt.Errorf("refusing to edit %s — file content changed on disk since last read. Re-read the file and retry replace_in_file with fresh old_text", path)
+	}
 
-	if !strings.Contains(content, oldText) {
-		return "", "", fmt.Errorf("old_text not found in %s — the string you passed does not appear anywhere in the file. old_text must match the file byte-for-byte including whitespace, punctuation, and line breaks. Current file content follows so you can copy the exact text:\n---\n%s\n---", path, previewForError(content))
+	commit := func(updated string) (string, string, error) {
+		e.saveUndo(path)
+		if err := e.sandbox.WriteFile(path, updated); err != nil {
+			return "", "", err
+		}
+		e.MarkRead(path, updated)
+		return content, updated, nil
 	}
 
 	count := strings.Count(content, oldText)
+	if count == 1 {
+		return commit(strings.Replace(content, oldText, newText, 1))
+	}
 	if count > 1 {
 		return "", "", fmt.Errorf("old_text appears %d times in %s — must be unique. Expand old_text with surrounding lines until it matches exactly one location", count, path)
 	}
 
-	e.saveUndo(path)
-	updated := strings.Replace(content, oldText, newText, 1)
-	if err := e.sandbox.WriteFile(path, updated); err != nil {
-		return "", "", err
+	if start, end, matches, ok := fuzzyWhitespaceMatch(content, oldText); ok {
+		return commit(content[:start] + newText + content[end:])
+	} else if matches > 1 {
+		return "", "", fmt.Errorf("old_text not found exactly, and whitespace-tolerant match is ambiguous (%d candidates) in %s — expand old_text with more surrounding context", matches, path)
 	}
-	return content, updated, nil
+
+	if start, end, matches, ok := trimmedLineMatch(content, oldText); ok {
+		replacement := newText
+		if end > 0 && end <= len(content) && content[end-1] == '\n' && !strings.HasSuffix(replacement, "\n") {
+			replacement += "\n"
+		}
+		return commit(content[:start] + replacement + content[end:])
+	} else if matches > 1 {
+		return "", "", fmt.Errorf("old_text not found exactly, and trimmed-line match is ambiguous (%d candidates) in %s — expand old_text with more surrounding context", matches, path)
+	}
+
+	return "", "", fmt.Errorf("old_text not found in %s — the string you passed does not appear anywhere in the file. old_text must match the file byte-for-byte including whitespace, punctuation, and line breaks. Current file content follows so you can copy the exact text:\n---\n%s\n---", path, previewForError(content))
+}
+
+func trimmedLineMatch(content, oldText string) (int, int, int, bool) {
+	rawOld := strings.Split(oldText, "\n")
+	oldLines := make([]string, 0, len(rawOld))
+	for _, l := range rawOld {
+		oldLines = append(oldLines, strings.TrimSpace(l))
+	}
+	for len(oldLines) > 0 && oldLines[0] == "" {
+		oldLines = oldLines[1:]
+	}
+	for len(oldLines) > 0 && oldLines[len(oldLines)-1] == "" {
+		oldLines = oldLines[:len(oldLines)-1]
+	}
+	if len(oldLines) == 0 {
+		return 0, 0, 0, false
+	}
+
+	contentLines := strings.Split(content, "\n")
+	trimmed := make([]string, len(contentLines))
+	for i, l := range contentLines {
+		trimmed[i] = strings.TrimSpace(l)
+	}
+
+	var hits [][2]int
+	for i := 0; i+len(oldLines) <= len(trimmed); i++ {
+		ok := true
+		for j, ol := range oldLines {
+			if trimmed[i+j] != ol {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			hits = append(hits, [2]int{i, i + len(oldLines)})
+		}
+	}
+	if len(hits) != 1 {
+		return 0, 0, len(hits), false
+	}
+
+	startLine, endLine := hits[0][0], hits[0][1]
+	start := 0
+	for i := 0; i < startLine; i++ {
+		start += len(contentLines[i]) + 1
+	}
+	end := start
+	for i := startLine; i < endLine; i++ {
+		end += len(contentLines[i]) + 1
+	}
+	if end > len(content) {
+		end = len(content)
+	}
+	return start, end, 1, true
+}
+
+func fuzzyWhitespaceMatch(content, oldText string) (int, int, int, bool) {
+	if strings.TrimSpace(oldText) == "" {
+		return 0, 0, 0, false
+	}
+	var b strings.Builder
+	inWS := false
+	hasWS := false
+	for _, r := range oldText {
+		if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+			if !inWS {
+				b.WriteString(`\s+`)
+				inWS = true
+				hasWS = true
+			}
+			continue
+		}
+		inWS = false
+		b.WriteString(regexp.QuoteMeta(string(r)))
+	}
+	if !hasWS {
+		return 0, 0, 0, false
+	}
+	re, err := regexp.Compile(b.String())
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	matches := re.FindAllStringIndex(content, -1)
+	if len(matches) == 1 {
+		return matches[0][0], matches[0][1], 1, true
+	}
+	return 0, 0, len(matches), false
 }
 
 func (e *Editor) RenameFile(oldPath, newPath string) error {
 	e.saveUndo(oldPath)
-	return e.sandbox.RenameFile(oldPath, newPath)
+	if err := e.sandbox.RenameFile(oldPath, newPath); err != nil {
+		return err
+	}
+	e.ForgetRead(oldPath)
+	e.ForgetRead(newPath)
+	return nil
 }
 
 func (e *Editor) DeleteFile(path string) error {
@@ -133,7 +279,11 @@ func (e *Editor) DeleteFile(path string) error {
 		return err
 	}
 	e.saveUndo(path)
-	return e.sandbox.DeleteFile(path)
+	if err := e.sandbox.DeleteFile(path); err != nil {
+		return err
+	}
+	e.ForgetRead(path)
+	return nil
 }
 
 func (e *Editor) ListDir(path string) ([]string, error) {

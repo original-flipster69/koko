@@ -5,67 +5,26 @@ import (
 	"strings"
 )
 
+const contextLines = 3
+
+type editOp struct {
+	kind byte
+	line string
+}
+
+type hunk struct {
+	oldStart int
+	newStart int
+	lines    []string
+}
+
 func Unified(oldText, newText, path string) string {
 	oldLines := splitLines(oldText)
 	newLines := splitLines(newText)
-
 	lcs := longestCommonSubseq(oldLines, newLines)
 
-	var hunks []hunk
-	var current *hunk
-
-	oi, ni, li := 0, 0, 0
-	for oi < len(oldLines) || ni < len(newLines) {
-		if li < len(lcs) && oi < len(oldLines) && ni < len(newLines) &&
-			oldLines[oi] == lcs[li] && newLines[ni] == lcs[li] {
-			if current != nil {
-				current.lines = append(current.lines, " "+oldLines[oi])
-			}
-			oi++
-			ni++
-			li++
-			continue
-		}
-
-		if current == nil {
-			h := hunk{oldStart: oi + 1, newStart: ni + 1}
-			contextStart := max(0, oi-3)
-			for c := contextStart; c < oi; c++ {
-				h.lines = append(h.lines, " "+oldLines[c])
-			}
-			if contextStart < oi {
-				h.oldStart = contextStart + 1
-				h.newStart = ni - (oi - contextStart) + 1
-			}
-			current = &h
-		}
-
-		if li < len(lcs) && oi < len(oldLines) && oldLines[oi] != lcs[li] {
-			current.lines = append(current.lines, "-"+oldLines[oi])
-			oi++
-			continue
-		}
-		if li < len(lcs) && ni < len(newLines) && newLines[ni] != lcs[li] {
-			current.lines = append(current.lines, "+"+newLines[ni])
-			ni++
-			continue
-		}
-		if oi >= len(oldLines) && ni < len(newLines) {
-			current.lines = append(current.lines, "+"+newLines[ni])
-			ni++
-			continue
-		}
-		if ni >= len(newLines) && oi < len(oldLines) {
-			current.lines = append(current.lines, "-"+oldLines[oi])
-			oi++
-			continue
-		}
-	}
-
-	if current != nil {
-		hunks = append(hunks, *current)
-	}
-
+	ops := buildOps(oldLines, newLines, lcs)
+	hunks := groupHunks(ops)
 	if len(hunks) == 0 {
 		return ""
 	}
@@ -75,10 +34,10 @@ func Unified(oldText, newText, path string) string {
 	for _, h := range hunks {
 		oldCount, newCount := 0, 0
 		for _, l := range h.lines {
-			switch {
-			case strings.HasPrefix(l, "-"):
+			switch l[0] {
+			case '-':
 				oldCount++
-			case strings.HasPrefix(l, "+"):
+			case '+':
 				newCount++
 			default:
 				oldCount++
@@ -93,10 +52,112 @@ func Unified(oldText, newText, path string) string {
 	return out.String()
 }
 
-type hunk struct {
-	oldStart int
-	newStart int
-	lines    []string
+func buildOps(oldLines, newLines, lcs []string) []editOp {
+	var ops []editOp
+	oi, ni, li := 0, 0, 0
+	for oi < len(oldLines) || ni < len(newLines) {
+		if li < len(lcs) && oi < len(oldLines) && ni < len(newLines) &&
+			oldLines[oi] == lcs[li] && newLines[ni] == lcs[li] {
+			ops = append(ops, editOp{' ', oldLines[oi]})
+			oi++
+			ni++
+			li++
+			continue
+		}
+		if li < len(lcs) && oi < len(oldLines) && oldLines[oi] != lcs[li] {
+			ops = append(ops, editOp{'-', oldLines[oi]})
+			oi++
+			continue
+		}
+		if li < len(lcs) && ni < len(newLines) && newLines[ni] != lcs[li] {
+			ops = append(ops, editOp{'+', newLines[ni]})
+			ni++
+			continue
+		}
+		if oi < len(oldLines) {
+			ops = append(ops, editOp{'-', oldLines[oi]})
+			oi++
+			continue
+		}
+		if ni < len(newLines) {
+			ops = append(ops, editOp{'+', newLines[ni]})
+			ni++
+			continue
+		}
+	}
+	return ops
+}
+
+func groupHunks(ops []editOp) []hunk {
+	var hunks []hunk
+	var cur *hunk
+	var leadBuf []editOp
+	oldLine, newLine := 1, 1
+	trailing := 0
+	gapAllowed := 2 * contextLines
+
+	flush := func() {
+		if cur == nil {
+			return
+		}
+		if trailing > contextLines {
+			excess := trailing - contextLines
+			cur.lines = cur.lines[:len(cur.lines)-excess]
+		}
+		hunks = append(hunks, *cur)
+		cur = nil
+		trailing = 0
+		leadBuf = nil
+	}
+
+	for _, o := range ops {
+		if o.kind == ' ' {
+			if cur == nil {
+				leadBuf = append(leadBuf, o)
+				if len(leadBuf) > contextLines {
+					leadBuf = leadBuf[1:]
+				}
+			} else {
+				cur.lines = append(cur.lines, " "+o.line)
+				trailing++
+				if trailing >= gapAllowed {
+					flush()
+				}
+			}
+			oldLine++
+			newLine++
+			continue
+		}
+
+		if cur == nil {
+			h := hunk{}
+			lead := len(leadBuf)
+			h.oldStart = oldLine - lead
+			h.newStart = newLine - lead
+			if h.oldStart < 1 {
+				h.oldStart = 1
+			}
+			if h.newStart < 1 {
+				h.newStart = 1
+			}
+			for _, c := range leadBuf {
+				h.lines = append(h.lines, " "+c.line)
+			}
+			leadBuf = nil
+			cur = &h
+		}
+		cur.lines = append(cur.lines, string(o.kind)+o.line)
+		trailing = 0
+
+		switch o.kind {
+		case '-':
+			oldLine++
+		case '+':
+			newLine++
+		}
+	}
+	flush()
+	return hunks
 }
 
 func splitLines(s string) []string {

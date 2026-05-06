@@ -22,6 +22,7 @@ import (
 	"github.com/meeseeks/koko/internal/policy"
 	"github.com/meeseeks/koko/internal/provider"
 	"github.com/meeseeks/koko/internal/sandbox"
+	"github.com/meeseeks/koko/internal/tui"
 	"github.com/meeseeks/koko/internal/ui"
 )
 
@@ -62,7 +63,7 @@ func main() {
 	}
 
 	if cfg.APIKey == "" {
-		cfg.APIKey = os.Getenv(apiKeyEnvVar(cfg.Provider))
+		cfg.APIKey = os.Getenv(config.APIKeyEnvVar(cfg.Provider))
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -77,13 +78,6 @@ func main() {
 	}
 
 	sb := sandbox.New(cfg)
-	confirm := func(action string) bool {
-		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.Purple, ui.Reset, ui.Violet, action, ui.Reset)
-		reader := bufio.NewReader(os.Stdin)
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		return answer == "y" || answer == "yes"
-	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(fmt.Sprintf("cannot determine home directory: %v", err)))
@@ -138,28 +132,34 @@ func main() {
 		fmt.Fprintln(os.Stderr, ui.Error(fmt.Sprintf("command policy: %v", err)))
 		os.Exit(1)
 	}
-	a := agent.New(llm, sb, os.Stdout, confirm, auditLog, extraContext)
-	a.SetThinkingVerbs(cfg.ThinkingVerbs)
-	a.SetMemory(memoryStore)
-	a.SetCommandPolicy(cmdPolicy)
-	a.SetLimits(cfg.MaxToolCalls, cfg.MaxSessionTokens)
-	a.SetScrubPII(cfg.ScrubPII)
-	a.SetQuietTools(cfg.QuietToolOutputs)
-	a.SetExecLimits(cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		fmt.Println()
-		fmt.Println(ui.Goodbye())
-		os.Exit(0)
-	}()
 
 	if *promptFlag != "" {
+		confirm := func(action string) bool {
+			fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.Purple, ui.Reset, ui.Violet, action, ui.Reset)
+			reader := bufio.NewReader(os.Stdin)
+			answer, _ := reader.ReadString('\n')
+			answer = strings.TrimSpace(strings.ToLower(answer))
+			return answer == "y" || answer == "yes"
+		}
+		a := agent.New(llm, sb, os.Stdout, confirm, auditLog, extraContext)
+		a.SetThinkingVerbs(cfg.ThinkingVerbs)
+		a.SetMemory(memoryStore)
+		a.SetCommandPolicy(cmdPolicy)
+		a.SetLimits(cfg.MaxToolCalls, cfg.MaxSessionTokens)
+		a.SetScrubPII(cfg.ScrubPII)
+		a.SetQuietTools(cfg.QuietToolOutputs)
+		a.SetExecLimits(cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-sigCh
+			cancel()
+			os.Exit(0)
+		}()
+
 		if err := a.Run(ctx, *promptFlag); err != nil {
 			fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 			os.Exit(1)
@@ -167,235 +167,172 @@ func main() {
 		return
 	}
 
-	fmt.Println()
-	fmt.Print(ui.Splash(llm.Name(), cfg.Model, cfg.SandboxRoot, version, project.Languages, project.BuildTools))
-	fmt.Println()
-	fmt.Printf("  %stype %sexit%s%s or %sctrl+c%s%s to quit%s\n\n", ui.Gray, ui.Violet, ui.Reset, ui.Gray, ui.Violet, ui.Reset, ui.Gray, ui.Reset)
+	splash := "\n" + ui.Splash(llm.Name(), cfg.Model, cfg.SandboxRoot, version, project.Languages, project.BuildTools) + "\n\n"
 
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	slashHandler := makeSlashHandler(cfg, llm, kokoDir, cfg.SandboxRoot, playRegistry)
 
-	for {
-		fmt.Print(ui.Prompt())
-		if !scanner.Scan() {
-			break
-		}
-
-		input := strings.TrimSpace(scanner.Text())
-		if input == "" {
-			continue
-		}
-
-		if input == `"""` {
-			var lines []string
-			fmt.Print(ui.MultilinePrompt())
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.TrimSpace(line) == `"""` {
-					break
-				}
-				lines = append(lines, line)
-				fmt.Print(ui.MultilinePrompt())
-			}
-			input = strings.Join(lines, "\n")
-			if strings.TrimSpace(input) == "" {
-				continue
-			}
-		}
-
-		if input == "exit" || input == "quit" {
-			fmt.Println(ui.Goodbye())
-			break
-		}
-
-		if strings.HasPrefix(input, ":") {
-			handled, prompt := handleSlashCommand(input, a, llm, kokoDir, cfg.SandboxRoot, playRegistry)
-			if handled {
-				continue
-			}
-			if prompt != "" {
-				if err := a.Run(ctx, prompt); err != nil {
-					fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
-					continue
-				}
-				fmt.Println(ui.TokenStats(a.TotalInput, a.TotalOutput))
-				fmt.Println()
-				_ = a.SaveSession(kokoDir)
-				continue
-			}
-		}
-
-		if err := a.Run(ctx, input); err != nil {
-			fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
-			continue
-		}
-		fmt.Println(ui.TokenStats(a.TotalInput, a.TotalOutput))
-		fmt.Println()
-		_ = a.SaveSession(kokoDir)
+	if err := tui.Run(cfg, llm, sb, auditLog, memoryStore, cmdPolicy, playRegistry, extraContext, kokoDir, splash, slashHandler); err != nil {
+		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
+		os.Exit(1)
 	}
+	fmt.Println(ui.Goodbye())
 }
 
-func handleSlashCommand(input string, a *agent.Agent, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) (bool, string) {
-	parts := strings.Fields(input)
-	cmd := parts[0]
+func makeSlashHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) tui.SlashHandler {
+	return func(input string, a *agent.Agent) (bool, string, string) {
+		parts := strings.Fields(input)
+		cmd := parts[0]
+		var out strings.Builder
 
-	switch cmd {
-	case ":koko":
-		fmt.Println(ui.Mascot())
-		fmt.Println()
-		return true, ""
+		switch cmd {
+		case ":koko":
+			out.WriteString("\n")
+			out.WriteString(ui.Mascot())
+			return true, "", out.String()
 
-	case ":help":
-		fmt.Println(ui.Response("  :clear        — reset conversation history"))
-		fmt.Println(ui.Response("  :history      — show message count"))
-		fmt.Println(ui.Response("  :undo         — revert last file change"))
-		fmt.Println(ui.Response("  :run <cmd>    — run a shell command directly"))
-		fmt.Println(ui.Response("  :tokens       — show token usage stats"))
-		fmt.Println(ui.Response("  :compact      — compress history to free context"))
-		fmt.Println(ui.Response("  :model [name] — show or switch model"))
-		fmt.Println(ui.Response("  :save         — save session to disk"))
-		fmt.Println(ui.Response("  :resume       — restore saved session"))
-		fmt.Println(ui.Response("  :plays        — list installed plays"))
-		fmt.Println(ui.Response("  :<name>       — run a play by name (e.g. :review)"))
-		fmt.Println(ui.Response("  :plan         — toggle plan mode (read-only)"))
-		fmt.Println(ui.Response("  :koko         — print the koko mascot"))
-		fmt.Println(ui.Response("  :help         — show this help"))
-		fmt.Println(ui.Response("  \"\"\"           — start multiline input"))
-		fmt.Println()
-		return true, ""
+		case ":help":
+			out.WriteString(":clear        — reset conversation history\n")
+			out.WriteString(":history      — show message count\n")
+			out.WriteString(":undo         — revert last file change\n")
+			out.WriteString(":run <cmd>    — run a shell command directly\n")
+			out.WriteString(":tokens       — show token usage stats\n")
+			out.WriteString(":compact      — compress history to free context\n")
+			out.WriteString(":model [name] — show or switch model\n")
+			out.WriteString(":config       — show active configuration\n")
+			out.WriteString(":save         — save session to disk\n")
+			out.WriteString(":resume       — restore saved session\n")
+			out.WriteString(":plays        — list installed plays\n")
+			out.WriteString(":<name>       — run a play by name (e.g. :review)\n")
+			out.WriteString(":plan         — toggle plan mode (read-only)\n")
+			out.WriteString(":koko         — print the koko mascot\n")
+			out.WriteString(":help         — show this help\n")
+			return true, "", out.String()
 
-	case ":clear":
-		a.ClearHistory()
-		fmt.Println(ui.Info("cleared", "conversation history reset"))
-		fmt.Println()
-		return true, ""
+		case ":clear":
+			a.ClearHistory()
+			out.WriteString(ui.Info("cleared", "conversation history reset"))
+			return true, "", out.String()
 
-	case ":history":
-		fmt.Println(ui.Info("messages", fmt.Sprintf("%d", a.HistoryLen())))
-		fmt.Println()
-		return true, ""
+		case ":history":
+			out.WriteString(ui.Info("messages", fmt.Sprintf("%d", a.HistoryLen())))
+			return true, "", out.String()
 
-	case ":undo":
-		path, err := a.Undo()
-		if err != nil {
-			fmt.Println(ui.Error(fmt.Sprintf("undo failed: %v", err)))
-		} else if path == "" {
-			fmt.Println(ui.Info("undo", "nothing to undo"))
-		} else {
-			fmt.Println(ui.Info("undo", fmt.Sprintf("reverted %s", path)))
-		}
-		fmt.Println()
-		return true, ""
-
-	case ":tokens":
-		fmt.Println(ui.Info("input   ", fmt.Sprintf("%d tokens", a.TotalInput)))
-		fmt.Println(ui.Info("output  ", fmt.Sprintf("%d tokens", a.TotalOutput)))
-		fmt.Println(ui.Info("total   ", fmt.Sprintf("%d tokens", a.TotalInput+a.TotalOutput)))
-		fmt.Println(ui.Info("messages", fmt.Sprintf("%d", a.HistoryLen())))
-		fmt.Println()
-		return true, ""
-
-	case ":run":
-		if len(parts) < 2 {
-			fmt.Println(ui.Error("usage: :run <command>"))
-		} else {
-			cmdStr := strings.TrimPrefix(input, ":run ")
-			runCmd := exec.Command("sh", "-c", cmdStr)
-			runCmd.Dir = sandboxRoot
-			out, err := runCmd.CombinedOutput()
-			result := strings.TrimRight(string(out), "\n")
+		case ":undo":
+			path, err := a.Undo()
 			if err != nil {
-				fmt.Println(ui.Error(result))
-			} else if result != "" {
-				fmt.Println(ui.Response(result))
+				out.WriteString(ui.Error(fmt.Sprintf("undo failed: %v", err)))
+			} else if path == "" {
+				out.WriteString(ui.Info("undo", "nothing to undo"))
+			} else {
+				out.WriteString(ui.Info("undo", fmt.Sprintf("reverted %s", path)))
 			}
-		}
-		fmt.Println()
-		return true, ""
+			return true, "", out.String()
 
-	case ":compact":
-		oldTokens, newTokens := a.Compact()
-		fmt.Println(ui.Info("compact", fmt.Sprintf("~%d → ~%d tokens", oldTokens, newTokens)))
-		fmt.Println()
-		return true, ""
+		case ":tokens":
+			out.WriteString(ui.Info("input   ", fmt.Sprintf("%d tokens", a.TotalInput)) + "\n")
+			out.WriteString(ui.Info("output  ", fmt.Sprintf("%d tokens", a.TotalOutput)) + "\n")
+			out.WriteString(ui.Info("total   ", fmt.Sprintf("%d tokens", a.TotalInput+a.TotalOutput)) + "\n")
+			out.WriteString(ui.Info("messages", fmt.Sprintf("%d", a.HistoryLen())))
+			return true, "", out.String()
 
-	case ":model":
-		if len(parts) < 2 {
-			fmt.Println(ui.Info("model", llm.Model()))
-		} else {
-			llm.SetModel(parts[1])
-			fmt.Println(ui.Info("model", fmt.Sprintf("switched to %s", parts[1])))
-		}
-		fmt.Println()
-		return true, ""
-
-	case ":save":
-		if err := a.SaveSession(dataDir); err != nil {
-			fmt.Println(ui.Error(fmt.Sprintf("save failed: %v", err)))
-		} else {
-			fmt.Println(ui.Info("saved", "session written to disk"))
-		}
-		fmt.Println()
-		return true, ""
-
-	case ":resume":
-		if err := a.LoadSession(dataDir); err != nil {
-			fmt.Println(ui.Error(fmt.Sprintf("resume failed: %v", err)))
-		} else {
-			fmt.Println(ui.Info("resumed", fmt.Sprintf("loaded %d messages", a.HistoryLen())))
-		}
-		fmt.Println()
-		return true, ""
-
-	case ":plays":
-		list := playRegistry.List()
-		if len(list) == 0 {
-			fmt.Println(ui.Info("plays", fmt.Sprintf("none installed — add *.md files in %s", playRegistry.Dir())))
-		} else {
-			for _, p := range list {
-				desc := p.Description
-				if desc == "" {
-					desc = "(no description)"
+		case ":run":
+			if len(parts) < 2 {
+				out.WriteString(ui.Error("usage: :run <command>"))
+			} else {
+				cmdStr := strings.TrimPrefix(input, ":run ")
+				runCmd := exec.Command("sh", "-c", cmdStr)
+				runCmd.Dir = sandboxRoot
+				result, err := runCmd.CombinedOutput()
+				text := strings.TrimRight(string(result), "\n")
+				if err != nil {
+					out.WriteString(ui.Error(text))
+				} else if text != "" {
+					out.WriteString(text)
 				}
-				fmt.Println(ui.Info(p.Name, desc))
 			}
-		}
-		fmt.Println()
-		return true, ""
+			return true, "", out.String()
 
-	case ":plan":
-		mode := a.TogglePlanMode()
-		if mode {
-			fmt.Println(ui.Info("plan", "mode on — read-only; call :plan again to exit"))
-		} else {
-			fmt.Println(ui.Info("plan", "mode off — full tools restored"))
-		}
-		fmt.Println()
-		return true, ""
+		case ":compact":
+			oldTokens, newTokens := a.Compact()
+			out.WriteString(ui.Info("compact", fmt.Sprintf("~%d → ~%d tokens", oldTokens, newTokens)))
+			return true, "", out.String()
 
-	default:
-		name := strings.TrimPrefix(cmd, ":")
-		if p, ok := playRegistry.Get(name); ok {
-			extra := strings.TrimSpace(strings.TrimPrefix(input, cmd))
-			prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Body)
-			if extra != "" {
-				prompt += "\n\nUser request:\n" + extra
+		case ":model":
+			if len(parts) < 2 {
+				out.WriteString(ui.Info("model", llm.Model()))
+			} else {
+				llm.SetModel(parts[1])
+				out.WriteString(ui.Info("model", fmt.Sprintf("switched to %s", parts[1])))
 			}
-			return false, prompt
+			return true, "", out.String()
+
+		case ":config":
+			out.WriteString(ui.Info("provider ", string(cfg.Provider)) + "\n")
+			out.WriteString(ui.Info("model    ", cfg.Model) + "\n")
+			out.WriteString(ui.Info("sandbox  ", cfg.SandboxRoot) + "\n")
+			out.WriteString(ui.Info("max_tok  ", fmt.Sprintf("%d", cfg.MaxTokens)) + "\n")
+			out.WriteString(ui.Info("tools    ", fmt.Sprintf("%d max", cfg.MaxToolCalls)) + "\n")
+			out.WriteString(ui.Info("session  ", fmt.Sprintf("%d max tokens", cfg.MaxSessionTokens)) + "\n")
+			out.WriteString(ui.Info("exec     ", fmt.Sprintf("%ds cpu, %dMB mem, %dMB file", cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)) + "\n")
+			out.WriteString(ui.Info("scrub_pii", fmt.Sprintf("%v", cfg.ScrubPII)) + "\n")
+			out.WriteString(ui.Info("verbs    ", strings.Join(cfg.ThinkingVerbs, ", ")) + "\n")
+			out.WriteString(ui.Info("quiet    ", strings.Join(cfg.QuietToolOutputs, ", ")) + "\n")
+			out.WriteString(ui.Info("config   ", config.ConfigPath()))
+			return true, "", out.String()
+
+		case ":save":
+			if err := a.SaveSession(dataDir); err != nil {
+				out.WriteString(ui.Error(fmt.Sprintf("save failed: %v", err)))
+			} else {
+				out.WriteString(ui.Info("saved", "session written to disk"))
+			}
+			return true, "", out.String()
+
+		case ":resume":
+			if err := a.LoadSession(dataDir); err != nil {
+				out.WriteString(ui.Error(fmt.Sprintf("resume failed: %v", err)))
+			} else {
+				out.WriteString(ui.Info("resumed", fmt.Sprintf("loaded %d messages", a.HistoryLen())))
+			}
+			return true, "", out.String()
+
+		case ":plays":
+			list := playRegistry.List()
+			if len(list) == 0 {
+				out.WriteString(ui.Info("plays", fmt.Sprintf("none installed — add *.md files in %s", playRegistry.Dir())))
+			} else {
+				for _, p := range list {
+					desc := p.Description
+					if desc == "" {
+						desc = "(no description)"
+					}
+					out.WriteString(ui.Info(p.Name, desc) + "\n")
+				}
+			}
+			return true, "", out.String()
+
+		case ":plan":
+			mode := a.TogglePlanMode()
+			if mode {
+				out.WriteString(ui.Info("plan", "mode on — read-only; call :plan again to exit"))
+			} else {
+				out.WriteString(ui.Info("plan", "mode off — full tools restored"))
+			}
+			return true, "", out.String()
+
+		default:
+			name := strings.TrimPrefix(cmd, ":")
+			if p, ok := playRegistry.Get(name); ok {
+				extra := strings.TrimSpace(strings.TrimPrefix(input, cmd))
+				prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Body)
+				if extra != "" {
+					prompt += "\n\nUser request:\n" + extra
+				}
+				return false, prompt, ""
+			}
+			out.WriteString(ui.Error(fmt.Sprintf("unknown command: %s (try :help)", cmd)))
+			return true, "", out.String()
 		}
-		fmt.Println(ui.Error(fmt.Sprintf("unknown command: %s (try :help)", cmd)))
-		fmt.Println()
-		return true, ""
 	}
 }
 
-func apiKeyEnvVar(p config.ProviderType) string {
-	switch p {
-	case config.ProviderAnthropic:
-		return "ANTHROPIC_API_KEY"
-	case config.ProviderMistral:
-		return "MISTRAL_API_KEY"
-	default:
-		return ""
-	}
-}

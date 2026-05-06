@@ -6,12 +6,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
+	"unsafe"
 )
 
 const (
-	Reset      = "\033[0m"
-	Bold       = "\033[1m"
-	Dim        = "\033[2m"
+	Reset         = "\033[0m"
+	Bold          = "\033[1m"
+	Dim           = "\033[2m"
+	Italic        = "\033[3m"
+	Underline     = "\033[4m"
+	Strikethrough = "\033[9m"
 	Purple     = "\033[38;5;135m"
 	LightPurp  = "\033[38;5;183m"
 	BrightPurp = "\033[38;5;99m"
@@ -202,17 +207,35 @@ func MultilinePrompt() string {
 	return fmt.Sprintf("%s%s · %s", Dim, Purple, Reset)
 }
 
+var toolSymbols = map[string]string{
+	"read_file":       "◇",
+	"write_file":      "✎",
+	"replace_in_file": "✎",
+	"delete_file":     "✕",
+	"rename_file":     "⇄",
+	"list_dir":        "≡",
+	"search_files":    "⌕",
+	"exec_command":    "⚡",
+	"save_memory":     "◆",
+	"delete_memory":   "◆",
+	"list_memories":   "◆",
+}
+
 func ToolTag(name string) string {
-	return fmt.Sprintf("%s%s[%s]%s", Bold, Purple, name, Reset)
+	sym := "▪"
+	if s, ok := toolSymbols[name]; ok {
+		sym = s
+	}
+	return fmt.Sprintf("%s%s%s%s", Bold, Purple, sym, Reset)
 }
 
 func FormatToolResult(name string, result string) string {
+	if strings.HasPrefix(result, "error:") {
+		return fmt.Sprintf("%s\n  %s%s%s", ToolTag(name), Red, result, Reset)
+	}
 	return fmt.Sprintf("%s %s%s%s", ToolTag(name), LightPurp, result, Reset)
 }
 
-func Response(text string) string {
-	return fmt.Sprintf("%s%s%s", White, text, Reset)
-}
 
 func Error(text string) string {
 	return fmt.Sprintf("%s%serror:%s %s", Bold, "\033[38;5;197m", Reset, text)
@@ -253,7 +276,7 @@ func Goodbye() string {
 const (
 	Red   = "\033[38;5;197m"
 	Green = "\033[38;5;114m"
-	Cyan  = "\033[38;5;81m"
+	Amber  = "\033[38;5;214m"
 )
 
 const (
@@ -268,7 +291,6 @@ func ColorDiff(diffText string) string {
 	if diffText == "" {
 		return ""
 	}
-	width := diffWidth()
 	var out strings.Builder
 	var oldLine, newLine int
 	var path string
@@ -291,7 +313,7 @@ func ColorDiff(diffText string) string {
 		case strings.HasPrefix(line, "@@"):
 			var oc, nc int
 			fmt.Sscanf(line, "@@ -%d,%d +%d,%d @@", &oldLine, &oc, &newLine, &nc)
-			out.WriteString(fmt.Sprintf("  %s│ %s%s%s\n", BrightPurp, Dim+Cyan, line, Reset))
+			out.WriteString(fmt.Sprintf("  %s│ %s%s%s\n", BrightPurp, Dim+Gray, line, Reset))
 			continue
 		case line == "":
 			continue
@@ -304,38 +326,30 @@ func ColorDiff(diffText string) string {
 		}
 		content = strings.ReplaceAll(content, "\t", "  ")
 
-		var gutter, body, bg, fg string
+		var gutter, bg, fg, prefix string
 		switch sign {
 		case "-":
 			gutter = fmt.Sprintf("%4d     ", oldLine)
-			body = " - " + content
-			bg, fg = diffBgRed, diffFgRed
+			bg, fg, prefix = diffBgRed, diffFgRed, " - "
 			oldLine++
 		case "+":
 			gutter = fmt.Sprintf("     %4d", newLine)
-			body = " + " + content
-			bg, fg = diffBgGreen, diffFgGreen
+			bg, fg, prefix = diffBgGreen, diffFgGreen, " + "
 			newLine++
 		default:
 			gutter = fmt.Sprintf("%4d %4d", oldLine, newLine)
-			body = "   " + content
-			fg = Gray
+			bg, fg, prefix = "", Gray, "   "
 			oldLine++
 			newLine++
 		}
 
-		available := width - 6 - len(gutter) - 1
-		if available < 10 {
-			available = 10
-		}
-		if runeLen(body) > available {
-			body = truncateRunes(body, available-1) + "…"
+		if bg != "" {
+			out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s%s\n",
+				BrightPurp, diffGutter, gutter, bg, fg, prefix, content, Reset))
 		} else {
-			body = body + strings.Repeat(" ", available-runeLen(body))
+			out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s\n",
+				BrightPurp, diffGutter, gutter, fg, prefix, content, Reset))
 		}
-
-		out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s\n",
-			BrightPurp, diffGutter, gutter, bg, fg, body, Reset))
 	}
 
 	if headerPrinted {
@@ -345,12 +359,32 @@ func ColorDiff(diffText string) string {
 }
 
 func diffWidth() int {
+	if c := termCols(); c >= 40 {
+		return c
+	}
 	if s := os.Getenv("COLUMNS"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n >= 40 {
 			return n
 		}
 	}
 	return 100
+}
+
+func termCols() int {
+	type winsize struct {
+		Row, Col, Xpixel, Ypixel uint16
+	}
+	ws := &winsize{}
+	_, _, err := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		os.Stdout.Fd(),
+		uintptr(syscall.TIOCGWINSZ),
+		uintptr(unsafe.Pointer(ws)),
+	)
+	if err != 0 || ws.Col == 0 {
+		return 0
+	}
+	return int(ws.Col)
 }
 
 func runeLen(s string) int {

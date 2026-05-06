@@ -53,7 +53,7 @@ func DefaultConfig() *Config {
 		},
 		MaxFileSize: 1024 * 1024,
 		ThinkingVerbs: []string{
-			"thinking", "pondering", "scheming", "plotting",
+			"pondering", "scheming", "plotting",
 			"cogitating", "musing", "ruminating", "brewing",
 			"conjuring", "divining", "reckoning", "untangling",
 		},
@@ -65,7 +65,7 @@ func DefaultConfig() *Config {
 		ExecMemoryMB:        512,
 		ExecMaxFileMB:       100,
 		ScrubPII:            true,
-		QuietToolOutputs:    []string{"read_file", "search_files"},
+		QuietToolOutputs:    []string{"read_file", "search_files", "exec_command"},
 	}
 }
 
@@ -84,7 +84,7 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	cfg.APIKey = os.Getenv(apiKeyEnvVar(cfg.Provider))
+	cfg.APIKey = os.Getenv(APIKeyEnvVar(cfg.Provider))
 	return cfg, nil
 }
 
@@ -111,7 +111,7 @@ func ConfigPath() string {
 	return filepath.Join(home, ".koko", "config.json")
 }
 
-func apiKeyEnvVar(p ProviderType) string {
+func APIKeyEnvVar(p ProviderType) string {
 	switch p {
 	case ProviderAnthropic:
 		return "ANTHROPIC_API_KEY"

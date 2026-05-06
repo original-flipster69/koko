@@ -15,9 +15,15 @@ const (
 	RoleSystem    Role = "system"
 )
 
+type Image struct {
+	MimeType string `json:"mime_type"`
+	Data     string `json:"data"`
+}
+
 type Message struct {
-	Role    Role   `json:"role"`
-	Content string `json:"content"`
+	Role    Role    `json:"role"`
+	Content string  `json:"content"`
+	Images  []Image `json:"images,omitempty"`
 }
 
 type ToolCall struct {

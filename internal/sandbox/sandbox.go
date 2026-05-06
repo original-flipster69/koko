@@ -138,6 +138,43 @@ func looksBinary(data []byte) bool {
 	return nonPrint*100/n > 30
 }
 
+var imageExtensions = map[string]string{
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+}
+
+func ImageMimeType(path string) (string, bool) {
+	mime, ok := imageExtensions[strings.ToLower(filepath.Ext(path))]
+	return mime, ok
+}
+
+func (s *Sandbox) ReadImageFile(path string) ([]byte, string, error) {
+	resolved, err := s.ValidatePath(path)
+	if err != nil {
+		return nil, "", err
+	}
+	mime, ok := imageExtensions[strings.ToLower(filepath.Ext(resolved))]
+	if !ok {
+		return nil, "", fmt.Errorf("%q is not a supported image format", path)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return nil, "", fmt.Errorf("stat: %w", err)
+	}
+	maxImage := int64(10 * 1024 * 1024)
+	if info.Size() > maxImage {
+		return nil, "", fmt.Errorf("image %q exceeds 10MB limit", path)
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading image: %w", err)
+	}
+	return data, mime, nil
+}
+
 func (s *Sandbox) ReadFile(path string) (string, error) {
 	resolved, err := s.ValidatePath(path)
 	if err != nil {
@@ -184,7 +221,7 @@ func (s *Sandbox) WriteFile(path string, content string) error {
 	}
 
 	dir := filepath.Dir(resolved)
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0775); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 
@@ -232,7 +269,7 @@ func (s *Sandbox) RenameFile(oldPath, newPath string) error {
 		return err
 	}
 	dir := filepath.Dir(resolvedNew)
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0775); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 	return os.Rename(resolvedOld, resolvedNew)

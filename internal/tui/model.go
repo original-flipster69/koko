@@ -1,0 +1,295 @@
+package tui
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/meeseeks/koko/internal/agent"
+	"github.com/meeseeks/koko/internal/ui"
+)
+
+type agentDoneMsg struct{ err error }
+type confirmRequestMsg string
+type spinnerTickMsg struct{}
+
+var (
+	zodiac      = []string{"♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"}
+	transitions = []string{"·", "✧", "•", "✦", "⋆", "✶", "∙", "✱"}
+	beats       = []time.Duration{190 * time.Millisecond, 190 * time.Millisecond, 560 * time.Millisecond}
+	dots        = []string{"   ", ".  ", ".. ", "..."}
+)
+
+type model struct {
+	viewport viewport.Model
+	input    textarea.Model
+	content  *strings.Builder
+
+	agent     *agent.Agent
+	ctx       context.Context
+	cancel    context.CancelFunc
+	runCancel context.CancelFunc
+	kokoDir   string
+	splash    string
+
+	confirmCh    chan bool
+	confirmMode  bool
+	confirmText  string
+	agentBusy    bool
+	ready        bool
+	quitting     bool
+	spinnerTick  int
+	spinnerLabel string
+
+	slashHandler SlashHandler
+}
+
+type SlashHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
+
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splash string, slashHandler SlashHandler, confirmCh chan bool) model {
+	ta := textarea.New()
+	ta.Placeholder = "ask koko anything... (shift+enter for newline)"
+	ta.Focus()
+	ta.CharLimit = 8192
+	ta.SetHeight(1)
+	ta.SetWidth(80)
+	ta.ShowLineNumbers = false
+	ta.Prompt = ""
+	ta.KeyMap.InsertNewline.SetKeys("shift+enter")
+
+	m := model{
+		input:        ta,
+		content:      &strings.Builder{},
+		agent:        a,
+		ctx:          ctx,
+		cancel:       cancel,
+		kokoDir:      kokoDir,
+		splash:       splash,
+		confirmCh:    confirmCh,
+		slashHandler: slashHandler,
+	}
+	return m
+}
+
+func (m model) Init() tea.Cmd {
+	return textarea.Blink
+}
+
+func spinnerTickCmd(tick int) tea.Cmd {
+	phase := tick % 3
+	return tea.Tick(beats[phase], func(time.Time) tea.Msg {
+		return spinnerTickMsg{}
+	})
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		chrome := 5
+		if !m.ready {
+			m.viewport = viewport.New(msg.Width, msg.Height-chrome)
+			m.content.WriteString(m.splash)
+			m.syncViewport()
+			m.ready = true
+		} else {
+			m.viewport.Width = msg.Width
+			m.viewport.Height = msg.Height - chrome
+			m.syncViewport()
+		}
+		m.input.SetWidth(msg.Width - 6)
+		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			if m.agentBusy {
+				if m.runCancel != nil {
+					m.runCancel()
+				}
+				m.agentBusy = false
+				m.appendOutput(fmt.Sprintf("\n%s%sinterrupted%s\n", ui.Dim, ui.Gray, ui.Reset))
+				return m, nil
+			}
+			m.quitting = true
+			m.cancel()
+			return m, tea.Quit
+
+		case tea.KeyPgUp, tea.KeyPgDown, tea.KeyUp, tea.KeyDown:
+			var cmd tea.Cmd
+			m.viewport, cmd = m.viewport.Update(msg)
+			return m, cmd
+
+		case tea.KeyEnter:
+			if m.confirmMode {
+				answer := strings.TrimSpace(strings.ToLower(m.input.Value()))
+				m.input.Reset()
+				m.confirmMode = false
+				m.confirmCh <- answer == "y" || answer == "yes"
+				return m, nil
+			}
+
+			input := strings.TrimSpace(m.input.Value())
+			if input == "" {
+				return m, nil
+			}
+			m.input.Reset()
+			m.input.SetHeight(1)
+
+			if input == "exit" || input == "quit" {
+				m.appendOutput("\n" + ui.Goodbye() + "\n")
+				m.quitting = true
+				m.cancel()
+				return m, tea.Quit
+			}
+
+			display := input
+			if strings.Contains(display, "\n") {
+				lines := strings.Split(display, "\n")
+				display = lines[0] + fmt.Sprintf(" (+%d lines)", len(lines)-1)
+			}
+			m.appendOutput(fmt.Sprintf("\n%s%s▶ %s%s\n", ui.Bold, ui.BrightPurp, display, ui.Reset))
+
+			if strings.HasPrefix(input, ":") && m.slashHandler != nil {
+				handled, prompt, output := m.slashHandler(input, m.agent)
+				if output != "" {
+					m.appendOutput(output + "\n")
+				}
+				if handled && prompt == "" {
+					return m, nil
+				}
+				if prompt != "" {
+					input = prompt
+				}
+			}
+
+			m.agentBusy = true
+			m.spinnerTick = 0
+			m.spinnerLabel = m.agent.ThinkingVerb()
+			runCtx, runCancel := context.WithCancel(m.ctx)
+			m.runCancel = runCancel
+			runInput := input
+			return m, tea.Batch(
+				func() tea.Msg {
+					err := m.agent.Run(runCtx, runInput)
+					runCancel()
+					return agentDoneMsg{err: err}
+				},
+				spinnerTickCmd(0),
+			)
+		}
+
+	case spinnerTickMsg:
+		if m.agentBusy {
+			m.spinnerTick++
+			cmds = append(cmds, spinnerTickCmd(m.spinnerTick))
+		}
+		return m, tea.Batch(cmds...)
+
+	case outputMsg:
+		atBottom := m.viewport.AtBottom()
+		m.content.WriteString(string(msg))
+		m.syncViewport()
+		if atBottom {
+			m.viewport.GotoBottom()
+		}
+		return m, nil
+
+	case agentDoneMsg:
+		m.agentBusy = false
+		if msg.err != nil {
+			m.appendOutput("\n" + ui.Error(msg.err.Error()) + "\n")
+		} else {
+			m.appendOutput(ui.TokenStats(m.agent.TotalInput, m.agent.TotalOutput) + "\n")
+		}
+		_ = m.agent.SaveSession(m.kokoDir)
+		return m, nil
+
+	case confirmRequestMsg:
+		m.confirmMode = true
+		m.confirmText = string(msg)
+		m.input.Reset()
+		return m, nil
+	}
+
+	if !m.agentBusy || m.confirmMode {
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		cmds = append(cmds, cmd)
+		lines := strings.Count(m.input.Value(), "\n") + 1
+		if lines > 5 {
+			lines = 5
+		}
+		if lines < 1 {
+			lines = 1
+		}
+		m.input.SetHeight(lines)
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *model) appendOutput(s string) {
+	m.content.WriteString(s)
+	m.syncViewport()
+	m.viewport.GotoBottom()
+}
+
+func (m *model) syncViewport() {
+	m.viewport.SetContent(m.content.String())
+}
+
+func (m model) spinnerView() string {
+	i := m.spinnerTick
+	phase := i % 3
+	cycle := i / 3
+	var frame string
+	switch phase {
+	case 0:
+		frame = transitions[(2*cycle)%len(transitions)]
+	case 1:
+		frame = transitions[(2*cycle+1)%len(transitions)]
+	case 2:
+		frame = zodiac[cycle%len(zodiac)]
+	}
+	dot := dots[cycle%len(dots)]
+	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.BrightPurp, frame, ui.Reset, ui.BrightPurp, m.spinnerLabel, dot, ui.Reset)
+}
+
+var inputBarStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderTop(true).
+	BorderForeground(lipgloss.Color("135"))
+
+var statusBarStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("243"))
+
+func (m model) View() string {
+	if !m.ready {
+		return "loading..."
+	}
+	if m.quitting {
+		return ""
+	}
+
+	var statusLine string
+	if m.agentBusy {
+		statusLine = fmt.Sprintf("  %s", m.spinnerView())
+	}
+
+	var inputLine string
+	if m.confirmMode {
+		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.Purple, ui.Reset, m.confirmText, m.input.View())
+	} else {
+		inputLine = fmt.Sprintf("%s▶%s %s", ui.BrightPurp, ui.Reset, m.input.View())
+	}
+
+	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)
+}

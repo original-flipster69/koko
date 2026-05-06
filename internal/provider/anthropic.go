@@ -48,10 +48,34 @@ func (a *AnthropicProvider) buildHTTPRequest(ctx context.Context, messages []Mes
 			system = m.Content
 			continue
 		}
-		apiMessages = append(apiMessages, anthropicMessage{
-			Role:    string(m.Role),
-			Content: m.Content,
-		})
+		if len(m.Images) > 0 {
+			var blocks []map[string]interface{}
+			for _, img := range m.Images {
+				blocks = append(blocks, map[string]interface{}{
+					"type": "image",
+					"source": map[string]interface{}{
+						"type":       "base64",
+						"media_type": img.MimeType,
+						"data":       img.Data,
+					},
+				})
+			}
+			if m.Content != "" {
+				blocks = append(blocks, map[string]interface{}{
+					"type": "text",
+					"text": m.Content,
+				})
+			}
+			apiMessages = append(apiMessages, anthropicMessage{
+				Role:    string(m.Role),
+				Content: blocks,
+			})
+		} else {
+			apiMessages = append(apiMessages, anthropicMessage{
+				Role:    string(m.Role),
+				Content: m.Content,
+			})
+		}
 	}
 
 	reqBody := anthropicRequest{
@@ -99,7 +123,7 @@ func (a *AnthropicProvider) Chat(ctx context.Context, messages []Message, tools 
 		return nil, err
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, a.client, req, 3)
+	resp, err := httputil.DoWithRetry(ctx, a.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -150,7 +174,7 @@ func (a *AnthropicProvider) ChatStream(ctx context.Context, messages []Message, 
 		return nil, err
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, a.client, req, 3)
+	resp, err := httputil.DoWithRetry(ctx, a.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -250,8 +274,8 @@ type anthropicStreamEvent struct {
 }
 
 type anthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"`
 }
 
 type anthropicTool struct {

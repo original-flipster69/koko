@@ -52,26 +52,55 @@ func (m *MistralProvider) Name() string      { return "mistral" }
 func (m *MistralProvider) Model() string     { return m.model }
 func (m *MistralProvider) SetModel(s string) { m.model = s }
 
-func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
-	if len(tools) > 0 {
-		return chatStreamFallback(ctx, m, messages, tools, onDelta)
+func toMistralMessages(messages []Message) []mistralMessage {
+	var out []mistralMessage
+	for _, msg := range messages {
+		if len(msg.Images) > 0 {
+			var blocks []map[string]interface{}
+			for _, img := range msg.Images {
+				blocks = append(blocks, map[string]interface{}{
+					"type": "image_url",
+					"image_url": map[string]string{
+						"url": "data:" + img.MimeType + ";base64," + img.Data,
+					},
+				})
+			}
+			if msg.Content != "" {
+				blocks = append(blocks, map[string]interface{}{
+					"type": "text",
+					"text": msg.Content,
+				})
+			}
+			out = append(out, mistralMessage{Role: string(msg.Role), Content: blocks})
+		} else {
+			out = append(out, mistralMessage{Role: string(msg.Role), Content: msg.Content})
+		}
 	}
+	return out
+}
 
+func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, 300*time.Second)
 	defer cancel()
 
-	var mistralMessages []mistralMessage
-	for _, msg := range messages {
-		mistralMessages = append(mistralMessages, mistralMessage{
-			Role:    string(msg.Role),
-			Content: msg.Content,
-		})
-	}
+	mistralMessages := toMistralMessages(messages)
 
 	reqBody := mistralRequest{
 		Model:    m.model,
 		Messages: mistralMessages,
 		Stream:   true,
+	}
+	if len(tools) > 0 {
+		for _, t := range tools {
+			reqBody.Tools = append(reqBody.Tools, mistralTool{
+				Type: "function",
+				Function: mistralFunction{
+					Name:        t.Name,
+					Description: t.Description,
+					Parameters:  t.Parameters,
+				},
+			})
+		}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -86,8 +115,11 @@ func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, to
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Authorization", "Bearer "+m.apiKey)
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+	}
 
-	resp, err := m.client.Do(req)
+	resp, err := httputil.DoWithRetry(ctx, m.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -98,8 +130,15 @@ func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, to
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, sanitizeErrorBody(body, 512))
 	}
 
+	type toolAcc struct {
+		name string
+		args strings.Builder
+	}
+
 	var content strings.Builder
 	var usage Usage
+	toolAccs := make(map[int]*toolAcc)
+
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
@@ -116,11 +155,24 @@ func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, to
 			continue
 		}
 		if len(chunk.Choices) > 0 {
-			delta := chunk.Choices[0].Delta.Content
-			if delta != "" {
-				content.WriteString(delta)
+			delta := chunk.Choices[0].Delta
+			if delta.Content != "" {
+				content.WriteString(delta.Content)
 				if onDelta != nil {
-					onDelta(StreamDelta{Text: delta})
+					onDelta(StreamDelta{Text: delta.Content})
+				}
+			}
+			for _, tc := range delta.ToolCalls {
+				acc, ok := toolAccs[tc.Index]
+				if !ok {
+					acc = &toolAcc{}
+					toolAccs[tc.Index] = acc
+				}
+				if tc.Function.Name != "" {
+					acc.name = tc.Function.Name
+				}
+				if tc.Function.Arguments != "" {
+					acc.args.WriteString(tc.Function.Arguments)
 				}
 			}
 		}
@@ -136,6 +188,42 @@ func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, to
 	}
 
 	result := &Response{Content: content.String(), Usage: usage}
+
+	for i := 0; i < len(toolAccs); i++ {
+		acc, ok := toolAccs[i]
+		if !ok {
+			continue
+		}
+		rawArgs := acc.args.String()
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(rawArgs), &parsed); err != nil {
+			slog.Warn("mistral stream tool args parse failed", "tool", acc.name, "raw", rawArgs, "err", err)
+			continue
+		}
+		args := make(map[string]string, len(parsed))
+		for k, v := range parsed {
+			if v == nil {
+				continue
+			}
+			switch vv := v.(type) {
+			case string:
+				args[k] = vv
+			case float64:
+				args[k] = strconv.FormatFloat(vv, 'f', -1, 64)
+			case bool:
+				args[k] = strconv.FormatBool(vv)
+			default:
+				b, _ := json.Marshal(vv)
+				args[k] = string(b)
+			}
+		}
+		slog.Info("mistral tool call", "tool", acc.name, "arg_keys", keysOf(args))
+		result.ToolCalls = append(result.ToolCalls, ToolCall{
+			Name: acc.name,
+			Args: args,
+		})
+	}
+
 	if onDelta != nil {
 		onDelta(StreamDelta{Done: true, Response: result})
 	}
@@ -146,13 +234,7 @@ func (m *MistralProvider) Chat(ctx context.Context, messages []Message, tools []
 	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 
-	var mistralMessages []mistralMessage
-	for _, msg := range messages {
-		mistralMessages = append(mistralMessages, mistralMessage{
-			Role:    string(msg.Role),
-			Content: msg.Content,
-		})
-	}
+	mistralMessages := toMistralMessages(messages)
 
 	reqBody := mistralRequest{
 		Model:    m.model,
@@ -187,7 +269,7 @@ func (m *MistralProvider) Chat(ctx context.Context, messages []Message, tools []
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, m.client, req, 3)
+	resp, err := httputil.DoWithRetry(ctx, m.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -253,8 +335,8 @@ func (m *MistralProvider) Chat(ctx context.Context, messages []Message, tools []
 }
 
 type mistralMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"`
 }
 
 type mistralFunction struct {
@@ -278,10 +360,19 @@ type mistralRequest struct {
 type mistralStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content   string                   `json:"content"`
+			ToolCalls []mistralStreamToolCall   `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 	} `json:"choices"`
 	Usage mistralUsage `json:"usage"`
+}
+
+type mistralStreamToolCall struct {
+	Index    int `json:"index"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
 }
 
 type mistralToolCall struct {
