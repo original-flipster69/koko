@@ -123,7 +123,7 @@ func (a *AnthropicProvider) Chat(ctx context.Context, messages []Message, tools 
 		return nil, err
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, a.client, req, 5)
+	resp, err := httputil.WithRetry(ctx, a.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -174,7 +174,7 @@ func (a *AnthropicProvider) ChatStream(ctx context.Context, messages []Message, 
 		return nil, err
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, a.client, req, 5)
+	resp, err := httputil.WithRetry(ctx, a.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}

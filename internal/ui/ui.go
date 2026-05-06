@@ -192,7 +192,7 @@ func Splash(provider, model, sandbox, version string, languages, tools []string)
 }
 
 func Info(label string, value string) string {
-	return fmt.Sprintf("  %s%s%s %s%s%s", DarkPurp, label, Reset, Violet, value, Reset)
+	return fmt.Sprintf("  %s%-9s%s %s%s%s", DarkPurp, label, Reset, Violet, value, Reset)
 }
 
 func Prompt() string {

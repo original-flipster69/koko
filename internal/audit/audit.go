@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type Entry struct {
+type entry struct {
 	Timestamp string            `json:"timestamp"`
 	Tool      string            `json:"tool"`
 	Args      map[string]string `json:"args"`
@@ -54,7 +54,7 @@ func loadLastHash(path string) (string, error) {
 	line := 0
 	for scanner.Scan() {
 		line++
-		var e Entry
+		var e entry
 		if err := json.Unmarshal(scanner.Bytes(), &e); err != nil {
 			return "", fmt.Errorf("audit: corrupt entry at line %d: %w", line, err)
 		}
@@ -77,7 +77,7 @@ func loadLastHash(path string) (string, error) {
 	return prev, nil
 }
 
-func hashEntry(e Entry) string {
+func hashEntry(e entry) string {
 	h := sha256.New()
 	h.Write([]byte(e.PrevHash))
 	h.Write([]byte(e.Timestamp))
@@ -95,7 +95,7 @@ func (l *Log) Record(tool string, args map[string]string, result string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	entry := Entry{
+	entry := entry{
 		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Tool:      tool,
 		Args:      args,

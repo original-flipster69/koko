@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type ProjectInfo struct {
+type ProjectStack struct {
 	Languages  []string
 	Frameworks []string
 	BuildTools []string
@@ -47,8 +47,8 @@ var markers = []struct {
 	{".prettierrc", "", "", "prettier"},
 }
 
-func Project(root string) ProjectInfo {
-	info := ProjectInfo{}
+func Project(root string) ProjectStack {
+	info := ProjectStack{}
 	seen := map[string]bool{}
 
 	_, err := os.Stat(filepath.Join(root, ".git"))
@@ -75,7 +75,7 @@ func Project(root string) ProjectInfo {
 	return info
 }
 
-func (p ProjectInfo) Summary() string {
+func (p ProjectStack) Summary() string {
 	if len(p.Languages) == 0 && len(p.Frameworks) == 0 {
 		return ""
 	}

@@ -82,7 +82,7 @@ func (o *OllamaProvider) ChatStream(ctx context.Context, messages []Message, too
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, o.client, req, 5)
+	resp, err := httputil.WithRetry(ctx, o.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request (is Ollama running?): %w", err)
 	}
@@ -218,7 +218,7 @@ func (o *OllamaProvider) Chat(ctx context.Context, messages []Message, tools []T
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, o.client, req, 5)
+	resp, err := httputil.WithRetry(ctx, o.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request (is Ollama running?): %w", err)
 	}

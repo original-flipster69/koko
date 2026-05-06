@@ -12,7 +12,6 @@ type Spinner struct {
 	label  string
 	stopCh chan struct{}
 	done   chan struct{}
-	once   sync.Once
 }
 
 func NewSpinner() *Spinner {
@@ -32,7 +31,6 @@ func (s *Spinner) Start() {
 	s.active = true
 	s.stopCh = make(chan struct{})
 	s.done = make(chan struct{})
-	s.once = sync.Once{}
 	label := s.label
 	s.mu.Unlock()
 
@@ -86,11 +84,9 @@ func (s *Spinner) Stop() {
 		s.mu.Unlock()
 		return
 	}
+	s.active = false
+	close(s.stopCh)
 	done := s.done
-	s.once.Do(func() {
-		s.active = false
-		close(s.stopCh)
-	})
 	s.mu.Unlock()
 	<-done
 }

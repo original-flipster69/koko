@@ -101,6 +101,8 @@ func (s *Sandbox) ValidatePath(path string) (string, error) {
 	return evaluated, nil
 }
 
+const maxImageSize = 10 * 1024 * 1024
+
 var binaryExtensions = map[string]bool{
 	".exe": true, ".dll": true, ".so": true, ".dylib": true,
 	".a": true, ".o": true, ".obj": true, ".class": true,
@@ -164,9 +166,8 @@ func (s *Sandbox) ReadImageFile(path string) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("stat: %w", err)
 	}
-	maxImage := int64(10 * 1024 * 1024)
-	if info.Size() > maxImage {
-		return nil, "", fmt.Errorf("image %q exceeds 10MB limit", path)
+	if info.Size() > maxImageSize {
+		return nil, "", fmt.Errorf("image %q exceeds %dMB limit", path, maxImageSize/(1024*1024))
 	}
 	data, err := os.ReadFile(resolved)
 	if err != nil {

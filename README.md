@@ -113,6 +113,12 @@ koko -prompt "Add error handling to main.go"
 go install github.com/meeseeks/koko@latest
 ```
 
+## Building from Source
+
+```
+go build -buildvcs=false && ./koko
+```
+
 ## Usage
 
 ```

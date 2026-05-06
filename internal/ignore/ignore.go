@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type Matcher struct {
+type matcher struct {
 	patterns []pattern
 }
 
@@ -16,8 +16,8 @@ type pattern struct {
 	glob    string
 }
 
-func LoadGitignore(root string) *Matcher {
-	m := &Matcher{}
+func LoadGitignore(root string) *matcher {
+	m := &matcher{}
 	data, err := os.ReadFile(filepath.Join(root, ".gitignore"))
 	if err != nil {
 		return m
@@ -42,7 +42,7 @@ func LoadGitignore(root string) *Matcher {
 	return m
 }
 
-func (m *Matcher) IsIgnored(relPath string, isDir bool) bool {
+func (m *matcher) IsIgnored(relPath string, isDir bool) bool {
 	if m == nil || len(m.patterns) == 0 {
 		return false
 	}

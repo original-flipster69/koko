@@ -18,8 +18,8 @@ const (
 type Config struct {
 	Provider            ProviderType `json:"provider"`
 	Model               string       `json:"model"`
-	APIKey              string       `json:"-"`
-	BaseURL             string       `json:"base_url"`
+	ApiKey              string       `json:"-"`
+	BaseUrl             string       `json:"base_url"`
 	MaxTokens           int          `json:"max_tokens"`
 	SandboxRoot         string       `json:"sandbox_root"`
 	AllowedDirs         []string     `json:"allowed_dirs"`
@@ -39,11 +39,14 @@ type Config struct {
 }
 
 func DefaultConfig() *Config {
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
 	return &Config{
 		Provider:    ProviderMistral,
 		Model:       "mistral-large-latest",
-		BaseURL:     "",
+		BaseUrl:     "",
 		MaxTokens:   16384,
 		SandboxRoot: cwd,
 		AllowedDirs: []string{cwd},
@@ -53,9 +56,7 @@ func DefaultConfig() *Config {
 		},
 		MaxFileSize: 1024 * 1024,
 		ThinkingVerbs: []string{
-			"pondering", "scheming", "plotting",
-			"cogitating", "musing", "ruminating", "brewing",
-			"conjuring", "divining", "reckoning", "untangling",
+			"banana munching", "marinating", "concocting", "brewing",
 		},
 		CommandAllowlist:    nil,
 		CommandDenyPatterns: nil,
@@ -84,7 +85,7 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	cfg.APIKey = os.Getenv(APIKeyEnvVar(cfg.Provider))
+	cfg.ApiKey = os.Getenv(ApiKeyEnv(cfg.Provider))
 	return cfg, nil
 }
 
@@ -111,7 +112,7 @@ func ConfigPath() string {
 	return filepath.Join(home, ".koko", "config.json")
 }
 
-func APIKeyEnvVar(p ProviderType) string {
+func ApiKeyEnv(p ProviderType) string {
 	switch p {
 	case ProviderAnthropic:
 		return "ANTHROPIC_API_KEY"

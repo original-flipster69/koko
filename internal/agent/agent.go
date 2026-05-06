@@ -37,7 +37,7 @@ var toolVerbs = map[string]string{
 	"rename_file":     "⇄ moving",
 	"list_dir":        "≡ listing",
 	"search_files":    "⌕ searching",
-	"exec_command":    "⚡running",
+	"exec_command":    "⚡ running",
 	"save_memory":     "◆ remembering",
 	"delete_memory":   "◆ forgetting",
 	"list_memories":   "◆ recalling",
@@ -50,7 +50,7 @@ func toolVerb(name string) string {
 	return "working"
 }
 
-type ConfirmFunc func(action string) bool
+type confirmFunc func(action string) bool
 
 type Agent struct {
 	provider         provider.Provider
@@ -61,7 +61,7 @@ type Agent struct {
 	history          []provider.Message
 	tools            []provider.ToolDef
 	output           io.Writer
-	confirm          ConfirmFunc
+	confirm          confirmFunc
 	auditLog         *audit.Log
 	planMode         bool
 	thinkingVerbs    []string
@@ -80,7 +80,9 @@ type Agent struct {
 	TotalOutput      int
 }
 
-func (a *Agent) SetSuppressSpinner(on bool) { a.suppressSpinner = on }
+func (a *Agent) SetOutput(w io.Writer)                    { a.output = w }
+func (a *Agent) SetConfirm(fn func(string) bool)          { a.confirm = confirmFunc(fn) }
+func (a *Agent) SetSuppressSpinner(on bool)               { a.suppressSpinner = on }
 func (a *Agent) SetCommandPolicy(p *policy.CommandPolicy) { a.commandPolicy = p }
 func (a *Agent) SetLimits(maxToolCalls, maxTokens int) {
 	a.maxToolCalls = maxToolCalls
@@ -109,7 +111,7 @@ func (a *Agent) SetThinkingVerbs(verbs []string) {
 
 func (a *Agent) ThinkingVerb() string {
 	if len(a.thinkingVerbs) == 0 {
-		return "thinking"
+		return "mentally marinating"
 	}
 	return a.thinkingVerbs[rand.Intn(len(a.thinkingVerbs))]
 }
@@ -129,7 +131,7 @@ func (a *Agent) TogglePlanMode() bool {
 
 func (a *Agent) PlanMode() bool { return a.planMode }
 
-func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm ConfirmFunc, auditLog *audit.Log, projectContext string) *Agent {
+func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confirmFunc, auditLog *audit.Log, projectContext string) *Agent {
 	ed := editor.New(sb)
 	a := &Agent{
 		provider: p,

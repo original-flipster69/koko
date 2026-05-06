@@ -31,7 +31,7 @@ var version = "dev"
 func main() {
 	providerFlag := flag.String("provider", "", "LLM provider: anthropic, mistral, ollama")
 	modelFlag := flag.String("model", "", "Model name to use")
-	baseURLFlag := flag.String("base-url", "", "Base URL for API (useful for local LLMs)")
+	baseUrlFlag := flag.String("base-url", "", "Base URL for API (useful for local LLMs)")
 	sandboxFlag := flag.String("sandbox", "", "Sandbox root directory (defaults to cwd)")
 	configFlag := flag.String("config", "", "Config file path")
 	promptFlag := flag.String("prompt", "", "Single prompt (non-interactive mode)")
@@ -54,16 +54,16 @@ func main() {
 	if *modelFlag != "" {
 		cfg.Model = *modelFlag
 	}
-	if *baseURLFlag != "" {
-		cfg.BaseURL = *baseURLFlag
+	if *baseUrlFlag != "" {
+		cfg.BaseUrl = *baseUrlFlag
 	}
 	if *sandboxFlag != "" {
 		cfg.SandboxRoot = *sandboxFlag
 		cfg.AllowedDirs = []string{*sandboxFlag}
 	}
 
-	if cfg.APIKey == "" {
-		cfg.APIKey = os.Getenv(config.APIKeyEnvVar(cfg.Provider))
+	if cfg.ApiKey == "" {
+		cfg.ApiKey = os.Getenv(config.ApiKeyEnv(cfg.Provider))
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -133,23 +133,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *promptFlag != "" {
-		confirm := func(action string) bool {
-			fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.Purple, ui.Reset, ui.Violet, action, ui.Reset)
-			reader := bufio.NewReader(os.Stdin)
-			answer, _ := reader.ReadString('\n')
-			answer = strings.TrimSpace(strings.ToLower(answer))
-			return answer == "y" || answer == "yes"
-		}
-		a := agent.New(llm, sb, os.Stdout, confirm, auditLog, extraContext)
-		a.SetThinkingVerbs(cfg.ThinkingVerbs)
-		a.SetMemory(memoryStore)
-		a.SetCommandPolicy(cmdPolicy)
-		a.SetLimits(cfg.MaxToolCalls, cfg.MaxSessionTokens)
-		a.SetScrubPII(cfg.ScrubPII)
-		a.SetQuietTools(cfg.QuietToolOutputs)
-		a.SetExecLimits(cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)
+	confirm := func(action string) bool {
+		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.Purple, ui.Reset, ui.Violet, action, ui.Reset)
+		reader := bufio.NewReader(os.Stdin)
+		answer, _ := reader.ReadString('\n')
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		return answer == "y" || answer == "yes"
+	}
+	a := agent.New(llm, sb, os.Stdout, confirm, auditLog, extraContext)
+	a.SetThinkingVerbs(cfg.ThinkingVerbs)
+	a.SetMemory(memoryStore)
+	a.SetCommandPolicy(cmdPolicy)
+	a.SetLimits(cfg.MaxToolCalls, cfg.MaxSessionTokens)
+	a.SetScrubPII(cfg.ScrubPII)
+	a.SetQuietTools(cfg.QuietToolOutputs)
+	a.SetExecLimits(cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)
 
+	if *promptFlag != "" {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		sigCh := make(chan os.Signal, 1)
@@ -169,16 +169,16 @@ func main() {
 
 	splash := "\n" + ui.Splash(llm.Name(), cfg.Model, cfg.SandboxRoot, version, project.Languages, project.BuildTools) + "\n\n"
 
-	slashHandler := makeSlashHandler(cfg, llm, kokoDir, cfg.SandboxRoot, playRegistry)
+	slashHandler := cmdHandler(cfg, llm, kokoDir, cfg.SandboxRoot, playRegistry)
 
-	if err := tui.Run(cfg, llm, sb, auditLog, memoryStore, cmdPolicy, playRegistry, extraContext, kokoDir, splash, slashHandler); err != nil {
+	if err := tui.Run(a, llm.Name(), kokoDir, splash, slashHandler); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 		os.Exit(1)
 	}
 	fmt.Println(ui.Goodbye())
 }
 
-func makeSlashHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) tui.SlashHandler {
+func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) tui.SlashHandler {
 	return func(input string, a *agent.Agent) (bool, string, string) {
 		parts := strings.Fields(input)
 		cmd := parts[0]
@@ -267,17 +267,17 @@ func makeSlashHandler(cfg *config.Config, llm provider.Provider, dataDir string,
 			return true, "", out.String()
 
 		case ":config":
-			out.WriteString(ui.Info("provider ", string(cfg.Provider)) + "\n")
-			out.WriteString(ui.Info("model    ", cfg.Model) + "\n")
-			out.WriteString(ui.Info("sandbox  ", cfg.SandboxRoot) + "\n")
-			out.WriteString(ui.Info("max_tok  ", fmt.Sprintf("%d", cfg.MaxTokens)) + "\n")
-			out.WriteString(ui.Info("tools    ", fmt.Sprintf("%d max", cfg.MaxToolCalls)) + "\n")
-			out.WriteString(ui.Info("session  ", fmt.Sprintf("%d max tokens", cfg.MaxSessionTokens)) + "\n")
-			out.WriteString(ui.Info("exec     ", fmt.Sprintf("%ds cpu, %dMB mem, %dMB file", cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)) + "\n")
+			out.WriteString(ui.Info("provider", string(cfg.Provider)) + "\n")
+			out.WriteString(ui.Info("model", cfg.Model) + "\n")
+			out.WriteString(ui.Info("sandbox", cfg.SandboxRoot) + "\n")
+			out.WriteString(ui.Info("max_tok", fmt.Sprintf("%d", cfg.MaxTokens)) + "\n")
+			out.WriteString(ui.Info("tools", fmt.Sprintf("%d max", cfg.MaxToolCalls)) + "\n")
+			out.WriteString(ui.Info("session", fmt.Sprintf("%d max tokens", cfg.MaxSessionTokens)) + "\n")
+			out.WriteString(ui.Info("exec", fmt.Sprintf("%ds cpu, %dMB mem, %dMB file", cfg.ExecCPUSeconds, cfg.ExecMemoryMB, cfg.ExecMaxFileMB)) + "\n")
 			out.WriteString(ui.Info("scrub_pii", fmt.Sprintf("%v", cfg.ScrubPII)) + "\n")
-			out.WriteString(ui.Info("verbs    ", strings.Join(cfg.ThinkingVerbs, ", ")) + "\n")
-			out.WriteString(ui.Info("quiet    ", strings.Join(cfg.QuietToolOutputs, ", ")) + "\n")
-			out.WriteString(ui.Info("config   ", config.ConfigPath()))
+			out.WriteString(ui.Info("verbs", strings.Join(cfg.ThinkingVerbs, ", ")) + "\n")
+			out.WriteString(ui.Info("quiet", strings.Join(cfg.QuietToolOutputs, ", ")) + "\n")
+			out.WriteString(ui.Info("config", config.ConfigPath()))
 			return true, "", out.String()
 
 		case ":save":
@@ -335,4 +335,3 @@ func makeSlashHandler(cfg *config.Config, llm provider.Provider, dataDir string,
 		}
 	}
 }
-

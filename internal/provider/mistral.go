@@ -119,7 +119,7 @@ func (m *MistralProvider) ChatStream(ctx context.Context, messages []Message, to
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, m.client, req, 5)
+	resp, err := httputil.WithRetry(ctx, m.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -269,7 +269,7 @@ func (m *MistralProvider) Chat(ctx context.Context, messages []Message, tools []
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
 
-	resp, err := httputil.DoWithRetry(ctx, m.client, req, 5)
+	resp, err := httputil.WithRetry(ctx, m.client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -360,8 +360,8 @@ type mistralRequest struct {
 type mistralStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content   string                   `json:"content"`
-			ToolCalls []mistralStreamToolCall   `json:"tool_calls,omitempty"`
+			Content   string                  `json:"content"`
+			ToolCalls []mistralStreamToolCall `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 	} `json:"choices"`
 	Usage mistralUsage `json:"usage"`
