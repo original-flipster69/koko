@@ -14,7 +14,7 @@ func Run(
 	providerName string,
 	kokoDir string,
 	splash string,
-	slashHandler SlashHandler,
+	slashHandler CmdHandler,
 ) error {
 	confirmCh := make(chan bool, 1)
 	w := &tuiWriter{atStart: true}

@@ -1,41 +1,76 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
-type ProviderType string
+type Provider string
 
 const (
-	ProviderAnthropic ProviderType = "anthropic"
-	ProviderMistral   ProviderType = "mistral"
-	ProviderOllama    ProviderType = "ollama"
+	Anthropic Provider = "anthropic"
+	Mistral   Provider = "mistral"
+	Ollama    Provider = "ollama"
 )
 
+type ExecProfile string
+
+const (
+	Strict     ExecProfile = "strict"
+	Default    ExecProfile = "default"
+	Permissive ExecProfile = "permissive"
+	Off        ExecProfile = "off"
+)
+
+type IgnoreMode string
+
+const (
+	Gitignore IgnoreMode = "gitignore"
+	Custom    IgnoreMode = "custom"
+)
+
+type LlmConfig struct {
+	Provider         Provider `toml:"provider"`
+	Model            string   `toml:"model"`
+	ApiKey           string   `toml:"-"`
+	Url              string   `toml:"url"`
+	MaxTokens        int      `toml:"max_tokens"`
+	MaxSessionTokens int      `toml:"max_session_tokens"`
+}
+
+type SandboxConfig struct {
+	Root           string     `toml:"root"`
+	AdditionalDirs []string   `toml:"additional_dirs"`
+	DenyFiles      []string   `toml:"deny_files"`
+	MaxFileSize    int64      `toml:"max_file_size"`
+	ScrubPII       bool       `toml:"scrub_pii"`
+	Exec           ExecConfig `toml:"exec"`
+}
+
+type ExecConfig struct {
+	Profile ExecProfile `toml:"profile"`
+	Allow   []string    `toml:"allow"`
+	Deny    []string    `toml:"deny"`
+}
+
+type IgnoreConfig struct {
+	Mode  IgnoreMode `toml:"mode"`
+	Files []string   `toml:"files"`
+}
+
+type StyleConfig struct {
+	ThinkingVerbs []string `toml:"thinking_verbs"`
+}
+
 type Config struct {
-	Provider            ProviderType `json:"provider"`
-	Model               string       `json:"model"`
-	ApiKey              string       `json:"-"`
-	BaseUrl             string       `json:"base_url"`
-	MaxTokens           int          `json:"max_tokens"`
-	SandboxRoot         string       `json:"sandbox_root"`
-	AllowedDirs         []string     `json:"allowed_dirs"`
-	DenyFiles           []string     `json:"deny_files"`
-	IgnoreFiles         []string     `json:"ignore_files"`
-	MaxFileSize         int64        `json:"max_file_size"`
-	ThinkingVerbs       []string     `json:"thinking_verbs"`
-	CommandAllowlist    []string     `json:"command_allowlist"`
-	CommandDenyPatterns []string     `json:"command_deny_patterns"`
-	MaxToolCalls        int          `json:"max_tool_calls"`
-	MaxSessionTokens    int          `json:"max_session_tokens"`
-	ExecCPUSeconds      int          `json:"exec_cpu_seconds"`
-	ExecMemoryMB        int          `json:"exec_memory_mb"`
-	ExecMaxFileMB       int          `json:"exec_max_file_mb"`
-	ScrubPII            bool         `json:"scrub_pii"`
-	QuietToolOutputs    []string     `json:"quiet_tool_outputs"`
+	Llm     LlmConfig     `toml:"llm"`
+	Sandbox SandboxConfig `toml:"sandbox"`
+	Ignore  IgnoreConfig  `toml:"ignore"`
+	Style   StyleConfig   `toml:"style"`
 }
 
 func DefaultConfig() *Config {
@@ -44,81 +79,186 @@ func DefaultConfig() *Config {
 		cwd = "."
 	}
 	return &Config{
-		Provider:    ProviderMistral,
-		Model:       "mistral-large-latest",
-		BaseUrl:     "",
-		MaxTokens:   16384,
-		SandboxRoot: cwd,
-		AllowedDirs: []string{cwd},
-		DenyFiles: []string{
-			".env", ".env.*", "*.pem", "*.key", "id_rsa*",
-			"credentials.json", "*.secret", "*.password",
+		Llm: LlmConfig{
+			Provider:         Mistral,
+			Model:            "mistral-large-latest",
+			Url:              "",
+			MaxTokens:        16384,
+			MaxSessionTokens: 1_000_000,
 		},
-		MaxFileSize: 1024 * 1024,
-		ThinkingVerbs: []string{
-			"banana munching", "marinating", "concocting", "brewing",
+		Sandbox: SandboxConfig{
+			Root: cwd,
+			DenyFiles: []string{
+				".env", ".env.*", "*.pem", "*.key", "id_rsa*",
+				"credentials.json", "*.secret", "*.password",
+			},
+			MaxFileSize: 1024 * 1024,
+			ScrubPII:    true,
+			Exec: ExecConfig{
+				Profile: Default,
+			},
 		},
-		CommandAllowlist:    nil,
-		CommandDenyPatterns: nil,
-		MaxToolCalls:        200,
-		MaxSessionTokens:    1_000_000,
-		ExecCPUSeconds:      30,
-		ExecMemoryMB:        512,
-		ExecMaxFileMB:       100,
-		ScrubPII:            true,
-		QuietToolOutputs:    []string{"read_file", "search_files", "exec_command"},
+		Ignore: IgnoreConfig{
+			Mode: Gitignore,
+		},
+		Style: StyleConfig{
+			ThinkingVerbs: []string{
+				"banana munching", "marinating", "concocting", "brewing",
+			},
+		},
 	}
 }
 
 func Load(path string) (*Config, error) {
 	cfg := DefaultConfig()
 
-	data, err := os.ReadFile(path)
-	if err != nil {
+	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
 		}
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
 
-	if err := json.Unmarshal(data, cfg); err != nil {
+	if _, err := toml.DecodeFile(path, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	cfg.ApiKey = os.Getenv(ApiKeyEnv(cfg.Provider))
 	return cfg, nil
 }
 
+func (c *Config) ApplyFlags(provider, model, llmUrl, sandbox string) {
+	if provider != "" {
+		c.Llm.Provider = Provider(provider)
+	}
+	if model != "" {
+		c.Llm.Model = model
+	}
+	if llmUrl != "" {
+		c.Llm.Url = llmUrl
+	}
+	if sandbox != "" {
+		c.Sandbox.Root = sandbox
+	}
+}
+
+func (c *Config) ApplyEnv() {
+	envName := apiKeyEnvName(c.Llm.Provider)
+	if v := os.Getenv(envName); v != "" {
+		c.Llm.ApiKey = v
+	}
+}
+
 func (c *Config) Validate() error {
-	switch c.Provider {
-	case ProviderAnthropic, ProviderMistral, ProviderOllama:
-	default:
-		return fmt.Errorf("unknown provider: %q (must be anthropic, mistral, or ollama)", c.Provider)
+	if err := c.Llm.Validate(); err != nil {
+		return err
 	}
-	if c.Model == "" {
-		return fmt.Errorf("model must not be empty")
+	if err := c.Sandbox.Validate(); err != nil {
+		return err
 	}
-	if c.SandboxRoot == "" {
-		return fmt.Errorf("sandbox root must not be empty")
-	}
-	if len(c.AllowedDirs) == 0 {
-		return fmt.Errorf("at least one allowed directory is required")
+	if err := c.Ignore.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
 
-func ConfigPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".koko", "config.json")
+func (l *LlmConfig) Validate() error {
+	switch l.Provider {
+	case Anthropic, Mistral, Ollama:
+	default:
+		return fmt.Errorf("unknown llm.provider: %q (must be anthropic, mistral, or ollama)", l.Provider)
+	}
+	if (l.Provider == Anthropic || l.Provider == Mistral) && l.ApiKey == "" {
+		return fmt.Errorf("%s provider requires an API key (set %s)", l.Provider, apiKeyEnvName(l.Provider))
+	}
+	if l.Model == "" {
+		return fmt.Errorf("llm.model must not be empty")
+	}
+	if err := checkModelProvider(l.Provider, l.Model); err != nil {
+		return err
+	}
+	if l.MaxTokens <= 0 {
+		return fmt.Errorf("llm.max_tokens must be positive (got %d)", l.MaxTokens)
+	}
+	if l.MaxSessionTokens < 0 {
+		return fmt.Errorf("llm.max_session_tokens must be non-negative (got %d; use 0 for unlimited)", l.MaxSessionTokens)
+	}
+	return nil
 }
 
-func ApiKeyEnv(p ProviderType) string {
-	switch p {
-	case ProviderAnthropic:
-		return "ANTHROPIC_API_KEY"
-	case ProviderMistral:
-		return "MISTRAL_API_KEY"
-	default:
-		return ""
+func (s *SandboxConfig) Validate() error {
+	if s.Root == "" {
+		return fmt.Errorf("sandbox.root must not be empty")
 	}
+	if !filepath.IsAbs(s.Root) {
+		return fmt.Errorf("sandbox.root must be absolute (got %q)", s.Root)
+	}
+	for _, d := range s.AdditionalDirs {
+		if !filepath.IsAbs(d) {
+			return fmt.Errorf("sandbox.additional_dirs entry must be absolute (got %q)", d)
+		}
+	}
+	if s.MaxFileSize <= 0 {
+		return fmt.Errorf("sandbox.max_file_size must be positive (got %d)", s.MaxFileSize)
+	}
+	if err := s.Exec.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *IgnoreConfig) Validate() error {
+	switch i.Mode {
+	case "", Gitignore, Custom:
+	default:
+		return fmt.Errorf("unknown ignore.mode: %q (must be gitignore or custom)", i.Mode)
+	}
+	return nil
+}
+
+func (e *ExecConfig) Validate() error {
+	switch e.Profile {
+	case "", Strict, Default, Permissive, Off:
+	default:
+		return fmt.Errorf("unknown sandbox.exec.profile: %q (must be strict, default, permissive, or off)", e.Profile)
+	}
+	return nil
+}
+
+func (e *ExecConfig) Limits() (cpuSec, memMB, fileMB int) {
+	switch e.Profile {
+	case Strict:
+		return 30, 512, 100
+	case Permissive:
+		return 1800, 8192, 2000
+	case Off:
+		return 0, 0, 0
+	default:
+		return 300, 2048, 500
+	}
+}
+
+func checkModelProvider(p Provider, model string) error {
+	switch {
+	case strings.HasPrefix(model, "claude-") && p != Anthropic:
+		return fmt.Errorf("model %q looks Anthropic but provider is %q", model, p)
+	case (strings.HasPrefix(model, "mistral-") ||
+		strings.HasPrefix(model, "codestral-") ||
+		strings.HasPrefix(model, "magistral-")) && p != Mistral:
+		return fmt.Errorf("model %q looks Mistral but provider is %q", model, p)
+	}
+	return nil
+}
+
+func apiKeyEnvName(p Provider) string {
+	switch p {
+	case Anthropic:
+		return "ANTHROPIC_API_KEY"
+	case Mistral:
+		return "MISTRAL_API_KEY"
+	}
+	return ""
+}
+
+func ConfigPath(kokoDir string) string {
+	return filepath.Join(kokoDir, "config.toml")
 }

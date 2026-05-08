@@ -13,33 +13,16 @@ type Sandbox struct {
 	root        string
 	allowedDirs []string
 	denyFiles   []string
-	ignore      *ignoreMatcher
 	maxFileSize int64
 }
 
 func New(cfg *config.Config) *Sandbox {
 	return &Sandbox{
-		root:        cfg.SandboxRoot,
-		allowedDirs: cfg.AllowedDirs,
-		denyFiles:   cfg.DenyFiles,
-		ignore:      newIgnoreMatcher(cfg.IgnoreFiles),
-		maxFileSize: cfg.MaxFileSize,
+		root:        cfg.Sandbox.Root,
+		allowedDirs: append([]string{cfg.Sandbox.Root}, cfg.Sandbox.AdditionalDirs...),
+		denyFiles:   cfg.Sandbox.DenyFiles,
+		maxFileSize: cfg.Sandbox.MaxFileSize,
 	}
-}
-
-func (s *Sandbox) IsIgnored(path string) bool {
-	if s.ignore == nil {
-		return false
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return false
-	}
-	rel, err := filepath.Rel(s.root, abs)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return false
-	}
-	return s.ignore.matches(rel)
 }
 
 func (s *Sandbox) Root() string {
@@ -88,10 +71,6 @@ func (s *Sandbox) ValidatePath(path string) (string, error) {
 	}
 	if !allowed {
 		return "", fmt.Errorf("path %q is outside allowed directories", path)
-	}
-
-	if s.IsIgnored(evaluated) {
-		return "", fmt.Errorf("no such file or directory: %q", path)
 	}
 
 	if s.isDenied(evaluated) {
@@ -232,32 +211,16 @@ func (s *Sandbox) WriteFile(path string, content string) error {
 	return os.Chmod(resolved, 0664)
 }
 
-func (s *Sandbox) ListDir(path string) ([]string, error) {
+func (s *Sandbox) ListDir(path string) (string, []os.DirEntry, error) {
 	resolved, err := s.ValidatePath(path)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-
 	entries, err := os.ReadDir(resolved)
 	if err != nil {
-		return nil, fmt.Errorf("reading directory: %w", err)
+		return "", nil, fmt.Errorf("reading directory: %w", err)
 	}
-
-	var names []string
-	for _, e := range entries {
-		entryPath := filepath.Join(resolved, e.Name())
-		if s.IsIgnored(entryPath) {
-			continue
-		}
-		name := e.Name()
-		if e.IsDir() {
-			name += "/"
-		} else if info, err := e.Info(); err == nil {
-			name += fmt.Sprintf(" (%s)", humanSize(info.Size()))
-		}
-		names = append(names, name)
-	}
-	return names, nil
+	return resolved, entries, nil
 }
 
 func (s *Sandbox) RenameFile(oldPath, newPath string) error {
@@ -282,17 +245,6 @@ func (s *Sandbox) DeleteFile(path string) error {
 		return err
 	}
 	return os.Remove(resolved)
-}
-
-func humanSize(bytes int64) string {
-	switch {
-	case bytes >= 1024*1024:
-		return fmt.Sprintf("%.1fM", float64(bytes)/(1024*1024))
-	case bytes >= 1024:
-		return fmt.Sprintf("%.1fK", float64(bytes)/1024)
-	default:
-		return fmt.Sprintf("%dB", bytes)
-	}
 }
 
 func (s *Sandbox) isDenied(path string) bool {

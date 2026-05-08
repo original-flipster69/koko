@@ -286,7 +286,7 @@ func (e *Editor) DeleteFile(path string) error {
 	return nil
 }
 
-func (e *Editor) ListDir(path string) ([]string, error) {
+func (e *Editor) ListDir(path string) (string, []os.DirEntry, error) {
 	return e.sandbox.ListDir(path)
 }
 

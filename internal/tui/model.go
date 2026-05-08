@@ -47,12 +47,12 @@ type model struct {
 	spinnerTick  int
 	spinnerLabel string
 
-	slashHandler SlashHandler
+	cmdHandler CmdHandler
 }
 
-type SlashHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
+type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
 
-func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splash string, slashHandler SlashHandler, confirmCh chan bool) model {
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splash string, cmdHandler CmdHandler, confirmCh chan bool) model {
 	ta := textarea.New()
 	ta.Placeholder = "ask koko anything... (shift+enter for newline)"
 	ta.Focus()
@@ -64,15 +64,15 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 	ta.KeyMap.InsertNewline.SetKeys("shift+enter")
 
 	m := model{
-		input:        ta,
-		content:      &strings.Builder{},
-		agent:        a,
-		ctx:          ctx,
-		cancel:       cancel,
-		kokoDir:      kokoDir,
-		splash:       splash,
-		confirmCh:    confirmCh,
-		slashHandler: slashHandler,
+		input:      ta,
+		content:    &strings.Builder{},
+		agent:      a,
+		ctx:        ctx,
+		cancel:     cancel,
+		kokoDir:    kokoDir,
+		splash:     splash,
+		confirmCh:  confirmCh,
+		cmdHandler: cmdHandler,
 	}
 	return m
 }
@@ -157,8 +157,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.appendOutput(fmt.Sprintf("\n%s%s▶ %s%s\n", ui.Bold, ui.BrightPurp, display, ui.Reset))
 
-			if strings.HasPrefix(input, ":") && m.slashHandler != nil {
-				handled, prompt, output := m.slashHandler(input, m.agent)
+			if strings.HasPrefix(input, ":") && m.cmdHandler != nil {
+				handled, prompt, output := m.cmdHandler(input, m.agent)
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}

@@ -85,14 +85,14 @@ func sanitizeErrorBody(body []byte, maxLen int) string {
 }
 
 func New(cfg *config.Config) (Provider, error) {
-	switch cfg.Provider {
-	case config.ProviderAnthropic:
-		return NewAnthropic(cfg.ApiKey, cfg.Model, cfg.MaxTokens)
-	case config.ProviderMistral:
-		return NewMistral(cfg.ApiKey, cfg.Model, cfg.BaseUrl)
-	case config.ProviderOllama:
-		return NewOllama(cfg.Model, cfg.BaseUrl)
+	switch cfg.Llm.Provider {
+	case config.Anthropic:
+		return NewAnthropic(cfg.Llm.ApiKey, cfg.Llm.Model, cfg.Llm.MaxTokens)
+	case config.Mistral:
+		return NewMistral(cfg.Llm.ApiKey, cfg.Llm.Model, cfg.Llm.Url)
+	case config.Ollama:
+		return NewOllama(cfg.Llm.Model, cfg.Llm.Url)
 	default:
-		return nil, fmt.Errorf("unsupported provider: %q", cfg.Provider)
+		return nil, fmt.Errorf("unsupported provider: %q", cfg.Llm.Provider)
 	}
 }

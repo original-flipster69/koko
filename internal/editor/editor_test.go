@@ -19,9 +19,10 @@ func setup(t *testing.T) (string, *editor.Editor) {
 		t.Fatal(err)
 	}
 	sb := sandbox.New(&config.Config{
-		SandboxRoot: resolved,
-		AllowedDirs: []string{resolved},
-		MaxFileSize: 1024 * 1024,
+		Sandbox: config.SandboxConfig{
+			Root:        resolved,
+			MaxFileSize: 1024 * 1024,
+		},
 	})
 	return resolved, editor.New(sb)
 }
