@@ -62,7 +62,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	sb := sandbox.New(cfg)
+	sb, err := sandbox.New(cfg.Sandbox.Root, cfg.Sandbox.AllowedDirs(), cfg.Sandbox.DenyFiles, cfg.Sandbox.MaxFileSize)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
+		os.Exit(1)
+	}
 	auditLog, err := audit.NewLog(filepath.Join(kokoDir, "audit.jsonl"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(fmt.Sprintf("cannot open audit log: %v", err)))

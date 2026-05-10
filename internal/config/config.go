@@ -185,6 +185,10 @@ func (l *LlmConfig) Validate() error {
 	return nil
 }
 
+func (s *SandboxConfig) AllowedDirs() []string {
+	return append([]string{s.Root}, s.AdditionalDirs...)
+}
+
 func (s *SandboxConfig) Validate() error {
 	if s.Root == "" {
 		return fmt.Errorf("sandbox.root must not be empty")

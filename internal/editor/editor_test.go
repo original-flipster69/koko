@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/meeseeks/koko/internal/config"
 	"github.com/meeseeks/koko/internal/editor"
 	"github.com/meeseeks/koko/internal/sandbox"
 )
@@ -18,12 +17,10 @@ func setup(t *testing.T) (string, *editor.Editor) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sb := sandbox.New(&config.Config{
-		Sandbox: config.SandboxConfig{
-			Root:        resolved,
-			MaxFileSize: 1024 * 1024,
-		},
-	})
+	sb, err := sandbox.New(resolved, []string{resolved}, nil, 1024*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return resolved, editor.New(sb)
 }
 

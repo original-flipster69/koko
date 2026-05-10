@@ -2,11 +2,11 @@ package sandbox
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/meeseeks/koko/internal/config"
+	"syscall"
 )
 
 type Sandbox struct {
@@ -16,12 +16,63 @@ type Sandbox struct {
 	maxFileSize int64
 }
 
-func New(cfg *config.Config) *Sandbox {
+func New(root string, allowedDirs, denyFiles []string, maxFileSize int64) (*Sandbox, error) {
+	absRoot, err := canonicalize(root)
+	if err != nil {
+		return nil, fmt.Errorf("sandbox root %q: %w", root, err)
+	}
+	canonical := make([]string, 0, len(allowedDirs))
+	for _, d := range allowedDirs {
+		abs, err := canonicalize(d)
+		if err != nil {
+			return nil, fmt.Errorf("allowed dir %q: %w", d, err)
+		}
+		canonical = append(canonical, abs)
+	}
+	for _, p := range denyFiles {
+		if _, err := filepath.Match(p, ""); err != nil {
+			return nil, fmt.Errorf("deny pattern %q: %w", p, err)
+		}
+	}
 	return &Sandbox{
-		root:        cfg.Sandbox.Root,
-		allowedDirs: append([]string{cfg.Sandbox.Root}, cfg.Sandbox.AdditionalDirs...),
-		denyFiles:   cfg.Sandbox.DenyFiles,
-		maxFileSize: cfg.Sandbox.MaxFileSize,
+		root:        absRoot,
+		allowedDirs: canonical,
+		denyFiles:   denyFiles,
+		maxFileSize: maxFileSize,
+	}, nil
+}
+
+func canonicalize(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	return resolveSymlinks(abs)
+}
+
+func resolveSymlinks(absPath string) (string, error) {
+	if evaluated, err := filepath.EvalSymlinks(absPath); err == nil {
+		return evaluated, nil
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("resolving symlinks: %w", err)
+	}
+	cur := absPath
+	var suffix []string
+	for {
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return absPath, nil
+		}
+		suffix = append([]string{filepath.Base(cur)}, suffix...)
+		cur = parent
+		existing, err := filepath.EvalSymlinks(cur)
+		if err == nil {
+			parts := append([]string{existing}, suffix...)
+			return filepath.Join(parts...), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("resolving symlinks: %w", err)
+		}
 	}
 }
 
@@ -35,27 +86,13 @@ func (s *Sandbox) ValidatePath(path string) (string, error) {
 		return "", fmt.Errorf("resolving path: %w", err)
 	}
 
-	evaluated, err := filepath.EvalSymlinks(resolved)
+	evaluated, err := resolveSymlinks(resolved)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", fmt.Errorf("resolving symlinks: %w", err)
-		}
-		dirResolved, dirErr := filepath.EvalSymlinks(filepath.Dir(resolved))
-		if dirErr != nil {
-			if !os.IsNotExist(dirErr) {
-				return "", fmt.Errorf("resolving symlinks: %w", dirErr)
-			}
-			dirResolved, _ = filepath.Abs(filepath.Dir(resolved))
-		}
-		evaluated = filepath.Join(dirResolved, filepath.Base(resolved))
+		return "", err
 	}
 
 	allowed := false
-	for _, dir := range s.allowedDirs {
-		absDir, err := filepath.Abs(dir)
-		if err != nil {
-			continue
-		}
+	for _, absDir := range s.allowedDirs {
 		if evaluated == absDir {
 			allowed = true
 			break
@@ -64,7 +101,7 @@ func (s *Sandbox) ValidatePath(path string) (string, error) {
 		if err != nil {
 			continue
 		}
-		if !strings.HasPrefix(rel, "..") {
+		if rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 			allowed = true
 			break
 		}
@@ -78,24 +115,6 @@ func (s *Sandbox) ValidatePath(path string) (string, error) {
 	}
 
 	return evaluated, nil
-}
-
-const maxImageSize = 10 * 1024 * 1024
-
-var binaryExtensions = map[string]bool{
-	".exe": true, ".dll": true, ".so": true, ".dylib": true,
-	".a": true, ".o": true, ".obj": true, ".class": true,
-	".jar": true, ".war": true, ".pyc": true, ".pyo": true,
-	".bin": true, ".dat": true, ".iso": true, ".img": true,
-	".zip": true, ".tar": true, ".gz": true, ".bz2": true, ".7z": true, ".rar": true,
-	".mp3": true, ".mp4": true, ".mov": true, ".avi": true, ".mkv": true, ".wav": true,
-	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".bmp": true, ".tiff": true, ".ico": true,
-	".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true, ".ppt": true, ".pptx": true,
-	".sqlite": true, ".db": true,
-}
-
-func hasBinaryExtension(path string) bool {
-	return binaryExtensions[strings.ToLower(filepath.Ext(path))]
 }
 
 func looksBinary(data []byte) bool {
@@ -141,14 +160,19 @@ func (s *Sandbox) ReadImageFile(path string) ([]byte, string, error) {
 	if !ok {
 		return nil, "", fmt.Errorf("%q is not a supported image format", path)
 	}
-	info, err := os.Stat(resolved)
+	file, err := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading image: %w", err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
 	if err != nil {
 		return nil, "", fmt.Errorf("stat: %w", err)
 	}
-	if info.Size() > maxImageSize {
-		return nil, "", fmt.Errorf("image %q exceeds %dMB limit", path, maxImageSize/(1024*1024))
+	if info.Size() > s.maxFileSize {
+		return nil, "", fmt.Errorf("image %q exceeds max size (%d bytes)", path, s.maxFileSize)
 	}
-	data, err := os.ReadFile(resolved)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, "", fmt.Errorf("reading image: %w", err)
 	}
@@ -161,11 +185,13 @@ func (s *Sandbox) ReadFile(path string) (string, error) {
 		return "", err
 	}
 
-	if hasBinaryExtension(resolved) {
-		return "", fmt.Errorf("refusing to read binary file %q (extension blocked)", path)
+	file, err := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return "", fmt.Errorf("reading file: %w", err)
 	}
+	defer file.Close()
 
-	info, err := os.Stat(resolved)
+	info, err := file.Stat()
 	if err != nil {
 		return "", fmt.Errorf("stat: %w", err)
 	}
@@ -173,7 +199,7 @@ func (s *Sandbox) ReadFile(path string) (string, error) {
 		return "", fmt.Errorf("file %q exceeds max size (%d bytes)", path, s.maxFileSize)
 	}
 
-	data, err := os.ReadFile(resolved)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return "", fmt.Errorf("reading file: %w", err)
 	}
@@ -189,9 +215,6 @@ func (s *Sandbox) WriteFile(path string, content string) error {
 		return err
 	}
 
-	if hasBinaryExtension(resolved) {
-		return fmt.Errorf("refusing to write binary file %q (extension blocked)", path)
-	}
 	if looksBinary([]byte(content)) {
 		return fmt.Errorf("refusing to write %q: content appears to be binary", path)
 	}
@@ -201,14 +224,33 @@ func (s *Sandbox) WriteFile(path string, content string) error {
 	}
 
 	dir := filepath.Dir(resolved)
-	if err := os.MkdirAll(dir, 0775); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 
-	if err := os.WriteFile(resolved, []byte(content), 0664); err != nil {
-		return err
+	existed := false
+	if _, err := os.Lstat(resolved); err == nil {
+		existed = true
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat: %w", err)
 	}
-	return os.Chmod(resolved, 0664)
+
+	file, err := os.OpenFile(resolved, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|syscall.O_NOFOLLOW, 0640)
+	if err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+	if _, err := file.Write([]byte(content)); err != nil {
+		file.Close()
+		return fmt.Errorf("writing file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+
+	if !existed {
+		return os.Chmod(resolved, 0640)
+	}
+	return nil
 }
 
 func (s *Sandbox) ListDir(path string) (string, []os.DirEntry, error) {
@@ -233,7 +275,7 @@ func (s *Sandbox) RenameFile(oldPath, newPath string) error {
 		return err
 	}
 	dir := filepath.Dir(resolvedNew)
-	if err := os.MkdirAll(dir, 0775); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
 	return os.Rename(resolvedOld, resolvedNew)
