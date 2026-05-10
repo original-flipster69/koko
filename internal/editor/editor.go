@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/meeseeks/koko/internal/sandbox"
+	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
 var lockfiles = map[string]string{

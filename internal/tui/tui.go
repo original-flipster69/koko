@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/meeseeks/koko/internal/agent"
-	"github.com/meeseeks/koko/internal/ui"
+	"github.com/original-flipster69/koko/internal/agent"
+	"github.com/original-flipster69/koko/internal/ui"
 )
 
 func Run(

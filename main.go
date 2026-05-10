@@ -10,22 +10,25 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
-	"github.com/meeseeks/koko/internal/agent"
-	"github.com/meeseeks/koko/internal/audit"
-	"github.com/meeseeks/koko/internal/config"
-	"github.com/meeseeks/koko/internal/detect"
-	"github.com/meeseeks/koko/internal/ignore"
-	"github.com/meeseeks/koko/internal/memory"
-	"github.com/meeseeks/koko/internal/plays"
-	"github.com/meeseeks/koko/internal/policy"
-	"github.com/meeseeks/koko/internal/provider"
-	"github.com/meeseeks/koko/internal/sandbox"
-	"github.com/meeseeks/koko/internal/tui"
-	"github.com/meeseeks/koko/internal/ui"
+	"github.com/original-flipster69/koko/internal/agent"
+	"github.com/original-flipster69/koko/internal/audit"
+	"github.com/original-flipster69/koko/internal/config"
+	"github.com/original-flipster69/koko/internal/detect"
+	"github.com/original-flipster69/koko/internal/ignore"
+	"github.com/original-flipster69/koko/internal/memory"
+	"github.com/original-flipster69/koko/internal/plays"
+	"github.com/original-flipster69/koko/internal/policy"
+	"github.com/original-flipster69/koko/internal/provider"
+	"github.com/original-flipster69/koko/internal/sandbox"
+	"github.com/original-flipster69/koko/internal/tui"
+	"github.com/original-flipster69/koko/internal/ui"
 )
 
 var version = "dev"
+
+const llmStreamTimeout = 5 * time.Minute
 
 func main() {
 	providerFlag := flag.String("provider", "", "LLM provider: anthropic, mistral, ollama")
@@ -133,6 +136,7 @@ func main() {
 		ProjectContext:   extraContext,
 		ThinkingVerbs:    cfg.Style.ThinkingVerbs,
 		MaxSessionTokens: cfg.Llm.MaxSessionTokens,
+		StreamTimeout:    llmStreamTimeout,
 		ScrubPII:         cfg.Sandbox.ScrubPII,
 		ExecCPUSeconds:   cpuSec,
 		ExecMemoryMB:     memMB,

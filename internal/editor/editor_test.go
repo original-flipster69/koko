@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/meeseeks/koko/internal/editor"
-	"github.com/meeseeks/koko/internal/sandbox"
+	"github.com/original-flipster69/koko/internal/editor"
+	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
 func setup(t *testing.T) (string, *editor.Editor) {
@@ -36,12 +36,12 @@ func writeTestFile(t *testing.T, path, content string) {
 
 func TestReplaceInFile(t *testing.T) {
 	tests := []struct {
-		name        string
-		initial     string
-		oldText     string
-		newText     string
-		wantAfter   string
-		wantErr     string
+		name      string
+		initial   string
+		oldText   string
+		newText   string
+		wantAfter string
+		wantErr   string
 	}{
 		{
 			name:      "exact match single occurrence",

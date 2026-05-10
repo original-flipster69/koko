@@ -1,4 +1,4 @@
-module github.com/meeseeks/koko
+module github.com/original-flipster69/koko
 
 go 1.24.5
 
