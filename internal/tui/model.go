@@ -243,7 +243,11 @@ func (m *model) appendOutput(s string) {
 }
 
 func (m *model) syncViewport() {
-	m.viewport.SetContent(m.content.String())
+	content := m.content.String()
+	if m.viewport.Width > 0 {
+		content = lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
+	}
+	m.viewport.SetContent(content)
 }
 
 func (m model) spinnerView() string {
