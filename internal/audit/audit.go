@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -105,11 +106,11 @@ func (l *Log) Record(tool string, args map[string]string, result string) {
 	entry.Hash = hashEntry(entry)
 	data, err := json.Marshal(entry)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "audit: marshal error: %v\n", err)
+		slog.Warn("audit marshal failed", "tool", tool, "err", err)
 		return
 	}
 	if _, err := l.file.Write(append(data, '\n')); err != nil {
-		fmt.Fprintf(os.Stderr, "audit: write error: %v\n", err)
+		slog.Warn("audit write failed", "tool", tool, "err", err)
 		return
 	}
 	l.lastHash = entry.Hash
