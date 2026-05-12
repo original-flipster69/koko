@@ -62,9 +62,32 @@ type Provider interface {
 }
 
 type ToolDef struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Params      map[string]interface{} `json:"parameters"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Params      Schema `json:"parameters"`
+}
+
+type Schema struct {
+	Type       string              `json:"type"`
+	Properties map[string]Property `json:"properties,omitempty"`
+	Required   []string            `json:"required,omitempty"`
+}
+
+type Property struct {
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+func StringParam(desc string) Property {
+	return Property{Type: "string", Description: desc}
+}
+
+func IntParam(desc string) Property {
+	return Property{Type: "integer", Description: desc}
+}
+
+func BoolParam(desc string) Property {
+	return Property{Type: "boolean", Description: desc}
 }
 
 func sendReq(ctx context.Context, client *http.Client, url string, body any, headers map[string]string) (*http.Response, error) {

@@ -201,9 +201,9 @@ type claudeMsg struct {
 }
 
 type claudeTool struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	InputSchema map[string]interface{} `json:"input_schema"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	InputSchema Schema `json:"input_schema"`
 }
 
 type claudeReq struct {

@@ -178,9 +178,9 @@ type mistralMsg struct {
 }
 
 type mistralFunc struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Params      map[string]interface{} `json:"parameters"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Params      Schema `json:"parameters"`
 }
 
 type mistralTool struct {

@@ -31,6 +31,8 @@ import (
 
 type confirmFunc func(action string) bool
 
+type OutboundFilter func([]provider.Msg) []provider.Msg
+
 type Agent struct {
 	provider         provider.Provider
 	editor           *editor.Editor
@@ -45,7 +47,7 @@ type Agent struct {
 	thinkingVerbs    []string
 	maxSessionTokens int
 	streamTimeout    time.Duration
-	scrubPII         bool
+	outboundFilters  []OutboundFilter
 	execCPUSecs      int
 	execMemoryMB     int
 	execMaxFileMB    int
@@ -107,7 +109,7 @@ type Options struct {
 	ThinkingVerbs    []string
 	MaxSessionTokens int
 	StreamTimeout    time.Duration
-	ScrubPII         bool
+	OutboundFilters  []OutboundFilter
 	ExecCPUSeconds   int
 	ExecMemoryMB     int
 	ExecMaxFileMB    int
@@ -128,7 +130,7 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		thinkingVerbs:    opts.ThinkingVerbs,
 		maxSessionTokens: opts.MaxSessionTokens,
 		streamTimeout:    opts.StreamTimeout,
-		scrubPII:         opts.ScrubPII,
+		outboundFilters:  opts.OutboundFilters,
 		execCPUSecs:      opts.ExecCPUSeconds,
 		execMemoryMB:     opts.ExecMemoryMB,
 		execMaxFileMB:    opts.ExecMaxFileMB,
@@ -174,8 +176,21 @@ func (a *Agent) Undo() (string, error) {
 	return a.editor.Undo()
 }
 
-const maxToolRounds = 15
-const maxSessionToolCalls = 1000
+const (
+	maxToolRounds       = 15
+	maxSessionToolCalls = 1000
+
+	searchTimeout         = 30 * time.Second
+	searchMaxMatches      = 30
+	searchMaxFileSize     = 512 * 1024
+	searchContextLines    = 2
+	searchContextLinesMax = 10
+
+	execWallTimeout = 10 * time.Minute
+	execMaxCapture  = 64 * 1024
+
+	memoryBodyPreview = 500
+)
 
 func (a *Agent) Run(ctx context.Context, userInput string) error {
 	a.mu.Lock()
@@ -211,15 +226,15 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 		if a.planMode {
 			filtered := make([]provider.ToolDef, 0, len(a.tools))
 			for _, t := range a.tools {
-				if readOnlyTools[t.Name] {
+				if toolReadOnly(t.Name) {
 					filtered = append(filtered, t)
 				}
 			}
 			activeTools = filtered
 		}
 		outbound := a.history
-		if a.scrubPII {
-			outbound = scrubMessages(a.history)
+		for _, f := range a.outboundFilters {
+			outbound = f(outbound)
 		}
 		resp, err := func() (*provider.Response, error) {
 			streamCtx := ctx
@@ -281,7 +296,7 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 		for _, tc := range toolCalls {
 			slog.Info("executing tool", "tool", tc.Name)
 			a.toolCallCount++
-			quiet := quietTools[tc.Name]
+			quiet := toolQuiet(tc.Name)
 			if !quiet {
 				fmt.Fprintf(a.output, "  %s%s%s%s\n", ui.Dim, ui.DarkPurp, toolVerb(tc.Name), ui.Reset)
 			}
@@ -347,7 +362,34 @@ func wrapWithUlimit(cmd string, cpuSec, memMB, fileMB int) string {
 	return prefix.String() + cmd
 }
 
-func scrubMessages(in []provider.Msg) []provider.Msg {
+type boundedBuffer struct {
+	buf       bytes.Buffer
+	max       int
+	truncated bool
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	if b.buf.Len() >= b.max {
+		b.truncated = true
+		return len(p), nil
+	}
+	remaining := b.max - b.buf.Len()
+	if len(p) > remaining {
+		b.buf.Write(p[:remaining])
+		b.truncated = true
+		return len(p), nil
+	}
+	return b.buf.Write(p)
+}
+
+func (b *boundedBuffer) String() string {
+	if b.truncated {
+		return b.buf.String() + "\n...(output truncated)"
+	}
+	return b.buf.String()
+}
+
+func ScrubPIIFilter(in []provider.Msg) []provider.Msg {
 	out := make([]provider.Msg, len(in))
 	for i, m := range in {
 		if m.Role == provider.System {
@@ -355,9 +397,17 @@ func scrubMessages(in []provider.Msg) []provider.Msg {
 			continue
 		}
 		scrubbed, _ := secrets.RedactAll(m.Content)
-		out[i] = provider.Msg{Role: m.Role, Content: scrubbed}
+		out[i] = provider.Msg{Role: m.Role, Content: scrubbed, Imgs: m.Imgs}
 	}
 	return out
+}
+
+func boolArg(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "true", "yes", "1", "on":
+		return true
+	}
+	return false
 }
 
 func (a *Agent) requireArgs(tc provider.ToolCall, keys ...string) error {
@@ -387,351 +437,266 @@ func (a *Agent) readImageFile(path string) string {
 }
 
 func (a *Agent) executeTool(ctx context.Context, tc provider.ToolCall) string {
-	if a.planMode && !readOnlyTools[tc.Name] {
-		return fmt.Sprintf("error: plan mode is active — %s is disabled. Present the plan; the user will exit plan mode to apply changes.", tc.Name)
-	}
-	switch tc.Name {
-	case "read_file":
-		if err := a.requireArgs(tc, "path"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if _, ok := sandbox.ImageMimeType(tc.Args["path"]); ok {
-			return a.readImageFile(tc.Args["path"])
-		}
-		content, err := a.editor.ReadFile(tc.Args["path"])
-		if err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		a.editor.MarkRead(tc.Args["path"], content)
-		redacted, count := secrets.Redact(content)
-		if count > 0 {
-			slog.Warn("secrets redacted", "path", tc.Args["path"], "count", count)
-		}
-		content = redacted
-		lines := strings.Split(content, "\n")
-		startLine := 1
-		endLine := len(lines)
-		if v := tc.Args["offset"]; v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n >= 1 {
-				startLine = n
-			}
-		}
-		if v := tc.Args["limit"]; v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n >= 1 {
-				endLine = startLine + n - 1
-			}
-		}
-		if startLine > len(lines) {
-			startLine = len(lines)
-		}
-		if endLine > len(lines) {
-			endLine = len(lines)
-		}
-		if endLine < startLine {
-			endLine = startLine
-		}
-		var numbered strings.Builder
-		for i := startLine; i <= endLine; i++ {
-			numbered.WriteString(fmt.Sprintf("%d\t%s\n", i, lines[i-1]))
-		}
-		return fmt.Sprintf("[%s lines %d-%d of %d]\n%s", tc.Args["path"], startLine, endLine, len(lines), numbered.String())
-
-	case "write_file":
-		if err := a.requireArgs(tc, "path"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if found := secrets.Scan(tc.Args["content"]); len(found) > 0 {
-			kinds := make([]string, 0, len(found))
-			for _, m := range found {
-				kinds = append(kinds, m.Kind)
-			}
-			return fmt.Sprintf("error: refusing to write — content contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
-		}
-		oldContent, _ := a.editor.ReadFile(tc.Args["path"])
-		overwrite := tc.Args["overwrite"] == "true"
-		if err := a.editor.WriteFile(tc.Args["path"], tc.Args["content"], overwrite); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		d := diff.Unified(oldContent, tc.Args["content"], tc.Args["path"])
-		if d != "" {
-			fmt.Fprint(a.output, ui.ColorDiff(d))
-		}
-		return fmt.Sprintf("wrote %s", tc.Args["path"])
-
-	case "replace_in_file":
-		if err := a.requireArgs(tc, "path", "old_text"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		oldContent, newContent, err := a.editor.ReplaceInFile(tc.Args["path"], tc.Args["old_text"], tc.Args["new_text"])
-		if err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		d := diff.Unified(oldContent, newContent, tc.Args["path"])
-		if d != "" {
-			fmt.Fprint(a.output, ui.ColorDiff(d))
-		}
-		return fmt.Sprintf("updated %s", tc.Args["path"])
-
-	case "delete_file":
-		if err := a.requireArgs(tc, "path"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if err := a.editor.DeleteFile(tc.Args["path"]); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		return fmt.Sprintf("deleted %s", tc.Args["path"])
-
-	case "rename_file":
-		if err := a.requireArgs(tc, "old_path", "new_path"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if err := a.editor.RenameFile(tc.Args["old_path"], tc.Args["new_path"]); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		return fmt.Sprintf("renamed %s → %s", tc.Args["old_path"], tc.Args["new_path"])
-
-	case "list_dir":
-		if err := a.requireArgs(tc, "path"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if tc.Args["recursive"] == "true" {
-			maxDepth := 3
-			if v := tc.Args["depth"]; v != "" {
-				if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 10 {
-					maxDepth = n
-				}
-			}
-			return a.buildTree(tc.Args["path"], "", 0, maxDepth)
-		}
-		resolved, entries, err := a.editor.ListDir(tc.Args["path"])
-		if err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		var lines []string
-		for _, e := range entries {
-			rel, _ := filepath.Rel(a.sandbox.Root(), filepath.Join(resolved, e.Name()))
-			if a.ignore.IsIgnored(rel, e.IsDir()) {
-				continue
-			}
-			lines = append(lines, formatDirEntry(e))
-		}
-		return strings.Join(lines, "\n")
-
-	case "search_files":
-		if tc.Args["pattern"] == "" {
-			for _, alias := range []string{"query", "text", "q", "regex", "search"} {
-				if v := tc.Args[alias]; v != "" {
-					tc.Args["pattern"] = v
-					break
-				}
-			}
-		}
-		if err := a.requireArgs(tc, "pattern"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		searchRoot := tc.Args["path"]
-		if searchRoot == "" {
-			searchRoot = a.sandbox.Root()
-		}
-		if _, err := a.sandbox.ValidatePath(searchRoot); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		searchCtx, searchCancel := context.WithTimeout(ctx, 30*time.Second)
-		defer searchCancel()
-		pattern := tc.Args["pattern"]
-		re, regexErr := regexp.Compile(pattern)
-		if regexErr != nil {
-			re = regexp.MustCompile(regexp.QuoteMeta(pattern))
-		}
-		contextLines := 2
-		if v := tc.Args["context_lines"]; v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 10 {
-				contextLines = n
-			}
-		}
-		globFilter := tc.Args["glob"]
-		matchCount := 0
-		var results strings.Builder
-		_ = filepath.Walk(searchRoot, func(path string, info os.FileInfo, err error) error {
-			if searchCtx.Err() != nil || matchCount >= 30 {
-				return filepath.SkipAll
-			}
-			if err != nil {
-				return nil
-			}
-			rel, _ := filepath.Rel(a.sandbox.Root(), path)
-			if info.IsDir() {
-				if skipDirs[info.Name()] || a.ignore.IsIgnored(rel, true) {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if a.ignore.IsIgnored(rel, false) {
-				return nil
-			}
-			if info.Size() > 512*1024 {
-				return nil
-			}
-			if globFilter != "" {
-				if matched, _ := filepath.Match(globFilter, info.Name()); !matched {
-					return nil
-				}
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			lines := strings.Split(string(data), "\n")
-			for i, line := range lines {
-				if matchCount >= 30 {
-					break
-				}
-				if re.MatchString(line) {
-					matchCount++
-					start := i - contextLines
-					if start < 0 {
-						start = 0
-					}
-					end := i + contextLines
-					if end >= len(lines) {
-						end = len(lines) - 1
-					}
-					results.WriteString(fmt.Sprintf("--- %s\n", rel))
-					for j := start; j <= end; j++ {
-						marker := " "
-						if j == i {
-							marker = ">"
-						}
-						results.WriteString(fmt.Sprintf("%s%d\t%s\n", marker, j+1, lines[j]))
-					}
-				}
-			}
-			return nil
-		})
-		if matchCount == 0 {
-			if searchCtx.Err() != nil {
-				return "search timed out"
-			}
-			return fmt.Sprintf("no matches for %q", pattern)
-		}
-		header := fmt.Sprintf("%d matches", matchCount)
-		if matchCount >= 30 {
-			header += " (limit reached, more may exist)"
-		}
-		redactedResults, _ := secrets.Redact(results.String())
-		return fmt.Sprintf("%s:\n%s", header, redactedResults)
-
-	case "exec_command":
-		if err := a.requireArgs(tc, "command"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		cmdStr := tc.Args["command"]
-		if a.cmdPolicy != nil {
-			if err := a.cmdPolicy.Check(cmdStr); err != nil {
-				return fmt.Sprintf("error: %v", err)
-			}
-		}
-		if a.confirm != nil && !a.confirm(cmdStr) {
-			return "command denied by user"
-		}
-		timeout := 60 * time.Second
-		if a.execCPUSecs > 0 {
-			timeout = time.Duration(a.execCPUSecs*2) * time.Second
-		}
-		cmdCtx, cmdCancel := context.WithTimeout(ctx, timeout)
-		defer cmdCancel()
-		wrapped := wrapWithUlimit(cmdStr, a.execCPUSecs, a.execMemoryMB, a.execMaxFileMB)
-		cmd := a.sandbox.WrapExec(sandbox.NewExecContext(cmdCtx), wrapped)
-		cmd.Dir = a.sandbox.Root()
-		var captured bytes.Buffer
-		cmd.Stdout = io.MultiWriter(&captured, a.output)
-		cmd.Stderr = io.MultiWriter(&captured, a.output)
-		err := cmd.Run()
-		output := strings.TrimRight(captured.String(), "\n")
-		if err != nil {
-			exitCode := -1
-			if cmd.ProcessState != nil {
-				exitCode = cmd.ProcessState.ExitCode()
-			}
-			return fmt.Sprintf("exit %d\n%s", exitCode, output)
-		}
-		return output
-
-	case "save_memory":
-		if a.memory == nil {
-			return "error: memory not configured"
-		}
-		if err := a.requireArgs(tc, "name", "type", "body"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		path, err := a.memory.Save(memory.Memory{
-			Name:        tc.Args["name"],
-			Description: tc.Args["description"],
-			Type:        memory.Type(tc.Args["type"]),
-			Body:        tc.Args["body"],
-		})
-		if err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		return fmt.Sprintf("saved memory %q to %s", tc.Args["name"], filepath.Base(path))
-
-	case "delete_memory":
-		if a.memory == nil {
-			return "error: memory not configured"
-		}
-		if err := a.requireArgs(tc, "name"); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if err := a.memory.Delete(tc.Args["name"]); err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		return fmt.Sprintf("deleted memory %q", tc.Args["name"])
-
-	case "exit_plan_mode":
-		if !a.planMode {
-			return "error: not currently in plan mode"
-		}
-		plan := tc.Args["plan"]
-		if plan == "" {
-			return "error: plan argument required"
-		}
-		md := ui.NewMarkdownStream()
-		fmt.Fprintln(a.output)
-		fmt.Fprint(a.output, md.Write("## Proposed plan\n\n"+plan+"\n"))
-		fmt.Fprint(a.output, md.Flush())
-		if a.confirm != nil && a.confirm("apply this plan") {
-			a.planMode = false
-			return "user approved the plan. Plan mode is now disabled. Proceed with implementation using the full tool set."
-		}
-		return "user rejected the plan. You remain in plan mode. Revise based on any feedback and call exit_plan_mode again when ready."
-
-	case "list_memories":
-		if a.memory == nil {
-			return "error: memory not configured"
-		}
-		list, err := a.memory.List()
-		if err != nil {
-			return fmt.Sprintf("error: %v", err)
-		}
-		if len(list) == 0 {
-			return "(no memories stored)"
-		}
-		var b strings.Builder
-		for _, m := range list {
-			desc := m.Description
-			if desc == "" {
-				desc = "(no description)"
-			}
-			b.WriteString(fmt.Sprintf("- %s [%s]: %s\n", m.Name, m.Type, desc))
-			if m.Body != "" {
-				b.WriteString("  " + strings.ReplaceAll(m.Body, "\n", "\n  ") + "\n")
-			}
-		}
-		return b.String()
-
-	default:
+	t, ok := toolsByName[tc.Name]
+	if !ok {
 		return fmt.Sprintf("unknown tool: %s", tc.Name)
 	}
+	if a.planMode && !t.ReadOnly {
+		return fmt.Sprintf("error: plan mode is active — %s is disabled. Present the plan; the user will exit plan mode to apply changes.", tc.Name)
+	}
+	return t.Handler(a, ctx, tc)
+}
+
+func (a *Agent) toolReadFile(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if _, ok := sandbox.ImageMimeType(tc.Args["path"]); ok {
+		return a.readImageFile(tc.Args["path"])
+	}
+	content, err := a.editor.ReadFile(tc.Args["path"])
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	a.editor.MarkRead(tc.Args["path"], content)
+	redacted, count := secrets.Redact(content)
+	if count > 0 {
+		slog.Warn("secrets redacted", "path", tc.Args["path"], "count", count)
+	}
+	content = redacted
+	lines := strings.Split(content, "\n")
+	startLine := 1
+	endLine := len(lines)
+	if v := tc.Args["offset"]; v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 {
+			startLine = n
+		}
+	}
+	if v := tc.Args["limit"]; v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 {
+			endLine = startLine + n - 1
+		}
+	}
+	if startLine > len(lines) {
+		startLine = len(lines)
+	}
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+	if endLine < startLine {
+		endLine = startLine
+	}
+	var numbered strings.Builder
+	for i := startLine; i <= endLine; i++ {
+		numbered.WriteString(fmt.Sprintf("%d\t%s\n", i, lines[i-1]))
+	}
+	return fmt.Sprintf("[%s lines %d-%d of %d]\n%s", tc.Args["path"], startLine, endLine, len(lines), numbered.String())
+}
+
+func (a *Agent) toolWriteFile(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if found := secrets.Scan(tc.Args["content"]); len(found) > 0 {
+		kinds := make([]string, 0, len(found))
+		for _, m := range found {
+			kinds = append(kinds, m.Kind)
+		}
+		return fmt.Sprintf("error: refusing to write — content contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
+	}
+	oldContent, _ := a.editor.ReadFile(tc.Args["path"])
+	overwrite := boolArg(tc.Args["overwrite"])
+	if err := a.editor.WriteFile(tc.Args["path"], tc.Args["content"], overwrite); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	d := diff.Unified(oldContent, tc.Args["content"], tc.Args["path"])
+	if d != "" {
+		fmt.Fprint(a.output, ui.ColorDiff(d))
+	}
+	return fmt.Sprintf("wrote %s", tc.Args["path"])
+}
+
+func (a *Agent) toolReplaceInFile(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "path", "old_text"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if found := secrets.Scan(tc.Args["new_text"]); len(found) > 0 {
+		kinds := make([]string, 0, len(found))
+		for _, m := range found {
+			kinds = append(kinds, m.Kind)
+		}
+		return fmt.Sprintf("error: refusing to replace — new_text contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
+	}
+	oldContent, newContent, err := a.editor.ReplaceInFile(tc.Args["path"], tc.Args["old_text"], tc.Args["new_text"])
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	d := diff.Unified(oldContent, newContent, tc.Args["path"])
+	if d != "" {
+		fmt.Fprint(a.output, ui.ColorDiff(d))
+	}
+	return fmt.Sprintf("updated %s", tc.Args["path"])
+}
+
+func (a *Agent) toolDeleteFile(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if err := a.editor.DeleteFile(tc.Args["path"]); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("deleted %s", tc.Args["path"])
+}
+
+func (a *Agent) toolRenameFile(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "old_path", "new_path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if err := a.editor.RenameFile(tc.Args["old_path"], tc.Args["new_path"]); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("renamed %s → %s", tc.Args["old_path"], tc.Args["new_path"])
+}
+
+func (a *Agent) toolListDir(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if boolArg(tc.Args["recursive"]) {
+		maxDepth := 3
+		if v := tc.Args["depth"]; v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 10 {
+				maxDepth = n
+			}
+		}
+		return a.buildTree(tc.Args["path"], "", 0, maxDepth)
+	}
+	resolved, entries, err := a.editor.ListDir(tc.Args["path"])
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	var lines []string
+	for _, e := range entries {
+		rel, _ := filepath.Rel(a.sandbox.Root(), filepath.Join(resolved, e.Name()))
+		if a.ignore.IsIgnored(rel, e.IsDir()) {
+			continue
+		}
+		lines = append(lines, formatDirEntry(e))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (a *Agent) toolExecCommand(ctx context.Context, tc provider.ToolCall) string {
+	if err := a.requireArgs(tc, "command"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	cmdStr := tc.Args["command"]
+	if a.cmdPolicy != nil {
+		if err := a.cmdPolicy.Check(cmdStr); err != nil {
+			return fmt.Sprintf("error: %v", err)
+		}
+	}
+	if a.confirm != nil && !a.confirm(cmdStr) {
+		return "command denied by user"
+	}
+	cmdCtx, cmdCancel := context.WithTimeout(ctx, execWallTimeout)
+	defer cmdCancel()
+	wrapped := wrapWithUlimit(cmdStr, a.execCPUSecs, a.execMemoryMB, a.execMaxFileMB)
+	cmd := a.sandbox.WrapExec(sandbox.NewExecContext(cmdCtx), wrapped)
+	cmd.Dir = a.sandbox.Root()
+	captured := &boundedBuffer{max: execMaxCapture}
+	cmd.Stdout = io.MultiWriter(captured, a.output)
+	cmd.Stderr = io.MultiWriter(captured, a.output)
+	err := cmd.Run()
+	output := strings.TrimRight(captured.String(), "\n")
+	if err != nil {
+		exitCode := -1
+		if cmd.ProcessState != nil {
+			exitCode = cmd.ProcessState.ExitCode()
+		}
+		return fmt.Sprintf("exit %d\n%s", exitCode, output)
+	}
+	return output
+}
+
+func (a *Agent) toolSaveMemory(ctx context.Context, tc provider.ToolCall) string {
+	if a.memory == nil {
+		return "error: memory not configured"
+	}
+	if err := a.requireArgs(tc, "name", "type", "body"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	path, err := a.memory.Save(memory.Memory{
+		Name:        tc.Args["name"],
+		Description: tc.Args["description"],
+		Type:        memory.Type(tc.Args["type"]),
+		Body:        tc.Args["body"],
+	})
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("saved memory %q to %s", tc.Args["name"], filepath.Base(path))
+}
+
+func (a *Agent) toolDeleteMemory(ctx context.Context, tc provider.ToolCall) string {
+	if a.memory == nil {
+		return "error: memory not configured"
+	}
+	if err := a.requireArgs(tc, "name"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if err := a.memory.Delete(tc.Args["name"]); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("deleted memory %q", tc.Args["name"])
+}
+
+func (a *Agent) toolListMemories(ctx context.Context, tc provider.ToolCall) string {
+	if a.memory == nil {
+		return "error: memory not configured"
+	}
+	list, err := a.memory.List()
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if len(list) == 0 {
+		return "(no memories stored)"
+	}
+	var b strings.Builder
+	for _, m := range list {
+		desc := m.Description
+		if desc == "" {
+			desc = "(no description)"
+		}
+		b.WriteString(fmt.Sprintf("- %s [%s]: %s\n", m.Name, m.Type, desc))
+		body := m.Body
+		if len(body) > memoryBodyPreview {
+			body = body[:memoryBodyPreview] + "...(truncated; use a more specific tool to read the full body)"
+		}
+		if body != "" {
+			b.WriteString("  " + strings.ReplaceAll(body, "\n", "\n  ") + "\n")
+		}
+	}
+	return b.String()
+}
+
+func (a *Agent) toolExitPlanMode(ctx context.Context, tc provider.ToolCall) string {
+	if !a.planMode {
+		return "error: not currently in plan mode"
+	}
+	plan := tc.Args["plan"]
+	if plan == "" {
+		return "error: plan argument required"
+	}
+	md := ui.NewMarkdownStream()
+	fmt.Fprintln(a.output)
+	fmt.Fprint(a.output, md.Write("## Proposed plan\n\n"+plan+"\n"))
+	fmt.Fprint(a.output, md.Flush())
+	if a.confirm != nil && a.confirm("apply this plan") {
+		a.planMode = false
+		return "user approved the plan. Plan mode is now disabled. Proceed with implementation using the full tool set."
+	}
+	return "user rejected the plan. You remain in plan mode. Revise based on any feedback and call exit_plan_mode again when ready."
 }
 
 var skipDirs = map[string]bool{
@@ -786,6 +751,115 @@ func (a *Agent) buildTree(dir, prefix string, depth, maxDepth int) string {
 	return result.String()
 }
 
+func (a *Agent) toolSearchFiles(ctx context.Context, tc provider.ToolCall) string {
+	if tc.Args["pattern"] == "" {
+		for _, alias := range []string{"query", "text", "q", "regex", "search"} {
+			if v := tc.Args[alias]; v != "" {
+				tc.Args["pattern"] = v
+				break
+			}
+		}
+	}
+	if err := a.requireArgs(tc, "pattern"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	pattern := tc.Args["pattern"]
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Sprintf("error: invalid regex %q: %v (use regexp.QuoteMeta-style escaping for literal matches)", pattern, err)
+	}
+	searchRoot := tc.Args["path"]
+	if searchRoot == "" {
+		searchRoot = a.sandbox.Root()
+	}
+	if _, err := a.sandbox.ValidatePath(searchRoot); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	contextLines := searchContextLines
+	if v := tc.Args["context_lines"]; v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= searchContextLinesMax {
+			contextLines = n
+		}
+	}
+	globFilter := tc.Args["glob"]
+
+	searchCtx, searchCancel := context.WithTimeout(ctx, searchTimeout)
+	defer searchCancel()
+
+	matchCount := 0
+	var results strings.Builder
+	_ = filepath.Walk(searchRoot, func(path string, info os.FileInfo, err error) error {
+		if searchCtx.Err() != nil || matchCount >= searchMaxMatches {
+			return filepath.SkipAll
+		}
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(a.sandbox.Root(), path)
+		if info.IsDir() {
+			if skipDirs[info.Name()] || a.ignore.IsIgnored(rel, true) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if a.ignore.IsIgnored(rel, false) {
+			return nil
+		}
+		if info.Size() > searchMaxFileSize {
+			return nil
+		}
+		if globFilter != "" {
+			if matched, _ := filepath.Match(globFilter, info.Name()); !matched {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		lines := strings.Split(string(data), "\n")
+		for i, line := range lines {
+			if matchCount >= searchMaxMatches {
+				break
+			}
+			if !re.MatchString(line) {
+				continue
+			}
+			matchCount++
+			start := i - contextLines
+			if start < 0 {
+				start = 0
+			}
+			end := i + contextLines
+			if end >= len(lines) {
+				end = len(lines) - 1
+			}
+			results.WriteString(fmt.Sprintf("--- %s\n", rel))
+			for j := start; j <= end; j++ {
+				marker := " "
+				if j == i {
+					marker = ">"
+				}
+				results.WriteString(fmt.Sprintf("%s%d\t%s\n", marker, j+1, lines[j]))
+			}
+		}
+		return nil
+	})
+
+	if matchCount == 0 {
+		if searchCtx.Err() != nil {
+			return "search timed out"
+		}
+		return fmt.Sprintf("no matches for %q", pattern)
+	}
+	header := fmt.Sprintf("%d matches", matchCount)
+	if matchCount >= searchMaxMatches {
+		header += " (limit reached, more may exist)"
+	}
+	redactedResults, _ := secrets.Redact(results.String())
+	return fmt.Sprintf("%s:\n%s", header, redactedResults)
+}
+
 func (a *Agent) parseInlineToolCalls(content string) []provider.ToolCall {
 	var calls []provider.ToolCall
 	for _, line := range strings.Split(content, "\n") {
@@ -803,233 +877,6 @@ func (a *Agent) parseInlineToolCalls(content string) []provider.ToolCall {
 		calls = append(calls, provider.ToolCall{Name: tc.Tool, Args: tc.Args})
 	}
 	return calls
-}
-
-func (a *Agent) buildTools() []provider.ToolDef {
-	return []provider.ToolDef{
-		{
-			Name:        "read_file",
-			Description: "Read the contents of a file. Returns numbered lines. Use offset and limit to read specific sections of large files.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the file to read",
-					},
-					"offset": map[string]interface{}{
-						"type":        "string",
-						"description": "Start line number (1-based, optional)",
-					},
-					"limit": map[string]interface{}{
-						"type":        "string",
-						"description": "Number of lines to read (optional, defaults to entire file)",
-					},
-				},
-				"required": []string{"path"},
-			},
-		},
-		{
-			Name:        "write_file",
-			Description: "Create a NEW file. Refuses to run if the path already exists unless overwrite=true is explicitly passed (reserved for deliberate full rewrites). For ANY modification of existing files, use replace_in_file — never write_file.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the new file",
-					},
-					"content": map[string]interface{}{
-						"type":        "string",
-						"description": "Full content for the new file",
-					},
-					"overwrite": map[string]interface{}{
-						"type":        "string",
-						"description": "Set to \"true\" ONLY when deliberately replacing an existing file wholesale. Defaults to false; any modification should go through replace_in_file instead.",
-					},
-				},
-				"required": []string{"path", "content"},
-			},
-		},
-		{
-			Name:        "replace_in_file",
-			Description: "Replace a unique substring in an existing file. You MUST call read_file on this path earlier in the session before calling replace_in_file — the tool will refuse otherwise. If the file changes on disk after your read, you must re-read it. old_text must match byte-for-byte — whitespace, punctuation, capitalization, and line breaks all count. Copy old_text directly from the read_file output. If a short phrase appears multiple times, expand old_text with surrounding context until it is unique.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the file",
-					},
-					"old_text": map[string]interface{}{
-						"type":        "string",
-						"description": "Text to find and replace (must be unique in the file)",
-					},
-					"new_text": map[string]interface{}{
-						"type":        "string",
-						"description": "Replacement text",
-					},
-				},
-				"required": []string{"path", "old_text", "new_text"},
-			},
-		},
-		{
-			Name:        "rename_file",
-			Description: "Move or rename a file",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"old_path": map[string]interface{}{
-						"type":        "string",
-						"description": "Current file path",
-					},
-					"new_path": map[string]interface{}{
-						"type":        "string",
-						"description": "New file path",
-					},
-				},
-				"required": []string{"old_path", "new_path"},
-			},
-		},
-		{
-			Name:        "delete_file",
-			Description: "Delete a file. Supports undo via /undo.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the file to delete",
-					},
-				},
-				"required": []string{"path"},
-			},
-		},
-		{
-			Name:        "list_dir",
-			Description: "List the contents of a directory. Use recursive=true for a tree view.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Path to the directory",
-					},
-					"recursive": map[string]interface{}{
-						"type":        "string",
-						"description": "Set to 'true' for recursive tree view",
-					},
-					"depth": map[string]interface{}{
-						"type":        "string",
-						"description": "Max depth for recursive listing (1-10, default 3)",
-					},
-				},
-				"required": []string{"path"},
-			},
-		},
-		{
-			Name:        "search_files",
-			Description: "Search for a text pattern in files recursively. Returns matches with surrounding context lines. Use glob to filter by file type.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"pattern": map[string]interface{}{
-						"type":        "string",
-						"description": "Text pattern to search for",
-					},
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Directory to search in (defaults to sandbox root)",
-					},
-					"context_lines": map[string]interface{}{
-						"type":        "string",
-						"description": "Number of context lines before/after each match (0-10, default 2)",
-					},
-					"glob": map[string]interface{}{
-						"type":        "string",
-						"description": "File name glob filter (e.g. \"*.go\", \"*.ts\", \"Makefile\")",
-					},
-				},
-				"required": []string{"pattern"},
-			},
-		},
-		{
-			Name:        "exec_command",
-			Description: "Execute a shell command and return its output. Runs in the sandbox root directory. Requires user approval.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"command": map[string]interface{}{
-						"type":        "string",
-						"description": "The shell command to execute",
-					},
-				},
-				"required": []string{"command"},
-			},
-		},
-		{
-			Name:        "save_memory",
-			Description: "Save a persistent memory for future sessions. Types: user (preferences, role), feedback (corrections, validated approaches), project (ongoing work context), reference (pointers to external systems).",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"name": map[string]interface{}{
-						"type":        "string",
-						"description": "Short unique name for the memory",
-					},
-					"description": map[string]interface{}{
-						"type":        "string",
-						"description": "One-line summary used when deciding relevance later",
-					},
-					"type": map[string]interface{}{
-						"type":        "string",
-						"description": "One of: user, feedback, project, reference",
-					},
-					"body": map[string]interface{}{
-						"type":        "string",
-						"description": "The memory content",
-					},
-				},
-				"required": []string{"name", "type", "body"},
-			},
-		},
-		{
-			Name:        "delete_memory",
-			Description: "Remove a stored memory by name.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"name": map[string]interface{}{
-						"type":        "string",
-						"description": "Name of the memory to delete",
-					},
-				},
-				"required": []string{"name"},
-			},
-		},
-		{
-			Name:        "list_memories",
-			Description: "List all stored memories with their types, descriptions, and bodies.",
-			Params: map[string]interface{}{
-				"type":       "object",
-				"properties": map[string]interface{}{},
-			},
-		},
-		{
-			Name:        "exit_plan_mode",
-			Description: "Present a plan to the user for approval and exit plan mode. Only callable while plan mode is active. Call this once investigation is done and you have a concrete plan to propose.",
-			Params: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"plan": map[string]interface{}{
-						"type":        "string",
-						"description": "The plan as markdown — steps, files to change, high-level approach.",
-					},
-				},
-				"required": []string{"plan"},
-			},
-		},
-	}
 }
 
 func formatDirEntry(e os.DirEntry) string {

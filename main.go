@@ -129,6 +129,10 @@ func main() {
 	} else {
 		ignoreMatcher = ignore.LoadGitignore(cfg.Sandbox.Root)
 	}
+	var outboundFilters []agent.OutboundFilter
+	if cfg.Sandbox.ScrubPII {
+		outboundFilters = append(outboundFilters, agent.ScrubPIIFilter)
+	}
 	a := agent.New(llm, sb, os.Stdout, confirm, auditLog, agent.Options{
 		Memory:           memoryStore,
 		CommandPolicy:    cmdPolicy,
@@ -137,7 +141,7 @@ func main() {
 		ThinkingVerbs:    cfg.Style.ThinkingVerbs,
 		MaxSessionTokens: cfg.Llm.MaxSessionTokens,
 		StreamTimeout:    llmStreamTimeout,
-		ScrubPII:         cfg.Sandbox.ScrubPII,
+		OutboundFilters:  outboundFilters,
 		ExecCPUSeconds:   cpuSec,
 		ExecMemoryMB:     memMB,
 		ExecMaxFileMB:    fileMB,
