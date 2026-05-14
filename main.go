@@ -135,9 +135,9 @@ func main() {
 	}
 	a := agent.New(llm, sb, os.Stdout, confirm, auditLog, agent.Options{
 		Memory:           memoryStore,
-		CommandPolicy:    cmdPolicy,
+		CmdPolicy:        cmdPolicy,
 		Ignore:           ignoreMatcher,
-		ProjectContext:   extraContext,
+		ProjectCtx:       extraContext,
 		ThinkingVerbs:    cfg.Style.ThinkingVerbs,
 		MaxSessionTokens: cfg.Llm.MaxSessionTokens,
 		StreamTimeout:    llmStreamTimeout,

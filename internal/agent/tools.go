@@ -23,7 +23,7 @@ var tools = []tool{
 		Verb:        "◇ reading",
 		ReadOnly:    true,
 		Quiet:       true,
-		Handler:     (*Agent).toolReadFile,
+		Handler:     (*Agent).readFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -38,7 +38,7 @@ var tools = []tool{
 		Name:        "write_file",
 		Description: "Create a NEW file. Refuses to run if the path already exists unless overwrite=true is explicitly passed (reserved for deliberate full rewrites). For ANY modification of existing files, use replace_in_file — never write_file.",
 		Verb:        "✎ writing",
-		Handler:     (*Agent).toolWriteFile,
+		Handler:     (*Agent).writeFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -53,7 +53,7 @@ var tools = []tool{
 		Name:        "replace_in_file",
 		Description: "Replace a unique substring in an existing file. You MUST call read_file on this path earlier in the session before calling replace_in_file — the tool will refuse otherwise. If the file changes on disk after your read, you must re-read it. old_text must match byte-for-byte — whitespace, punctuation, capitalization, and line breaks all count. Copy old_text directly from the read_file output. If a short phrase appears multiple times, expand old_text with surrounding context until it is unique.",
 		Verb:        "✎ editing",
-		Handler:     (*Agent).toolReplaceInFile,
+		Handler:     (*Agent).replaceInFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -68,7 +68,7 @@ var tools = []tool{
 		Name:        "rename_file",
 		Description: "Move or rename a file",
 		Verb:        "⇄ moving",
-		Handler:     (*Agent).toolRenameFile,
+		Handler:     (*Agent).renameFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -82,7 +82,7 @@ var tools = []tool{
 		Name:        "delete_file",
 		Description: "Delete a file. Supports undo via /undo.",
 		Verb:        "✕ deleting",
-		Handler:     (*Agent).toolDeleteFile,
+		Handler:     (*Agent).deleteFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -96,7 +96,7 @@ var tools = []tool{
 		Description: "List the contents of a directory. Use recursive=true for a tree view.",
 		Verb:        "≡ listing",
 		ReadOnly:    true,
-		Handler:     (*Agent).toolListDir,
+		Handler:     (*Agent).listDir,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -113,7 +113,7 @@ var tools = []tool{
 		Verb:        "⌕ searching",
 		ReadOnly:    true,
 		Quiet:       true,
-		Handler:     (*Agent).toolSearchFiles,
+		Handler:     (*Agent).searchFiles,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -130,7 +130,7 @@ var tools = []tool{
 		Description: "Execute a shell command and return its output. Runs in the sandbox root directory. Requires user approval.",
 		Verb:        "⚡ running",
 		Quiet:       true,
-		Handler:     (*Agent).toolExecCommand,
+		Handler:     (*Agent).execCmd,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -143,7 +143,7 @@ var tools = []tool{
 		Name:        "save_memory",
 		Description: "Save a persistent memory for future sessions. Types: user (preferences, role), feedback (corrections, validated approaches), project (ongoing work context), reference (pointers to external systems).",
 		Verb:        "◆ remembering",
-		Handler:     (*Agent).toolSaveMemory,
+		Handler:     (*Agent).saveMemory,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -159,7 +159,7 @@ var tools = []tool{
 		Name:        "delete_memory",
 		Description: "Remove a stored memory by name.",
 		Verb:        "◆ forgetting",
-		Handler:     (*Agent).toolDeleteMemory,
+		Handler:     (*Agent).deleteMemory,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -173,14 +173,14 @@ var tools = []tool{
 		Description: "List all stored memories with their types, descriptions, and bodies.",
 		Verb:        "◆ recalling",
 		ReadOnly:    true,
-		Handler:     (*Agent).toolListMemories,
+		Handler:     (*Agent).listMemories,
 		Params:      provider.Schema{Type: "object"},
 	},
 	{
 		Name:        "exit_plan_mode",
 		Description: "Present a plan to the user for approval and exit plan mode. Only callable while plan mode is active. Call this once investigation is done and you have a concrete plan to propose.",
 		ReadOnly:    true,
-		Handler:     (*Agent).toolExitPlanMode,
+		Handler:     (*Agent).exitPlanMode,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{

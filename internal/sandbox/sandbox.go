@@ -146,12 +146,12 @@ var imageExtensions = map[string]string{
 	".webp": "image/webp",
 }
 
-func ImageMimeType(path string) (string, bool) {
+func ImgMimeType(path string) (string, bool) {
 	mime, ok := imageExtensions[strings.ToLower(filepath.Ext(path))]
 	return mime, ok
 }
 
-func (s *Sandbox) ReadImageFile(path string) ([]byte, string, error) {
+func (s *Sandbox) ReadImg(path string) ([]byte, string, error) {
 	resolved, err := s.ValidatePath(path)
 	if err != nil {
 		return nil, "", err
