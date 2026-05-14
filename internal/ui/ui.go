@@ -17,14 +17,14 @@ const (
 	Italic        = "\033[3m"
 	Underline     = "\033[4m"
 	Strikethrough = "\033[9m"
-	Purple     = "\033[38;5;135m"
-	LightPurp  = "\033[38;5;183m"
-	BrightPurp = "\033[38;5;99m"
-	DarkPurp   = "\033[38;5;54m"
-	Violet     = "\033[38;5;141m"
-	Gray       = "\033[38;5;243m"
-	White      = "\033[38;5;255m"
-	BgPurple   = "\033[48;5;53m"
+	Purple        = "\033[38;5;135m"
+	LightPurp     = "\033[38;5;183m"
+	BrightPurp    = "\033[38;5;99m"
+	DarkPurp      = "\033[38;5;54m"
+	Violet        = "\033[38;5;141m"
+	Gray          = "\033[38;5;243m"
+	White         = "\033[38;5;255m"
+	BgPurple      = "\033[48;5;53m"
 
 	DKBrown  = "\033[38;5;94m"
 	DKTan    = "\033[38;5;223m"
@@ -121,7 +121,7 @@ func visibleWidth(s string) int {
 	return w
 }
 
-func Splash(provider, model, sandbox, version string, languages, tools []string) string {
+func Splash(provider, model, sandbox, version string, detected []string) string {
 	left := strings.Split(strings.TrimRight(Mascot(), "\n"), "\n")
 
 	title := fmt.Sprintf("%s%s k o k o %s", Bold, BrightPurp, Reset)
@@ -138,11 +138,8 @@ func Splash(provider, model, sandbox, version string, languages, tools []string)
 	right = append(right, Info("provider", provider))
 	right = append(right, Info("model   ", model))
 	right = append(right, Info("sandbox ", sandbox))
-	if len(languages) > 0 {
-		right = append(right, Info("project ", strings.Join(languages, ", ")))
-	}
-	if len(tools) > 0 {
-		right = append(right, Info("tools   ", strings.Join(tools, ", ")))
+	if len(detected) > 0 {
+		right = append(right, Info("stack", strings.Join(detected, ", ")))
 	}
 
 	leftW := 0
@@ -236,7 +233,6 @@ func FormatToolResult(name string, result string) string {
 	return fmt.Sprintf("%s %s%s%s", ToolTag(name), LightPurp, result, Reset)
 }
 
-
 func Error(text string) string {
 	return fmt.Sprintf("%s%serror:%s %s", Bold, "\033[38;5;197m", Reset, text)
 }
@@ -276,7 +272,7 @@ func Goodbye() string {
 const (
 	Red   = "\033[38;5;197m"
 	Green = "\033[38;5;114m"
-	Amber  = "\033[38;5;214m"
+	Amber = "\033[38;5;214m"
 )
 
 const (

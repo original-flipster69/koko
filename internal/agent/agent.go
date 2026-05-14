@@ -39,7 +39,7 @@ type Agent struct {
 	sandbox          *sandbox.Sandbox
 	ignore           *ignore.Matcher
 	memory           *memory.Store
-	cmdPolicy        *policy.CommandPolicy
+	cmdPolicy        *policy.CmdPolicy
 	tools            []provider.ToolDef
 	output           io.Writer
 	confirm          confirmFunc
@@ -103,7 +103,7 @@ func (a *Agent) PlanMode() bool {
 
 type Options struct {
 	Memory           *memory.Store
-	CmdPolicy        *policy.CommandPolicy
+	CmdPolicy        *policy.CmdPolicy
 	Ignore           *ignore.Matcher
 	ProjectCtx       string
 	ThinkingVerbs    []string

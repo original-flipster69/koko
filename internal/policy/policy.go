@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-type CommandPolicy struct {
-	Allowlist      []string
-	DenyPatterns   []string
-	denyCompiled   []*regexp.Regexp
-	allowedParsed  map[string]bool
-	requireAllow   bool
+type CmdPolicy struct {
+	Allowlist     []string
+	DenyPatterns  []string
+	denyCompiled  []*regexp.Regexp
+	allowedParsed map[string]bool
+	requireAllow  bool
 }
 
 var DefaultDenyPatterns = []string{
@@ -40,7 +40,7 @@ var DefaultDenyPatterns = []string{
 	`\bdd\s+if=/dev/`,
 }
 
-func NewCommandPolicy(allowlist, deny []string) (*CommandPolicy, error) {
+func NewCommandPolicy(allowlist, deny []string) (*CmdPolicy, error) {
 	if len(deny) == 0 {
 		deny = DefaultDenyPatterns
 	}
@@ -56,7 +56,7 @@ func NewCommandPolicy(allowlist, deny []string) (*CommandPolicy, error) {
 	for _, a := range allowlist {
 		allowed[a] = true
 	}
-	return &CommandPolicy{
+	return &CmdPolicy{
 		Allowlist:     allowlist,
 		DenyPatterns:  deny,
 		denyCompiled:  compiled,
@@ -65,7 +65,7 @@ func NewCommandPolicy(allowlist, deny []string) (*CommandPolicy, error) {
 	}, nil
 }
 
-func (p *CommandPolicy) Check(cmd string) error {
+func (p *CmdPolicy) Check(cmd string) error {
 	for i, re := range p.denyCompiled {
 		if re.MatchString(cmd) {
 			return fmt.Errorf("command blocked by deny pattern %q", p.DenyPatterns[i])
@@ -85,15 +85,15 @@ func (p *CommandPolicy) Check(cmd string) error {
 }
 
 func firstToken(cmd string) string {
-	trimmed := strings.TrimSpace(cmd)
-	if trimmed == "" {
+	trim := strings.TrimSpace(cmd)
+	if trim == "" {
 		return ""
 	}
-	for i := 0; i < len(trimmed); i++ {
-		c := trimmed[i]
+	for i := 0; i < len(trim); i++ {
+		c := trim[i]
 		if c == ' ' || c == '\t' {
-			return trimmed[:i]
+			return trim[:i]
 		}
 	}
-	return trimmed
+	return trim
 }

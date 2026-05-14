@@ -66,7 +66,7 @@ func loadLastHash(path string) (string, error) {
 		if e.PrevHash != prev {
 			return "", fmt.Errorf("audit: chain broken at line %d (expected prev_hash %q, got %q)", line, prev, e.PrevHash)
 		}
-		expected := hashEntry(e)
+		expected := e.hash()
 		if expected != e.Hash {
 			return "", fmt.Errorf("audit: tampered entry at line %d (hash mismatch)", line)
 		}
@@ -78,7 +78,7 @@ func loadLastHash(path string) (string, error) {
 	return prev, nil
 }
 
-func hashEntry(e entry) string {
+func (e entry) hash() string {
 	h := sha256.New()
 	h.Write([]byte(e.PrevHash))
 	h.Write([]byte(e.Timestamp))
@@ -103,7 +103,7 @@ func (l *Log) Record(tool string, args map[string]string, result string) {
 		Result:    truncate(result, 2048),
 		PrevHash:  l.lastHash,
 	}
-	entry.Hash = hashEntry(entry)
+	entry.Hash = entry.hash()
 	data, err := json.Marshal(entry)
 	if err != nil {
 		slog.Warn("audit marshal failed", "tool", tool, "err", err)

@@ -73,7 +73,7 @@ type Config struct {
 	Style   StyleConfig   `toml:"style"`
 }
 
-func DefaultConfig() *Config {
+func defaultConf() *Config {
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
@@ -110,7 +110,7 @@ func DefaultConfig() *Config {
 }
 
 func Load(path string) (*Config, error) {
-	cfg := DefaultConfig()
+	cfg := defaultConf()
 
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -263,6 +263,6 @@ func apiKeyEnvName(p Provider) string {
 	return ""
 }
 
-func ConfigPath(kokoDir string) string {
+func Path(kokoDir string) string {
 	return filepath.Join(kokoDir, "config.toml")
 }

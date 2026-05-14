@@ -15,11 +15,11 @@ import (
 	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/audit"
 	"github.com/original-flipster69/koko/internal/config"
-	"github.com/original-flipster69/koko/internal/detect"
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/memory"
 	"github.com/original-flipster69/koko/internal/plays"
 	"github.com/original-flipster69/koko/internal/policy"
+	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/sandbox"
 	"github.com/original-flipster69/koko/internal/tui"
@@ -40,7 +40,7 @@ func main() {
 
 	kokoDir := getKokoDir()
 
-	cfgPath := config.ConfigPath(kokoDir)
+	cfgPath := config.Path(kokoDir)
 	if *configFlag != "" {
 		cfgPath = *configFlag
 	}
@@ -59,7 +59,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	llm, err := provider.New(cfg)
+	llm, err := provider.New(&cfg.Llm)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 		os.Exit(1)
@@ -84,7 +84,7 @@ func main() {
 	}
 	slog.Info("session started", "provider", llm.Name(), "model", cfg.Llm.Model, "sandbox", cfg.Sandbox.Root)
 
-	project := detect.Project(cfg.Sandbox.Root)
+	stack := project.Scan(cfg.Sandbox.Root)
 	playsDir := filepath.Join(kokoDir, "plays")
 	playRegistry, err := plays.Load(playsDir)
 	if err != nil {
@@ -96,7 +96,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, ui.Error(fmt.Sprintf("cannot open memory store: %v", err)))
 		os.Exit(1)
 	}
-	extraContext := project.Summary()
+	extraContext := stack.Summary()
 	if idx := playRegistry.Index(); idx != "" {
 		if extraContext != "" {
 			extraContext += "\n\n"
@@ -147,7 +147,7 @@ func main() {
 		ExecMaxFileMB:    fileMB,
 	})
 
-	splash := "\n" + ui.Splash(llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, project.Languages, project.BuildTools) + "\n\n"
+	splash := "\n" + ui.Splash(llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
 
 	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry)
 
@@ -232,7 +232,7 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 			b.WriteString(ui.Info("exec", fmt.Sprintf("%s (%ds cpu, %dMB mem, %dMB file)", cfg.Sandbox.Exec.Profile, cpuSec, memMB, fileMB)) + "\n")
 			b.WriteString(ui.Info("scrub_pii", fmt.Sprintf("%v", cfg.Sandbox.ScrubPII)) + "\n")
 			b.WriteString(ui.Info("verbs", strings.Join(cfg.Style.ThinkingVerbs, ", ")) + "\n")
-			b.WriteString(ui.Info("config", config.ConfigPath(dataDir)))
+			b.WriteString(ui.Info("config", config.Path(dataDir)))
 			return true, "", b.String()
 		}},
 		":save": {desc: "save session to disk", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {

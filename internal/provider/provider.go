@@ -10,7 +10,6 @@ import (
 	"strconv"
 
 	"github.com/original-flipster69/koko/internal/config"
-	"github.com/original-flipster69/koko/internal/httputil"
 )
 
 type role string
@@ -106,7 +105,7 @@ func sendReq(ctx context.Context, client *http.Client, url string, body any, hea
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
-	resp, err := httputil.WithRetry(ctx, client, req, 5)
+	resp, err := withRetry(ctx, client, req, 5)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}
@@ -147,15 +146,15 @@ func coerceArgs(input map[string]interface{}) map[string]string {
 	return args
 }
 
-func New(cfg *config.Config) (Provider, error) {
-	switch cfg.Llm.Provider {
+func New(cfg *config.LlmConfig) (Provider, error) {
+	switch cfg.Provider {
 	case config.Claude:
-		return newClaude(cfg.Llm.ApiKey, cfg.Llm.Model, cfg.Llm.Url, cfg.Llm.MaxTokens)
+		return newClaude(cfg.ApiKey, cfg.Model, cfg.Url, cfg.MaxTokens)
 	case config.Mistral:
-		return newMistral(cfg.Llm.ApiKey, cfg.Llm.Model, cfg.Llm.Url)
+		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url)
 	case config.Ollama:
-		return newOllama(cfg.Llm.Model, cfg.Llm.Url)
+		return newOllama(cfg.Model, cfg.Url)
 	default:
-		return nil, fmt.Errorf("unsupported provider: %q", cfg.Llm.Provider)
+		return nil, fmt.Errorf("unsupported provider: %q", cfg.Provider)
 	}
 }

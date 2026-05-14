@@ -1,4 +1,4 @@
-package httputil
+package provider
 
 import (
 	"context"
@@ -14,7 +14,7 @@ const (
 	maxBackoff  = 30 * time.Second
 )
 
-func WithRetry(ctx context.Context, client *http.Client, req *http.Request, maxAttempts int) (*http.Response, error) {
+func withRetry(ctx context.Context, client *http.Client, req *http.Request, maxAttempts int) (*http.Response, error) {
 	var lastErr error
 	var lastStatus int
 	var nextWait time.Duration

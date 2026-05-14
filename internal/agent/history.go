@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/original-flipster69/koko/internal/provider"
-	"github.com/original-flipster69/koko/internal/session"
 )
 
 const (
@@ -34,11 +33,11 @@ func (a *Agent) SaveSession(dir string) error {
 	a.mu.Lock()
 	snapshot := append([]provider.Msg(nil), a.history[1:]...)
 	a.mu.Unlock()
-	return session.Save(dir, snapshot)
+	return saveSession(dir, snapshot)
 }
 
 func (a *Agent) LoadSession(dir string) error {
-	msgs, err := session.Load(dir)
+	msgs, err := loadSession(dir)
 	if err != nil {
 		return err
 	}
