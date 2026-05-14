@@ -423,8 +423,8 @@ func (a *Agent) requireArgs(tc provider.ToolCall, keys ...string) error {
 	return fmt.Errorf("HARD FAIL: %s missing required arg(s): %s — reissue with all args (%s)", tc.Name, strings.Join(missing, ", "), strings.Join(keys, ", "))
 }
 
-func (a *Agent) readImg(path string) string {
-	data, mime, err := a.sandbox.ReadImg(path)
+func (a *Agent) readImg(rawPath string, vp sandbox.ValidPath) string {
+	data, mime, err := a.sandbox.ReadImg(vp)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
@@ -433,7 +433,7 @@ func (a *Agent) readImg(path string) string {
 		Mime: mime,
 		Data: encoded,
 	})
-	return fmt.Sprintf("[image: %s (%s, %d bytes)]", path, mime, len(data))
+	return fmt.Sprintf("[image: %s (%s, %d bytes)]", rawPath, mime, len(data))
 }
 
 func (a *Agent) execTool(ctx context.Context, tc provider.ToolCall) string {
@@ -451,17 +451,22 @@ func (a *Agent) readFile(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.requireArgs(tc, "path"); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if _, ok := sandbox.ImgMimeType(tc.Args["path"]); ok {
-		return a.readImg(tc.Args["path"])
-	}
-	content, err := a.editor.ReadFile(tc.Args["path"])
+	rawPath := tc.Args["path"]
+	vp, err := a.sandbox.ValidatePath(rawPath)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	a.editor.MarkRead(tc.Args["path"], content)
+	if _, ok := sandbox.ImgMimeType(rawPath); ok {
+		return a.readImg(rawPath, vp)
+	}
+	content, err := a.editor.ReadFile(vp)
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	a.editor.MarkRead(vp, content)
 	redacted, count := secrets.Redact(content)
 	if count > 0 {
-		slog.Warn("secrets redacted", "path", tc.Args["path"], "count", count)
+		slog.Warn("secrets redacted", "path", rawPath, "count", count)
 	}
 	content = redacted
 	lines := strings.Split(content, "\n")
@@ -490,11 +495,16 @@ func (a *Agent) readFile(ctx context.Context, tc provider.ToolCall) string {
 	for i := startLine; i <= endLine; i++ {
 		numbered.WriteString(fmt.Sprintf("%d\t%s\n", i, lines[i-1]))
 	}
-	return fmt.Sprintf("[%s lines %d-%d of %d]\n%s", tc.Args["path"], startLine, endLine, len(lines), numbered.String())
+	return fmt.Sprintf("[%s lines %d-%d of %d]\n%s", rawPath, startLine, endLine, len(lines), numbered.String())
 }
 
 func (a *Agent) writeFile(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.requireArgs(tc, "path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	rawPath := tc.Args["path"]
+	vp, err := a.sandbox.ValidatePath(rawPath)
+	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	if found := secrets.Scan(tc.Args["content"]); len(found) > 0 {
@@ -504,20 +514,25 @@ func (a *Agent) writeFile(ctx context.Context, tc provider.ToolCall) string {
 		}
 		return fmt.Sprintf("error: refusing to write — content contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
 	}
-	oldContent, _ := a.editor.ReadFile(tc.Args["path"])
+	oldContent, _ := a.editor.ReadFile(vp)
 	overwrite := boolArg(tc.Args["overwrite"])
-	if err := a.editor.WriteFile(tc.Args["path"], tc.Args["content"], overwrite); err != nil {
+	if err := a.editor.WriteFile(vp, tc.Args["content"], overwrite); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	d := diff.Unified(oldContent, tc.Args["content"], tc.Args["path"])
+	d := diff.Unified(oldContent, tc.Args["content"], rawPath)
 	if d != "" {
 		fmt.Fprint(a.output, ui.ColorDiff(d))
 	}
-	return fmt.Sprintf("wrote %s", tc.Args["path"])
+	return fmt.Sprintf("wrote %s", rawPath)
 }
 
 func (a *Agent) replaceInFile(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.requireArgs(tc, "path", "old_text"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	rawPath := tc.Args["path"]
+	vp, err := a.sandbox.ValidatePath(rawPath)
+	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	if found := secrets.Scan(tc.Args["new_text"]); len(found) > 0 {
@@ -527,39 +542,59 @@ func (a *Agent) replaceInFile(ctx context.Context, tc provider.ToolCall) string 
 		}
 		return fmt.Sprintf("error: refusing to replace — new_text contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
 	}
-	oldContent, newContent, err := a.editor.ReplaceInFile(tc.Args["path"], tc.Args["old_text"], tc.Args["new_text"])
+	oldContent, newContent, err := a.editor.ReplaceInFile(vp, tc.Args["old_text"], tc.Args["new_text"])
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	d := diff.Unified(oldContent, newContent, tc.Args["path"])
+	d := diff.Unified(oldContent, newContent, rawPath)
 	if d != "" {
 		fmt.Fprint(a.output, ui.ColorDiff(d))
 	}
-	return fmt.Sprintf("updated %s", tc.Args["path"])
+	return fmt.Sprintf("updated %s", rawPath)
 }
 
 func (a *Agent) deleteFile(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.requireArgs(tc, "path"); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if err := a.editor.DeleteFile(tc.Args["path"]); err != nil {
+	rawPath := tc.Args["path"]
+	vp, err := a.sandbox.ValidatePath(rawPath)
+	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	return fmt.Sprintf("deleted %s", tc.Args["path"])
+	if err := a.editor.DeleteFile(vp); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("deleted %s", rawPath)
 }
 
 func (a *Agent) renameFile(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.requireArgs(tc, "old_path", "new_path"); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if err := a.editor.RenameFile(tc.Args["old_path"], tc.Args["new_path"]); err != nil {
+	rawOld := tc.Args["old_path"]
+	rawNew := tc.Args["new_path"]
+	vpOld, err := a.sandbox.ValidatePath(rawOld)
+	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	return fmt.Sprintf("renamed %s → %s", tc.Args["old_path"], tc.Args["new_path"])
+	vpNew, err := a.sandbox.ValidatePath(rawNew)
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	if err := a.editor.RenameFile(vpOld, vpNew); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("renamed %s → %s", rawOld, rawNew)
 }
 
 func (a *Agent) listDir(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.requireArgs(tc, "path"); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	rawPath := tc.Args["path"]
+	vp, err := a.sandbox.ValidatePath(rawPath)
+	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	if boolArg(tc.Args["recursive"]) {
@@ -569,9 +604,9 @@ func (a *Agent) listDir(ctx context.Context, tc provider.ToolCall) string {
 				maxDepth = n
 			}
 		}
-		return a.buildTree(tc.Args["path"], "", 0, maxDepth)
+		return a.buildTree(vp, "", 0, maxDepth)
 	}
-	resolved, entries, err := a.editor.ListDir(tc.Args["path"])
+	resolved, entries, err := a.editor.ListDir(vp)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
@@ -706,7 +741,7 @@ var skipDirs = map[string]bool{
 	"target": true, ".cache": true, "coverage": true,
 }
 
-func (a *Agent) buildTree(dir, prefix string, depth, maxDepth int) string {
+func (a *Agent) buildTree(dir sandbox.ValidPath, prefix string, depth, maxDepth int) string {
 	if depth >= maxDepth {
 		return ""
 	}
@@ -744,7 +779,11 @@ func (a *Agent) buildTree(dir, prefix string, depth, maxDepth int) string {
 			if isLast {
 				childPrefix = prefix + "    "
 			}
-			sub := a.buildTree(filepath.Join(dir, name), childPrefix, depth+1, maxDepth)
+			childPath, err := a.sandbox.ValidatePath(filepath.Join(string(dir), name))
+			if err != nil {
+				continue
+			}
+			sub := a.buildTree(childPath, childPrefix, depth+1, maxDepth)
 			result.WriteString(sub)
 		}
 	}

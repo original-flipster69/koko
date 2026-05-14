@@ -27,8 +27,8 @@ var lockfiles = map[string]string{
 	"uv.lock":           "uv lock",
 }
 
-func lockfileGuard(path string) error {
-	base := filepath.Base(path)
+func lockfileGuard(path sandbox.ValidPath) error {
+	base := filepath.Base(string(path))
 	if manager, ok := lockfiles[base]; ok {
 		return fmt.Errorf("refusing to modify lockfile %q directly — run `%s` via exec_command instead", base, manager)
 	}
@@ -36,7 +36,7 @@ func lockfileGuard(path string) error {
 }
 
 type undoEntry struct {
-	path    string
+	path    sandbox.ValidPath
 	content string
 	existed bool
 }
@@ -45,26 +45,26 @@ type Editor struct {
 	sandbox   *sandbox.Sandbox
 	mu        sync.Mutex
 	undoStack []undoEntry
-	reads     map[string][32]byte
+	reads     map[sandbox.ValidPath][32]byte
 }
 
 func New(sb *sandbox.Sandbox) *Editor {
-	return &Editor{sandbox: sb, reads: make(map[string][32]byte)}
+	return &Editor{sandbox: sb, reads: make(map[sandbox.ValidPath][32]byte)}
 }
 
-func (e *Editor) MarkRead(path, content string) {
+func (e *Editor) MarkRead(path sandbox.ValidPath, content string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.reads[path] = sha256.Sum256([]byte(content))
 }
 
-func (e *Editor) ForgetRead(path string) {
+func (e *Editor) ForgetRead(path sandbox.ValidPath) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	delete(e.reads, path)
 }
 
-func (e *Editor) readHash(path string) ([32]byte, bool) {
+func (e *Editor) readHash(path sandbox.ValidPath) ([32]byte, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	h, ok := e.reads[path]
@@ -80,19 +80,20 @@ func (e *Editor) Undo() (string, error) {
 	}
 	entry := e.undoStack[len(e.undoStack)-1]
 	e.undoStack = e.undoStack[:len(e.undoStack)-1]
+	pathStr := string(entry.path)
 	if !entry.existed {
-		if err := os.Remove(entry.path); err != nil && !os.IsNotExist(err) {
-			return entry.path, fmt.Errorf("removing %s: %w", entry.path, err)
+		if err := e.sandbox.DeleteFile(entry.path); err != nil && !os.IsNotExist(err) {
+			return pathStr, fmt.Errorf("removing %s: %w", pathStr, err)
 		}
-		return entry.path, nil
+		return pathStr, nil
 	}
 	if err := e.sandbox.WriteFile(entry.path, entry.content); err != nil {
-		return entry.path, fmt.Errorf("restoring %s: %w", entry.path, err)
+		return pathStr, fmt.Errorf("restoring %s: %w", pathStr, err)
 	}
-	return entry.path, nil
+	return pathStr, nil
 }
 
-func (e *Editor) saveUndo(path string) {
+func (e *Editor) saveUndo(path sandbox.ValidPath) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -104,11 +105,11 @@ func (e *Editor) saveUndo(path string) {
 	e.undoStack = append(e.undoStack, undoEntry{path: path, content: content, existed: true})
 }
 
-func (e *Editor) ReadFile(path string) (string, error) {
+func (e *Editor) ReadFile(path sandbox.ValidPath) (string, error) {
 	return e.sandbox.ReadFile(path)
 }
 
-func (e *Editor) WriteFile(path string, content string, overwrite bool) error {
+func (e *Editor) WriteFile(path sandbox.ValidPath, content string, overwrite bool) error {
 	if err := lockfileGuard(path); err != nil {
 		return err
 	}
@@ -123,7 +124,7 @@ func (e *Editor) WriteFile(path string, content string, overwrite bool) error {
 	return nil
 }
 
-func (e *Editor) ReplaceInFile(path, oldText, newText string) (before string, after string, err error) {
+func (e *Editor) ReplaceInFile(path sandbox.ValidPath, oldText, newText string) (before string, after string, err error) {
 	if err := lockfileGuard(path); err != nil {
 		return "", "", err
 	}
@@ -264,7 +265,7 @@ func fuzzyWhitespaceMatch(content, oldText string) (int, int, int, bool) {
 	return 0, 0, len(matches), false
 }
 
-func (e *Editor) RenameFile(oldPath, newPath string) error {
+func (e *Editor) RenameFile(oldPath, newPath sandbox.ValidPath) error {
 	e.saveUndo(oldPath)
 	if err := e.sandbox.RenameFile(oldPath, newPath); err != nil {
 		return err
@@ -274,7 +275,7 @@ func (e *Editor) RenameFile(oldPath, newPath string) error {
 	return nil
 }
 
-func (e *Editor) DeleteFile(path string) error {
+func (e *Editor) DeleteFile(path sandbox.ValidPath) error {
 	if err := lockfileGuard(path); err != nil {
 		return err
 	}
@@ -286,7 +287,7 @@ func (e *Editor) DeleteFile(path string) error {
 	return nil
 }
 
-func (e *Editor) ListDir(path string) (string, []os.DirEntry, error) {
+func (e *Editor) ListDir(path sandbox.ValidPath) (string, []os.DirEntry, error) {
 	return e.sandbox.ListDir(path)
 }
 

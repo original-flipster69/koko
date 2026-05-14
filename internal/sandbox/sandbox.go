@@ -9,6 +9,8 @@ import (
 	"syscall"
 )
 
+type ValidPath string
+
 type Sandbox struct {
 	root        string
 	allowedDirs []string
@@ -80,7 +82,7 @@ func (s *Sandbox) Root() string {
 	return s.root
 }
 
-func (s *Sandbox) ValidatePath(path string) (string, error) {
+func (s *Sandbox) ValidatePath(path string) (ValidPath, error) {
 	resolved, err := filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("resolving path: %w", err)
@@ -114,7 +116,7 @@ func (s *Sandbox) ValidatePath(path string) (string, error) {
 		return "", fmt.Errorf("path %q matches a denied file pattern", path)
 	}
 
-	return evaluated, nil
+	return ValidPath(evaluated), nil
 }
 
 func looksBinary(data []byte) bool {
@@ -151,14 +153,11 @@ func ImgMimeType(path string) (string, bool) {
 	return mime, ok
 }
 
-func (s *Sandbox) ReadImg(path string) ([]byte, string, error) {
-	resolved, err := s.ValidatePath(path)
-	if err != nil {
-		return nil, "", err
-	}
+func (s *Sandbox) ReadImg(p ValidPath) ([]byte, string, error) {
+	resolved := string(p)
 	mime, ok := imageExtensions[strings.ToLower(filepath.Ext(resolved))]
 	if !ok {
-		return nil, "", fmt.Errorf("%q is not a supported image format", path)
+		return nil, "", fmt.Errorf("%q is not a supported image format", resolved)
 	}
 	file, err := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
@@ -170,7 +169,7 @@ func (s *Sandbox) ReadImg(path string) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("stat: %w", err)
 	}
 	if info.Size() > s.maxFileSize {
-		return nil, "", fmt.Errorf("image %q exceeds max size (%d bytes)", path, s.maxFileSize)
+		return nil, "", fmt.Errorf("image %q exceeds max size (%d bytes)", resolved, s.maxFileSize)
 	}
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -179,12 +178,8 @@ func (s *Sandbox) ReadImg(path string) ([]byte, string, error) {
 	return data, mime, nil
 }
 
-func (s *Sandbox) ReadFile(path string) (string, error) {
-	resolved, err := s.ValidatePath(path)
-	if err != nil {
-		return "", err
-	}
-
+func (s *Sandbox) ReadFile(p ValidPath) (string, error) {
+	resolved := string(p)
 	file, err := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return "", fmt.Errorf("reading file: %w", err)
@@ -196,7 +191,7 @@ func (s *Sandbox) ReadFile(path string) (string, error) {
 		return "", fmt.Errorf("stat: %w", err)
 	}
 	if info.Size() > s.maxFileSize {
-		return "", fmt.Errorf("file %q exceeds max size (%d bytes)", path, s.maxFileSize)
+		return "", fmt.Errorf("file %q exceeds max size (%d bytes)", resolved, s.maxFileSize)
 	}
 
 	data, err := io.ReadAll(file)
@@ -204,19 +199,15 @@ func (s *Sandbox) ReadFile(path string) (string, error) {
 		return "", fmt.Errorf("reading file: %w", err)
 	}
 	if looksBinary(data) {
-		return "", fmt.Errorf("refusing to read %q: content appears to be binary", path)
+		return "", fmt.Errorf("refusing to read %q: content appears to be binary", resolved)
 	}
 	return string(data), nil
 }
 
-func (s *Sandbox) WriteFile(path string, content string) error {
-	resolved, err := s.ValidatePath(path)
-	if err != nil {
-		return err
-	}
-
+func (s *Sandbox) WriteFile(p ValidPath, content string) error {
+	resolved := string(p)
 	if looksBinary([]byte(content)) {
-		return fmt.Errorf("refusing to write %q: content appears to be binary", path)
+		return fmt.Errorf("refusing to write %q: content appears to be binary", resolved)
 	}
 
 	if int64(len(content)) > s.maxFileSize {
@@ -253,11 +244,8 @@ func (s *Sandbox) WriteFile(path string, content string) error {
 	return nil
 }
 
-func (s *Sandbox) ListDir(path string) (string, []os.DirEntry, error) {
-	resolved, err := s.ValidatePath(path)
-	if err != nil {
-		return "", nil, err
-	}
+func (s *Sandbox) ListDir(p ValidPath) (string, []os.DirEntry, error) {
+	resolved := string(p)
 	entries, err := os.ReadDir(resolved)
 	if err != nil {
 		return "", nil, fmt.Errorf("reading directory: %w", err)
@@ -265,28 +253,17 @@ func (s *Sandbox) ListDir(path string) (string, []os.DirEntry, error) {
 	return resolved, entries, nil
 }
 
-func (s *Sandbox) RenameFile(oldPath, newPath string) error {
-	resolvedOld, err := s.ValidatePath(oldPath)
-	if err != nil {
-		return err
-	}
-	resolvedNew, err := s.ValidatePath(newPath)
-	if err != nil {
-		return err
-	}
+func (s *Sandbox) RenameFile(oldPath, newPath ValidPath) error {
+	resolvedNew := string(newPath)
 	dir := filepath.Dir(resolvedNew)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
 	}
-	return os.Rename(resolvedOld, resolvedNew)
+	return os.Rename(string(oldPath), resolvedNew)
 }
 
-func (s *Sandbox) DeleteFile(path string) error {
-	resolved, err := s.ValidatePath(path)
-	if err != nil {
-		return err
-	}
-	return os.Remove(resolved)
+func (s *Sandbox) DeleteFile(p ValidPath) error {
+	return os.Remove(string(p))
 }
 
 func (s *Sandbox) isDenied(path string) bool {
