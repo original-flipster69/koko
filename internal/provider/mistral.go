@@ -156,7 +156,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		rawArgs := acc.args.String()
 		var parsed map[string]interface{}
 		if err := json.Unmarshal([]byte(rawArgs), &parsed); err != nil {
-			slog.Warn("mistral stream tool args parse failed", "tool", acc.name, "raw", rawArgs, "err", err)
+			slog.Warn("mistral stream tool args parse failed", "tool", acc.name, "raw_len", len(rawArgs), "err", err)
 			continue
 		}
 		args := coerceArgs(parsed)

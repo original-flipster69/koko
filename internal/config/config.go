@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -182,7 +183,34 @@ func (l *LlmConfig) Validate() error {
 	if l.MaxSessionTokens < 0 {
 		return fmt.Errorf("llm.max_session_tokens must be non-negative (got %d; use 0 for unlimited)", l.MaxSessionTokens)
 	}
+	if l.Url != "" {
+		if err := validateLlmUrl(l.Url); err != nil {
+			return fmt.Errorf("llm.url: %w", err)
+		}
+	}
 	return nil
+}
+
+func validateLlmUrl(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid url: %w", err)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("url must include a host")
+	}
+	switch u.Scheme {
+	case "https":
+		return nil
+	case "http":
+		host := u.Hostname()
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+			return nil
+		}
+		return fmt.Errorf("plain http only allowed for localhost (got host %q)", host)
+	default:
+		return fmt.Errorf("scheme must be https or http (got %q)", u.Scheme)
+	}
 }
 
 func (s *SandboxConfig) AllowedDirs() []string {

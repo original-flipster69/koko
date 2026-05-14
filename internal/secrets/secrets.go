@@ -3,6 +3,7 @@ package secrets
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -13,31 +14,38 @@ type Match struct {
 }
 
 type pattern struct {
-	kind string
-	re   *regexp.Regexp
+	kind     string
+	re       *regexp.Regexp
+	validate func(string) bool
 }
 
 var patterns = []pattern{
-	{"aws_access_key", regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)},
-	{"aws_secret_key", regexp.MustCompile(`(?i)aws_secret[_-]?access[_-]?key["'\s:=]+["']?([A-Za-z0-9/+=]{40})["']?`)},
-	{"github_pat", regexp.MustCompile(`\bghp_[A-Za-z0-9]{36}\b`)},
-	{"github_oauth", regexp.MustCompile(`\bgho_[A-Za-z0-9]{36}\b`)},
-	{"github_refresh", regexp.MustCompile(`\bghr_[A-Za-z0-9]{36}\b`)},
-	{"github_server", regexp.MustCompile(`\bghs_[A-Za-z0-9]{36}\b`)},
-	{"google_api_key", regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`)},
-	{"slack_token", regexp.MustCompile(`\bxox[baprs]-[0-9A-Za-z-]{10,}\b`)},
-	{"stripe_key", regexp.MustCompile(`\b(?:sk|pk|rk)_(?:live|test)_[0-9A-Za-z]{24,}\b`)},
-	{"openai_key", regexp.MustCompile(`\bsk-[A-Za-z0-9]{32,}\b`)},
-	{"anthropic_key", regexp.MustCompile(`\bsk-ant-[A-Za-z0-9_\-]{32,}\b`)},
-	{"jwt", regexp.MustCompile(`\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b`)},
-	{"private_key", regexp.MustCompile(`-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----`)},
-	{"generic_secret", regexp.MustCompile(`(?i)(?:api[_-]?key|secret|token|password|passwd|auth)["'\s:=]+["']([A-Za-z0-9_\-]{24,})["']`)},
+	{kind: "aws_access_key", re: regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`)},
+	{kind: "aws_secret_key", re: regexp.MustCompile(`(?i)aws_secret[_-]?access[_-]?key["'\s:=]+["']?([A-Za-z0-9/+=]{40})["']?`)},
+	{kind: "github_pat", re: regexp.MustCompile(`\bghp_[A-Za-z0-9]{36}\b`)},
+	{kind: "github_oauth", re: regexp.MustCompile(`\bgho_[A-Za-z0-9]{36}\b`)},
+	{kind: "github_user_to_server", re: regexp.MustCompile(`\bghu_[A-Za-z0-9]{36}\b`)},
+	{kind: "github_refresh", re: regexp.MustCompile(`\bghr_[A-Za-z0-9]{36}\b`)},
+	{kind: "github_server", re: regexp.MustCompile(`\bghs_[A-Za-z0-9]{36}\b`)},
+	{kind: "google_api_key", re: regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`)},
+	{kind: "slack_token", re: regexp.MustCompile(`\bxox[baprs]-[0-9A-Za-z-]{10,}\b`)},
+	{kind: "stripe_key", re: regexp.MustCompile(`\b(?:sk|pk|rk)_(?:live|test)_[0-9A-Za-z]{24,}\b`)},
+	{kind: "openai_key", re: regexp.MustCompile(`\bsk-[A-Za-z0-9]{32,}\b`)},
+	{kind: "anthropic_key", re: regexp.MustCompile(`\bsk-ant-[A-Za-z0-9_\-]{32,}\b`)},
+	{kind: "jwt", re: regexp.MustCompile(`\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b`)},
+	{kind: "private_key", re: regexp.MustCompile(`-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PR
+  KEY-----`)},
+	{kind: "generic_secret", re: regexp.MustCompile(`(?i)(?:api[_-]?key|secret|token|password|passwd|auth)
+  =]+["']?([A-Za-z0-9_\-]{24,})["']?`)},
 }
 
 func Scan(content string) []Match {
 	var matches []Match
 	for _, p := range patterns {
 		for _, loc := range p.re.FindAllStringIndex(content, -1) {
+			if p.validate != nil && !p.validate(content[loc[0]:loc[1]]) {
+				continue
+			}
 			matches = append(matches, Match{Kind: p.kind, Start: loc[0], End: loc[1]})
 		}
 	}
@@ -68,9 +76,5 @@ func Redact(content string) (string, int) {
 }
 
 func sortMatches(matches []Match) {
-	for i := 1; i < len(matches); i++ {
-		for j := i; j > 0 && matches[j-1].Start > matches[j].Start; j-- {
-			matches[j-1], matches[j] = matches[j], matches[j-1]
-		}
-	}
+	sort.Slice(matches, func(i, j int) bool { return matches[i].Start < matches[j].Start })
 }

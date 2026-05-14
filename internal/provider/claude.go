@@ -156,7 +156,7 @@ func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, on
 				if err := json.Unmarshal([]byte(rawArgs), &raw); err == nil {
 					args = coerceArgs(raw)
 				} else {
-					slog.Warn("claude stream tool args parse failed", "tool", currentToolName, "raw", rawArgs, "err", err)
+					slog.Warn("claude stream tool args parse failed", "tool", currentToolName, "raw_len", len(rawArgs), "err", err)
 				}
 				result.ToolCalls = append(result.ToolCalls, ToolCall{
 					Name: currentToolName,
