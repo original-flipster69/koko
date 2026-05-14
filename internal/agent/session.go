@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/original-flipster69/koko/internal/privacy"
 	"github.com/original-flipster69/koko/internal/provider"
-	"github.com/original-flipster69/koko/internal/secrets"
 )
 
 type sessionFile struct {
@@ -23,7 +23,7 @@ func saveSession(dir string, history []provider.Msg) error {
 			redacted[i] = m
 			continue
 		}
-		content, _ := secrets.RedactAll(m.Content)
+		content, _ := privacy.RedactAll(m.Content)
 		redacted[i] = provider.Msg{Role: m.Role, Content: content}
 	}
 	data, err := json.MarshalIndent(sessionFile{History: redacted}, "", "  ")
@@ -44,4 +44,3 @@ func loadSession(dir string) ([]provider.Msg, error) {
 	}
 	return s.History, nil
 }
-

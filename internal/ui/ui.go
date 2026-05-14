@@ -3,11 +3,7 @@ package ui
 import (
 	"fmt"
 	"math/rand"
-	"os"
-	"strconv"
 	"strings"
-
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -25,13 +21,6 @@ const (
 	Gray          = "\033[38;5;243m"
 	White         = "\033[38;5;255m"
 	BgPurple      = "\033[48;5;53m"
-
-	DKBrown  = "\033[38;5;94m"
-	DKTan    = "\033[38;5;223m"
-	DKMuzzle = "\033[38;5;180m"
-	DKRed    = "\033[38;5;196m"
-	DKYellow = "\033[38;5;226m"
-	DKBlack  = "\033[38;5;16m"
 )
 
 func Mascot() string {
@@ -87,19 +76,6 @@ func colorizeMascot(line string) string {
 	}
 	b.WriteString(Reset)
 	return b.String()
-}
-
-func Banner() string {
-	return fmt.Sprintf(""+
-		"%s%s╔══════════════════════════════════════════╗%s\n"+
-		"%s%s║%s  %s%s k o k o%s                        %s%s║%s\n"+
-		"%s%s║%s  %s▸ secure coding assistant%s               %s%s║%s\n"+
-		"%s%s╚══════════════════════════════════════════╝%s",
-		Bold, BrightPurp, Reset,
-		Bold, BrightPurp, Reset, Bold, LightPurp, Reset, Bold, BrightPurp, Reset,
-		Bold, BrightPurp, Reset, Purple, Reset, Bold, BrightPurp, Reset,
-		Bold, BrightPurp, Reset,
-	)
 }
 
 func visibleWidth(s string) int {
@@ -189,19 +165,7 @@ func Splash(provider, model, sandbox, version string, detected []string) string 
 }
 
 func Info(label string, value string) string {
-	return fmt.Sprintf("  %s%-9s%s %s%s%s", DarkPurp, label, Reset, Violet, value, Reset)
-}
-
-func Prompt() string {
-	bar := strings.Repeat("─", 40)
-	return fmt.Sprintf("%s%s╭─ you %s%s\n%s%s│ ▶ %s",
-		Bold, BrightPurp, bar, Reset,
-		Bold, BrightPurp, Reset,
-	)
-}
-
-func MultilinePrompt() string {
-	return fmt.Sprintf("%s%s · %s", Dim, Purple, Reset)
+	return fmt.Sprintf("  %s%-9s%s %s%s%s", Violet, label, Reset, Amber, value, Reset)
 }
 
 var toolSymbols = map[string]string{
@@ -352,36 +316,4 @@ func ColorDiff(diffText string) string {
 		out.WriteString(fmt.Sprintf("  %s╰─%s\n", BrightPurp, Reset))
 	}
 	return out.String()
-}
-
-func diffWidth() int {
-	if c := termCols(); c >= 40 {
-		return c
-	}
-	if s := os.Getenv("COLUMNS"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n >= 40 {
-			return n
-		}
-	}
-	return 100
-}
-
-func termCols() int {
-	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
-	if err != nil || ws.Col == 0 {
-		return 0
-	}
-	return int(ws.Col)
-}
-
-func runeLen(s string) int {
-	return len([]rune(s))
-}
-
-func truncateRunes(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	return string(r[:n])
 }

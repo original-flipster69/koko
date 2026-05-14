@@ -23,9 +23,9 @@ import (
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/memory"
 	"github.com/original-flipster69/koko/internal/policy"
+	"github.com/original-flipster69/koko/internal/privacy"
 	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/sandbox"
-	"github.com/original-flipster69/koko/internal/secrets"
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
@@ -396,7 +396,7 @@ func ScrubPIIFilter(in []provider.Msg) []provider.Msg {
 			out[i] = m
 			continue
 		}
-		scrubbed, _ := secrets.RedactAll(m.Content)
+		scrubbed, _ := privacy.RedactAll(m.Content)
 		out[i] = provider.Msg{Role: m.Role, Content: scrubbed, Imgs: m.Imgs}
 	}
 	return out
@@ -464,9 +464,9 @@ func (a *Agent) readFile(ctx context.Context, tc provider.ToolCall) string {
 		return fmt.Sprintf("error: %v", err)
 	}
 	a.editor.MarkRead(vp, content)
-	redacted, count := secrets.Redact(content)
+	redacted, count := privacy.Redact(content)
 	if count > 0 {
-		slog.Warn("secrets redacted", "path", rawPath, "count", count)
+		slog.Warn("privacy redacted", "path", rawPath, "count", count)
 	}
 	content = redacted
 	lines := strings.Split(content, "\n")
@@ -507,12 +507,12 @@ func (a *Agent) writeFile(ctx context.Context, tc provider.ToolCall) string {
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if found := secrets.Scan(tc.Args["content"]); len(found) > 0 {
+	if found := privacy.Scan(tc.Args["content"]); len(found) > 0 {
 		kinds := make([]string, 0, len(found))
 		for _, m := range found {
 			kinds = append(kinds, m.Kind)
 		}
-		return fmt.Sprintf("error: refusing to write — content contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
+		return fmt.Sprintf("error: refusing to write — content contains apparent privacy (%s). Remove or redact them first.", strings.Join(kinds, ", "))
 	}
 	oldContent, _ := a.editor.Read(vp)
 	overwrite := boolArg(tc.Args["overwrite"])
@@ -535,12 +535,12 @@ func (a *Agent) replaceInFile(ctx context.Context, tc provider.ToolCall) string 
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if found := secrets.Scan(tc.Args["new_text"]); len(found) > 0 {
+	if found := privacy.Scan(tc.Args["new_text"]); len(found) > 0 {
 		kinds := make([]string, 0, len(found))
 		for _, m := range found {
 			kinds = append(kinds, m.Kind)
 		}
-		return fmt.Sprintf("error: refusing to replace — new_text contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
+		return fmt.Sprintf("error: refusing to replace — new_text contains apparent privacy (%s). Remove or redact them first.", strings.Join(kinds, ", "))
 	}
 	oldContent, newContent, err := a.editor.Replace(vp, tc.Args["old_text"], tc.Args["new_text"])
 	if err != nil {
@@ -895,7 +895,7 @@ func (a *Agent) searchFiles(ctx context.Context, tc provider.ToolCall) string {
 	if matchCount >= searchMaxMatches {
 		header += " (limit reached, more may exist)"
 	}
-	redactedResults, _ := secrets.Redact(results.String())
+	redactedResults, _ := privacy.Redact(results.String())
 	return fmt.Sprintf("%s:\n%s", header, redactedResults)
 }
 

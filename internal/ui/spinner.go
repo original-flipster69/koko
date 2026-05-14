@@ -14,10 +14,6 @@ type Spinner struct {
 	done   chan struct{}
 }
 
-func NewSpinner() *Spinner {
-	return &Spinner{label: "thinking"}
-}
-
 func NewLabeledSpinner(label string) *Spinner {
 	return &Spinner{label: label}
 }

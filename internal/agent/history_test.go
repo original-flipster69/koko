@@ -35,7 +35,7 @@ func TestExtractToolOutputFacts_MultilineFormat(t *testing.T) {
 }
 
 func TestExtractToolOutputFacts_ErrorLineCapture(t *testing.T) {
-	content := "<tool_output name=\"write_file\">\nerror: refusing to write — secrets detected\n</tool_output>\n"
+	content := "<tool_output name=\"write_file\">\nerror: refusing to write — privacy detected\n</tool_output>\n"
 
 	var modified, read, commands, errors []string
 	extractToolOutputFacts(content, &modified, &read, &commands, &errors)

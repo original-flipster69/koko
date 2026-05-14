@@ -345,7 +345,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/secrets -->
+<!-- github.com/original&#45;flipster69/koko/internal/privacy -->
 <g id="node14" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/secrets</title>
 <g id="a_node14"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/secrets" xlink:title="github.com/original&#45;flipster69/koko/internal/secrets" target="_graphviz">
@@ -355,7 +355,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/secrets -->
+<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy -->
 <g id="edge21" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/secrets</title>
 <g id="a_edge21"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/secrets">

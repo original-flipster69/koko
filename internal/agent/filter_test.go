@@ -53,7 +53,7 @@ func TestScrubPIIFilter_DoesNotMutateInputContent(t *testing.T) {
 
 func TestScrubPIIFilter_PreservesPlainContent(t *testing.T) {
 	in := []provider.Msg{
-		{Role: provider.User, Content: "Hello, world! This is plain text with no secrets."},
+		{Role: provider.User, Content: "Hello, world! This is plain text with no privacy."},
 		{Role: provider.Assistant, Content: "Plain reply."},
 	}
 	out := ScrubPIIFilter(in)
