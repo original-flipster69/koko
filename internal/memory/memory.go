@@ -2,6 +2,7 @@ package memory
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -55,6 +56,7 @@ func (s *Store) List() ([]Memory, error) {
 		path := filepath.Join(s.dir, e.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
+			slog.Warn("memory: skipping unreadable entry", "path", path, "err", err)
 			continue
 		}
 		m := parse(string(data))

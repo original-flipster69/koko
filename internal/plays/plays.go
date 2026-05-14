@@ -2,6 +2,7 @@ package plays
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -36,6 +37,7 @@ func Load(dir string) (*Registry, error) {
 		path := filepath.Join(dir, e.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
+			slog.Warn("plays: skipping unreadable entry", "path", path, "err", err)
 			continue
 		}
 		p := parse(string(data))

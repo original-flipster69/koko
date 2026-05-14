@@ -60,8 +60,7 @@ func loadLastHash(path string) (string, error) {
 			return "", fmt.Errorf("audit: corrupt entry at line %d: %w", line, err)
 		}
 		if e.Hash == "" {
-			prev = ""
-			continue
+			return "", fmt.Errorf("audit: missing hash at line %d", line)
 		}
 		if e.PrevHash != prev {
 			return "", fmt.Errorf("audit: chain broken at line %d (expected prev_hash %q, got %q)", line, prev, e.PrevHash)

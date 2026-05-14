@@ -16,13 +16,19 @@ func Run(
 	splash string,
 	slashHandler CmdHandler,
 ) error {
+	ctx, cancel := context.WithCancel(context.Background())
 	confirmCh := make(chan bool, 1)
 	w := &tuiWriter{atStart: true}
 
 	a.SetOutput(w)
 	a.SetConfirm(func(action string) bool {
 		w.program.Send(confirmRequestMsg(action))
-		return <-confirmCh
+		select {
+		case ok := <-confirmCh:
+			return ok
+		case <-ctx.Done():
+			return false
+		}
 	})
 	a.SetSuppressSpinner(true)
 
@@ -30,7 +36,6 @@ func Run(
 		splash += ui.Dim + ui.Gray + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	m := newModel(a, ctx, cancel, kokoDir, splash, slashHandler, confirmCh)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

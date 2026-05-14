@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
-	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -367,17 +367,8 @@ func diffWidth() int {
 }
 
 func termCols() int {
-	type winsize struct {
-		Row, Col, Xpixel, Ypixel uint16
-	}
-	ws := &winsize{}
-	_, _, err := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		os.Stdout.Fd(),
-		uintptr(syscall.TIOCGWINSZ),
-		uintptr(unsafe.Pointer(ws)),
-	)
-	if err != 0 || ws.Col == 0 {
+	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+	if err != nil || ws.Col == 0 {
 		return 0
 	}
 	return int(ws.Col)

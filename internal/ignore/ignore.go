@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -47,6 +48,9 @@ func NewFromPatterns(lines []string) *Matcher {
 			if re, err := compileGlob(line); err == nil {
 				p.regex = re
 			}
+		} else if _, err := filepath.Match(line, ""); err != nil {
+			slog.Warn("ignore: skipping malformed pattern", "pattern", line, "err", err)
+			continue
 		}
 		m.patterns = append(m.patterns, p)
 	}
