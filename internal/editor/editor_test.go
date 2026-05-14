@@ -118,7 +118,7 @@ func TestReplaceInFile(t *testing.T) {
 
 			ed.MarkRead(vp(t, sb, path), tc.initial)
 
-			_, after, err := ed.ReplaceInFile(vp(t, sb, path), tc.oldText, tc.newText)
+			_, after, err := ed.Replace(vp(t, sb, path), tc.oldText, tc.newText)
 			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
@@ -185,11 +185,11 @@ func TestReadBeforeEditEnforcement(t *testing.T) {
 				path := filepath.Join(tmpDir, "multi.txt")
 				writeTestFile(t, path, "first line\nsecond line\n")
 				ed.MarkRead(vp(t, sb, path), "first line\nsecond line\n")
-				_, _, err := ed.ReplaceInFile(vp(t, sb, path), "first line", "1st line")
+				_, _, err := ed.Replace(vp(t, sb, path), "first line", "1st line")
 				if err != nil {
 					t.Fatalf("first replace failed: %v", err)
 				}
-				_, _, err = ed.ReplaceInFile(vp(t, sb, path), "second line", "2nd line")
+				_, _, err = ed.Replace(vp(t, sb, path), "second line", "2nd line")
 				if err != nil {
 					t.Fatalf("second replace failed: %v", err)
 				}
@@ -205,7 +205,7 @@ func TestReadBeforeEditEnforcement(t *testing.T) {
 			path := tc.setup(t, tmpDir, ed, sb)
 
 			if tc.name == "succeeds after MarkRead" {
-				_, _, err := ed.ReplaceInFile(vp(t, sb, path), "bbb", "BBB")
+				_, _, err := ed.Replace(vp(t, sb, path), "bbb", "BBB")
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -215,7 +215,7 @@ func TestReadBeforeEditEnforcement(t *testing.T) {
 				return
 			}
 
-			_, _, err := ed.ReplaceInFile(vp(t, sb, path), "content", "new")
+			_, _, err := ed.Replace(vp(t, sb, path), "content", "new")
 			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
@@ -234,14 +234,14 @@ func TestWriteFileUpdatesHash(t *testing.T) {
 	tmpDir, ed, sb := setup(t)
 	path := filepath.Join(tmpDir, "written.txt")
 
-	err := ed.WriteFile(vp(t, sb, path), "initial content", false)
+	err := ed.Write(vp(t, sb, path), "initial content", false)
 	if err != nil {
-		t.Fatalf("WriteFile failed: %v", err)
+		t.Fatalf("Write failed: %v", err)
 	}
 
-	_, _, err = ed.ReplaceInFile(vp(t, sb, path), "initial", "updated")
+	_, _, err = ed.Replace(vp(t, sb, path), "initial", "updated")
 	if err != nil {
-		t.Fatalf("ReplaceInFile after WriteFile should succeed: %v", err)
+		t.Fatalf("Replace after Write should succeed: %v", err)
 	}
 }
 
@@ -262,10 +262,10 @@ func TestLockfileGuard(t *testing.T) {
 	}
 
 	for _, lf := range lockfiles {
-		t.Run("WriteFile/"+lf, func(t *testing.T) {
+		t.Run("Write/"+lf, func(t *testing.T) {
 			tmpDir, ed, sb := setup(t)
 			path := filepath.Join(tmpDir, lf)
-			err := ed.WriteFile(vp(t, sb, path), "data", false)
+			err := ed.Write(vp(t, sb, path), "data", false)
 			if err == nil {
 				t.Fatal("expected lockfile error, got nil")
 			}
@@ -274,12 +274,12 @@ func TestLockfileGuard(t *testing.T) {
 			}
 		})
 
-		t.Run("ReplaceInFile/"+lf, func(t *testing.T) {
+		t.Run("Replace/"+lf, func(t *testing.T) {
 			tmpDir, ed, sb := setup(t)
 			path := filepath.Join(tmpDir, lf)
 			writeTestFile(t, path, "data")
 			ed.MarkRead(vp(t, sb, path), "data")
-			_, _, err := ed.ReplaceInFile(vp(t, sb, path), "data", "new")
+			_, _, err := ed.Replace(vp(t, sb, path), "data", "new")
 			if err == nil {
 				t.Fatal("expected lockfile error, got nil")
 			}
@@ -288,11 +288,11 @@ func TestLockfileGuard(t *testing.T) {
 			}
 		})
 
-		t.Run("DeleteFile/"+lf, func(t *testing.T) {
+		t.Run("Delete/"+lf, func(t *testing.T) {
 			tmpDir, ed, sb := setup(t)
 			path := filepath.Join(tmpDir, lf)
 			writeTestFile(t, path, "data")
-			err := ed.DeleteFile(vp(t, sb, path))
+			err := ed.Delete(vp(t, sb, path))
 			if err == nil {
 				t.Fatal("expected lockfile error, got nil")
 			}
@@ -339,7 +339,7 @@ func TestWriteFile(t *testing.T) {
 				writeTestFile(t, path, "existing content")
 			}
 
-			err := ed.WriteFile(vp(t, sb, path), "new content", tc.overwrite)
+			err := ed.Write(vp(t, sb, path), "new content", tc.overwrite)
 			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
@@ -374,7 +374,7 @@ func TestUndo(t *testing.T) {
 				path := filepath.Join(tmpDir, "undo.txt")
 				writeTestFile(t, path, "before")
 				ed.MarkRead(vp(t, sb, path), "before")
-				_, _, err := ed.ReplaceInFile(vp(t, sb, path), "before", "after")
+				_, _, err := ed.Replace(vp(t, sb, path), "before", "after")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -386,7 +386,7 @@ func TestUndo(t *testing.T) {
 			name: "undo of new file deletes it",
 			setup: func(t *testing.T, tmpDir string, ed *editor.Editor, sb *sandbox.Sandbox) string {
 				path := filepath.Join(tmpDir, "brand_new.txt")
-				if err := ed.WriteFile(vp(t, sb, path), "created", false); err != nil {
+				if err := ed.Write(vp(t, sb, path), "created", false); err != nil {
 					t.Fatal(err)
 				}
 				return path

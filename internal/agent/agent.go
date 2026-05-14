@@ -424,7 +424,7 @@ func (a *Agent) requireArgs(tc provider.ToolCall, keys ...string) error {
 }
 
 func (a *Agent) readImg(rawPath string, vp sandbox.ValidPath) string {
-	data, mime, err := a.sandbox.ReadImg(vp)
+	data, mime, err := a.editor.ReadImg(vp)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
@@ -459,7 +459,7 @@ func (a *Agent) readFile(ctx context.Context, tc provider.ToolCall) string {
 	if _, ok := sandbox.ImgMimeType(rawPath); ok {
 		return a.readImg(rawPath, vp)
 	}
-	content, err := a.editor.ReadFile(vp)
+	content, err := a.editor.Read(vp)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
@@ -514,9 +514,9 @@ func (a *Agent) writeFile(ctx context.Context, tc provider.ToolCall) string {
 		}
 		return fmt.Sprintf("error: refusing to write — content contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
 	}
-	oldContent, _ := a.editor.ReadFile(vp)
+	oldContent, _ := a.editor.Read(vp)
 	overwrite := boolArg(tc.Args["overwrite"])
-	if err := a.editor.WriteFile(vp, tc.Args["content"], overwrite); err != nil {
+	if err := a.editor.Write(vp, tc.Args["content"], overwrite); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	d := diff.Unified(oldContent, tc.Args["content"], rawPath)
@@ -542,7 +542,7 @@ func (a *Agent) replaceInFile(ctx context.Context, tc provider.ToolCall) string 
 		}
 		return fmt.Sprintf("error: refusing to replace — new_text contains apparent secrets (%s). Remove or redact them first.", strings.Join(kinds, ", "))
 	}
-	oldContent, newContent, err := a.editor.ReplaceInFile(vp, tc.Args["old_text"], tc.Args["new_text"])
+	oldContent, newContent, err := a.editor.Replace(vp, tc.Args["old_text"], tc.Args["new_text"])
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
@@ -562,7 +562,7 @@ func (a *Agent) deleteFile(ctx context.Context, tc provider.ToolCall) string {
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if err := a.editor.DeleteFile(vp); err != nil {
+	if err := a.editor.Delete(vp); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	return fmt.Sprintf("deleted %s", rawPath)
@@ -582,7 +582,7 @@ func (a *Agent) renameFile(ctx context.Context, tc provider.ToolCall) string {
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	if err := a.editor.RenameFile(vpOld, vpNew); err != nil {
+	if err := a.editor.Rename(vpOld, vpNew); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	return fmt.Sprintf("renamed %s → %s", rawOld, rawNew)
@@ -606,7 +606,7 @@ func (a *Agent) listDir(ctx context.Context, tc provider.ToolCall) string {
 		}
 		return a.buildTree(vp, "", 0, maxDepth)
 	}
-	resolved, entries, err := a.editor.ListDir(vp)
+	resolved, entries, err := a.editor.List(vp)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
@@ -745,7 +745,7 @@ func (a *Agent) buildTree(dir sandbox.ValidPath, prefix string, depth, maxDepth 
 	if depth >= maxDepth {
 		return ""
 	}
-	resolved, entries, err := a.editor.ListDir(dir)
+	resolved, entries, err := a.editor.List(dir)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
