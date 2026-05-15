@@ -215,7 +215,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/tui -->
+<!-- github.com/original&#45;flipster69/koko/internal/terminal -->
 <g id="node15" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/tui</title>
 <g id="a_node15"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/tui" xlink:title="github.com/original&#45;flipster69/koko/internal/tui" target="_graphviz">
@@ -225,7 +225,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/tui -->
+<!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/terminal -->
 <g id="edge11" class="edge">
 <title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/tui</title>
 <g id="a_edge11"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/tui">
@@ -391,7 +391,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/tui&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent -->
+<!-- github.com/original&#45;flipster69/koko/internal/terminal&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent -->
 <g id="edge25" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/tui:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent</title>
 <g id="a_edge25"><a xlink:title="github.com/original&#45;flipster69/koko/internal/tui &#45;&gt; github.com/original&#45;flipster69/koko/internal/agent">
@@ -400,7 +400,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/tui&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui -->
+<!-- github.com/original&#45;flipster69/koko/internal/terminal&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui -->
 <g id="edge26" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/tui:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui</title>
 <g id="a_edge26"><a xlink:title="github.com/original&#45;flipster69/koko/internal/tui &#45;&gt; github.com/original&#45;flipster69/koko/internal/ui">

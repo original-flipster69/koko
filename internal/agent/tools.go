@@ -227,3 +227,17 @@ func (a *Agent) buildTools() []provider.ToolDef {
 	}
 	return out
 }
+
+var toolSymbols = map[string]string{
+	"read_file":       "◇",
+	"write_file":      "✎",
+	"replace_in_file": "✎",
+	"delete_file":     "✕",
+	"rename_file":     "⇄",
+	"list_dir":        "≡",
+	"search_files":    "⌕",
+	"exec_command":    "⚡",
+	"save_memory":     "◆",
+	"delete_memory":   "◆",
+	"list_memories":   "◆",
+}

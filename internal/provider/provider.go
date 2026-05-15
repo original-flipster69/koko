@@ -36,6 +36,17 @@ type ToolCall struct {
 	Args map[string]string `json:"args"`
 }
 
+func (tc ToolCall) ArgsFormat() string {
+	args := ""
+	for k, v := range tc.Args {
+		if args != "" {
+			args += ", "
+		}
+		args += "'" + k + "': \"" + v + "\""
+	}
+	return args
+}
+
 type Usg struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`

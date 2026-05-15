@@ -298,16 +298,18 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 			a.toolCallCount++
 			quiet := toolQuiet(tc.Name)
 			if !quiet {
-				fmt.Fprintf(a.output, "  %s%s%s%s\n", ui.Dim, ui.DarkPurp, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(a.output, "\n%s%s%s\n", ui.Blueberry, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(a.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
 			}
 			result := a.execTool(ctx, tc)
 			a.auditLog.Record(tc.Name, tc.Args, result)
 			isError := strings.HasPrefix(result, "error:")
 			if quiet && isError {
-				fmt.Fprintf(a.output, "  %s%s%s%s\n", ui.Dim, ui.DarkPurp, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(a.output, "\n%s%s%s\n", ui.Blueberry, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(a.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
 			}
 			if !quiet || isError {
-				fmt.Fprintln(a.output, ui.FormatToolResult(tc.Name, result))
+				fmt.Fprintln(a.output, formatToolResult(tc.Name, result))
 				if isError {
 					fmt.Fprintln(a.output)
 				}
@@ -343,6 +345,21 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 	}
 
 	return nil
+}
+
+func formatToolResult(name string, result string) string {
+	if strings.HasPrefix(result, "error:") {
+		return fmt.Sprintf("%s\n  %s%s%s", toolTag(name), ui.Red, result, ui.Reset)
+	}
+	return fmt.Sprintf("%s %s%s%s", toolTag(name), ui.Mauve, result, ui.Reset)
+}
+
+func toolTag(name string) string {
+	sym := "▪"
+	if s, ok := toolSymbols[name]; ok {
+		sym = s
+	}
+	return fmt.Sprintf("%s%s%s %s [Result]%s\n", ui.Bold, ui.LavenderIndigo, sym, name, ui.Reset)
 }
 
 func wrapWithUlimit(cmd string, cpuSec, memMB, fileMB int) string {

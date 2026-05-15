@@ -64,7 +64,7 @@ func (s *Spinner) Start() {
 				}
 				dot := dots[cycle%len(dots)]
 				fmt.Printf("\r\033[K  %s%s%s%s\033[7G%s%s%s%s",
-					Bold, BrightPurp, frame, Reset,
+					Bold, Blueberry, frame, Reset,
 					Gray, label, dot, Reset,
 				)
 				time.Sleep(beats[phase])

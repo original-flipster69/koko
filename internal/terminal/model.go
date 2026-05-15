@@ -1,4 +1,4 @@
-package tui
+package terminal
 
 import (
 	"context"
@@ -150,12 +150,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-			display := input
+			display := "▼ " + input
 			if strings.Contains(display, "\n") {
 				lines := strings.Split(display, "\n")
 				display = lines[0] + fmt.Sprintf(" (+%d lines)", len(lines)-1)
 			}
-			m.appendOutput(fmt.Sprintf("\n%s%s▶ %s%s\n", ui.Bold, ui.BrightPurp, display, ui.Reset))
+			block := userEchoStyle.Width(m.viewport.Width - 2).Render(display)
+			m.appendOutput("\n" + block + "\n\n")
 
 			if strings.HasPrefix(input, ":") && m.cmdHandler != nil {
 				handled, prompt, output := m.cmdHandler(input, m.agent)
@@ -264,13 +265,23 @@ func (m model) spinnerView() string {
 		frame = zodiac[cycle%len(zodiac)]
 	}
 	dot := dots[cycle%len(dots)]
-	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.BrightPurp, frame, ui.Reset, ui.BrightPurp, m.spinnerLabel, dot, ui.Reset)
+	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.Blueberry, frame, ui.Reset, ui.Blueberry, m.spinnerLabel, dot, ui.Reset)
 }
 
 var inputBarStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderTop(true).
 	BorderForeground(lipgloss.Color("135"))
+
+var userEchoStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("234")).
+	Foreground(lipgloss.Color("141")).
+	Padding(0, 1)
+
+var userLabelStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("135")).
+	Foreground(lipgloss.Color("214")).
+	Bold(true)
 
 var statusBarStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("243"))
@@ -290,9 +301,9 @@ func (m model) View() string {
 
 	var inputLine string
 	if m.confirmMode {
-		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.Purple, ui.Reset, m.confirmText, m.input.View())
+		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.LavenderIndigo, ui.Reset, m.confirmText, m.input.View())
 	} else {
-		inputLine = fmt.Sprintf("%s▶%s %s", ui.BrightPurp, ui.Reset, m.input.View())
+		inputLine = fmt.Sprintf("%s▶%s %s", ui.Blueberry, ui.Reset, m.input.View())
 	}
 
 	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)

@@ -22,7 +22,7 @@ import (
 	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/sandbox"
-	"github.com/original-flipster69/koko/internal/tui"
+	"github.com/original-flipster69/koko/internal/terminal"
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
@@ -116,7 +116,7 @@ func main() {
 	}
 
 	confirm := func(action string) bool {
-		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.Purple, ui.Reset, ui.Violet, action, ui.Reset)
+		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.LavenderIndigo, ui.Reset, ui.BrightLavender, action, ui.Reset)
 		reader := bufio.NewReader(os.Stdin)
 		answer, _ := reader.ReadString('\n')
 		answer = strings.TrimSpace(strings.ToLower(answer))
@@ -151,7 +151,7 @@ func main() {
 
 	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry)
 
-	if err := tui.Run(a, llm.Name(), kokoDir, splash, cmdHandlers); err != nil {
+	if err := terminal.Run(a, llm.Name(), kokoDir, splash, cmdHandlers); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 		os.Exit(1)
 	}
@@ -164,7 +164,7 @@ type command struct {
 	fn   func(input string, parts []string, a *agent.Agent) (handled bool, prompt string, output string)
 }
 
-func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) tui.CmdHandler {
+func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) terminal.CmdHandler {
 	var commands map[string]command
 	commands = map[string]command{
 		":koko": {desc: "print the koko mascot", fn: func(string, []string, *agent.Agent) (bool, string, string) {
