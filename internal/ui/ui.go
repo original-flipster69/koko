@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -31,88 +33,37 @@ const (
 	PureOrange = "\033[38;5;214m"
 )
 
-func visibleWidth(s string) int {
-	w := 0
-	inEsc := false
-	for _, r := range s {
-		if inEsc {
-			if r == 'm' || r == 'K' || r == 'H' || r == 'J' {
-				inEsc = false
-			}
-			continue
-		}
-		if r == 0x1b {
-			inEsc = true
-			continue
-		}
-		w++
+var splashFrame = lipgloss.NewStyle().
+	Border(lipgloss.DoubleBorder()).
+	BorderForeground(lipgloss.Color("99")).
+	Padding(0, 1)
+
+var splashTitle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("99"))
+
+var splashTagline = lipgloss.NewStyle().
+	Italic(true)
+
+func Splash(mascot, provider, model, sandbox, version string, detected []string) string {
+	left := strings.TrimRight(mascot, "\n")
+
+	rightLines := []string{
+		"",
+		splashTitle.Render(" k o k o "),
+		splashTagline.Render("  secure coding assistant"),
+		"",
+		Info("version ", version),
+		Info("provider", provider),
+		Info("model   ", model),
+		Info("sandbox ", sandbox),
 	}
-	return w
-}
-
-func Splash(provider, model, sandbox, version string, detected []string) string {
-	left := strings.Split(strings.TrimRight(Mascot(), "\n"), "\n")
-
-	title := fmt.Sprintf("%s%s k o k o %s", Bold, Blueberry, Reset)
-	tagline := fmt.Sprintf("%s  secure coding assistant%s", Italic, Reset)
-
-	var right []string
-	right = append(right, "")
-	right = append(right, title)
-	right = append(right, tagline)
-	right = append(right, "")
-	right = append(right, Info("version ", version))
-	right = append(right, Info("provider", provider))
-	right = append(right, Info("model   ", model))
-	right = append(right, Info("sandbox ", sandbox))
 	if len(detected) > 0 {
-		right = append(right, Info("stack", strings.Join(detected, ", ")))
+		rightLines = append(rightLines, Info("stack", strings.Join(detected, ", ")))
 	}
 
-	leftW := 0
-	for _, line := range left {
-		if w := visibleWidth(line); w > leftW {
-			leftW = w
-		}
-	}
-	rightW := 0
-	for _, line := range right {
-		if w := visibleWidth(line); w > rightW {
-			rightW = w
-		}
-	}
-
-	rows := len(left)
-	if len(right) > rows {
-		rows = len(right)
-	}
-	leftOffset := (rows - len(left)) / 2
-	rightOffset := (rows - len(right)) / 2
-
-	gap := "    "
-	contentW := leftW + len(gap) + rightW
-	innerPadL := " "
-	innerPadR := " "
-	totalW := len(innerPadL) + contentW + len(innerPadR)
-
-	var out strings.Builder
-	out.WriteString(Bold + Blueberry + "╔" + strings.Repeat("═", totalW) + "╗" + Reset + "\n")
-	for i := 0; i < rows; i++ {
-		var l, r string
-		li := i - leftOffset
-		if li >= 0 && li < len(left) {
-			l = left[li]
-		}
-		lPad := strings.Repeat(" ", leftW-visibleWidth(l))
-		ri := i - rightOffset
-		if ri >= 0 && ri < len(right) {
-			r = right[ri]
-		}
-		rPad := strings.Repeat(" ", rightW-visibleWidth(r))
-		out.WriteString(Bold + Blueberry + "║" + Reset + innerPadL + l + lPad + gap + r + rPad + innerPadR + Bold + Blueberry + "║" + Reset + "\n")
-	}
-	out.WriteString(Bold + Blueberry + "╚" + strings.Repeat("═", totalW) + "╝" + Reset + "\n")
-	return out.String()
+	body := lipgloss.JoinHorizontal(lipgloss.Center, left, "    ", strings.Join(rightLines, "\n"))
+	return splashFrame.Render(body) + "\n"
 }
 
 func Info(label string, value string) string {

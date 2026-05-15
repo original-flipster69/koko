@@ -31,7 +31,7 @@
 <g id="a_node2"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/agent" xlink:title="github.com/original&#45;flipster69/koko/internal/agent" target="_graphviz">
 <polygon fill="none" stroke="#910766" stroke-width="2" stroke-opacity="0.698039" points="772,-347.42 520,-347.42 520,-311.42 772,-311.42 772,-347.42"/>
 <text xml:space="preserve" text-anchor="start" x="528" y="-331.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/agent</text>
-<text xml:space="preserve" text-anchor="start" x="528" y="-319.92" font-family="Times,serif" font-size="10.00">1431 / 43.9KB</text>
+<text xml:space="preserve" text-anchor="start" x="528" y="-319.92" font-family="Times,serif" font-size="10.00">1459 / 44.9KB</text>
 </a>
 </g>
 </g>
@@ -50,7 +50,7 @@
 <g id="a_node3"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/audit" xlink:title="github.com/original&#45;flipster69/koko/internal/audit" target="_graphviz">
 <polygon fill="none" stroke="#529107" stroke-width="2" stroke-opacity="0.698039" points="1132,-94.42 880,-94.42 880,-58.42 1132,-58.42 1132,-94.42"/>
 <text xml:space="preserve" text-anchor="start" x="888" y="-78.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/audit</text>
-<text xml:space="preserve" text-anchor="start" x="888" y="-66.92" font-family="Times,serif" font-size="10.00">121 / 2.7KB</text>
+<text xml:space="preserve" text-anchor="start" x="888" y="-66.92" font-family="Times,serif" font-size="10.00">120 / 2.8KB</text>
 </a>
 </g>
 </g>
@@ -69,7 +69,7 @@
 <g id="a_node4"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/config" xlink:title="github.com/original&#45;flipster69/koko/internal/config" target="_graphviz">
 <polygon fill="none" stroke="#915907" stroke-width="2" stroke-opacity="0.698039" points="1492,-165.42 1240,-165.42 1240,-129.42 1492,-129.42 1492,-165.42"/>
 <text xml:space="preserve" text-anchor="start" x="1248" y="-149.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/config</text>
-<text xml:space="preserve" text-anchor="start" x="1248" y="-137.92" font-family="Times,serif" font-size="10.00">237 / 6.0KB</text>
+<text xml:space="preserve" text-anchor="start" x="1248" y="-137.92" font-family="Times,serif" font-size="10.00">264 / 6.6KB</text>
 </a>
 </g>
 </g>
@@ -88,7 +88,7 @@
 <g id="a_node7"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/ignore" xlink:title="github.com/original&#45;flipster69/koko/internal/ignore" target="_graphviz">
 <polygon fill="none" stroke="#073391" stroke-width="2" stroke-opacity="0.698039" points="1132,-148.42 880,-148.42 880,-112.42 1132,-112.42 1132,-148.42"/>
 <text xml:space="preserve" text-anchor="start" x="888" y="-132.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/ignore</text>
-<text xml:space="preserve" text-anchor="start" x="888" y="-120.92" font-family="Times,serif" font-size="10.00">110 / 2.2KB</text>
+<text xml:space="preserve" text-anchor="start" x="888" y="-120.92" font-family="Times,serif" font-size="10.00">114 / 2.3KB</text>
 </a>
 </g>
 </g>
@@ -107,7 +107,7 @@
 <g id="a_node8"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/memory" xlink:title="github.com/original&#45;flipster69/koko/internal/memory" target="_graphviz">
 <polygon fill="none" stroke="#079143" stroke-width="2" stroke-opacity="0.698039" points="1132,-202.42 880,-202.42 880,-166.42 1132,-166.42 1132,-202.42"/>
 <text xml:space="preserve" text-anchor="start" x="888" y="-186.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/memory</text>
-<text xml:space="preserve" text-anchor="start" x="888" y="-174.92" font-family="Times,serif" font-size="10.00">174 / 3.8KB</text>
+<text xml:space="preserve" text-anchor="start" x="888" y="-174.92" font-family="Times,serif" font-size="10.00">176 / 3.9KB</text>
 </a>
 </g>
 </g>
@@ -126,7 +126,7 @@
 <g id="a_node9"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/plays" xlink:title="github.com/original&#45;flipster69/koko/internal/plays" target="_graphviz">
 <polygon fill="none" stroke="#549107" stroke-width="2" stroke-opacity="0.698039" points="412,-293.42 160,-293.42 160,-257.42 412,-257.42 412,-293.42"/>
 <text xml:space="preserve" text-anchor="start" x="168" y="-277.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/plays</text>
-<text xml:space="preserve" text-anchor="start" x="168" y="-265.92" font-family="Times,serif" font-size="10.00">109 / 2.2KB</text>
+<text xml:space="preserve" text-anchor="start" x="168" y="-265.92" font-family="Times,serif" font-size="10.00">111 / 2.3KB</text>
 </a>
 </g>
 </g>
@@ -153,18 +153,18 @@
 <g id="edge7" class="edge">
 <title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/policy</title>
 <g id="a_edge7"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/policy">
-<path fill="none" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" d="M52,-293.42C112.54,-293.42 103.5,-354.68 160,-376.42 212.43,-396.59 356.05,-391.4 412,-396.42 572.16,-410.78 612.75,-410.14 772,-432.42 812.87,-438.14 857.51,-445.83 896.69,-453.07"/>
-<polygon fill="#911d07" fill-opacity="0.698039" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" points="896.03,-456.5 906.51,-454.89 897.32,-449.62 896.03,-456.5"/>
+<path fill="none" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" d="M52,-293.42C112.54,-293.42 103.5,-354.68 160,-376.42 212.43,-396.59 356.06,-391.25 412,-396.42 572.21,-411.23 612.63,-412.35 772,-434.42 810.72,-439.78 852.87,-446.69 890.55,-453.25"/>
+<polygon fill="#911d07" fill-opacity="0.698039" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" points="889.71,-456.65 900.17,-454.94 890.92,-449.76 889.71,-456.65"/>
 </a>
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/project -->
-<g id="node11" class="node">
+<g id="node12" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/project</title>
-<g id="a_node11"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/project" xlink:title="github.com/original&#45;flipster69/koko/internal/project" target="_graphviz">
+<g id="a_node12"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/project" xlink:title="github.com/original&#45;flipster69/koko/internal/project" target="_graphviz">
 <polygon fill="none" stroke="#910756" stroke-width="2" stroke-opacity="0.698039" points="412,-367.42 160,-367.42 160,-331.42 412,-331.42 412,-367.42"/>
 <text xml:space="preserve" text-anchor="start" x="168" y="-351.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/project</text>
-<text xml:space="preserve" text-anchor="start" x="168" y="-339.92" font-family="Times,serif" font-size="10.00">88 / 2.5KB</text>
+<text xml:space="preserve" text-anchor="start" x="168" y="-339.92" font-family="Times,serif" font-size="10.00">69 / 1.6KB</text>
 </a>
 </g>
 </g>
@@ -178,12 +178,12 @@
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/provider -->
-<g id="node12" class="node">
+<g id="node13" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/provider</title>
-<g id="a_node12"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/provider" xlink:title="github.com/original&#45;flipster69/koko/internal/provider" target="_graphviz">
+<g id="a_node13"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/provider" xlink:title="github.com/original&#45;flipster69/koko/internal/provider" target="_graphviz">
 <polygon fill="none" stroke="#8c0791" stroke-width="2" stroke-opacity="0.698039" points="1132,-256.42 880,-256.42 880,-220.42 1132,-220.42 1132,-256.42"/>
 <text xml:space="preserve" text-anchor="start" x="888" y="-240.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/provider</text>
-<text xml:space="preserve" text-anchor="start" x="888" y="-228.92" font-family="Times,serif" font-size="10.00">818 / 20.7KB</text>
+<text xml:space="preserve" text-anchor="start" x="888" y="-228.92" font-family="Times,serif" font-size="10.00">828 / 20.9KB</text>
 </a>
 </g>
 </g>
@@ -197,12 +197,12 @@
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/sandbox -->
-<g id="node13" class="node">
+<g id="node14" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/sandbox</title>
-<g id="a_node13"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/sandbox" xlink:title="github.com/original&#45;flipster69/koko/internal/sandbox" target="_graphviz">
-<polygon fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1492,-438.42 1240,-438.42 1240,-402.42 1492,-402.42 1492,-438.42"/>
-<text xml:space="preserve" text-anchor="start" x="1248" y="-422.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/sandbox</text>
-<text xml:space="preserve" text-anchor="start" x="1248" y="-410.92" font-family="Times,serif" font-size="10.00">168 / 4.2KB</text>
+<g id="a_node14"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/sandbox" xlink:title="github.com/original&#45;flipster69/koko/internal/sandbox" target="_graphviz">
+<polygon fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1492,-455.42 1240,-455.42 1240,-419.42 1492,-419.42 1492,-455.42"/>
+<text xml:space="preserve" text-anchor="start" x="1248" y="-439.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/sandbox</text>
+<text xml:space="preserve" text-anchor="start" x="1248" y="-427.92" font-family="Times,serif" font-size="10.00">168 / 4.2KB</text>
 </a>
 </g>
 </g>
@@ -210,27 +210,27 @@
 <g id="edge10" class="edge">
 <title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox</title>
 <g id="a_edge10"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/sandbox">
-<path fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" d="M52,-293.42C149.52,-293.42 78.91,-430.25 160,-484.42 427.39,-663.02 558.67,-543.38 880,-555.42 991.92,-559.61 1023.84,-584.49 1132,-555.42 1210.04,-534.44 1288.92,-480.25 1331.93,-447.25"/>
-<polygon fill="#07911b" fill-opacity="0.698039" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1333.94,-450.12 1339.68,-441.22 1329.64,-444.6 1333.94,-450.12"/>
+<path fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" d="M52,-293.42C149.52,-293.42 78.91,-430.25 160,-484.42 427.39,-663.02 558.67,-543.38 880,-555.42 991.92,-559.61 1023.06,-581.43 1132,-555.42 1206.04,-537.74 1283.18,-492.5 1327.51,-463.45"/>
+<polygon fill="#07911b" fill-opacity="0.698039" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1329.41,-466.39 1335.79,-457.94 1325.53,-460.56 1329.41,-466.39"/>
 </a>
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/terminal -->
 <g id="node15" class="node">
-<title>github.com/original&#45;flipster69/koko/internal/tui</title>
-<g id="a_node15"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/tui" xlink:title="github.com/original&#45;flipster69/koko/internal/tui" target="_graphviz">
-<polygon fill="none" stroke="#079111" stroke-width="2" stroke-opacity="0.698039" points="394,-441.42 178,-441.42 178,-405.42 394,-405.42 394,-441.42"/>
-<text xml:space="preserve" text-anchor="start" x="186" y="-425.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/tui</text>
-<text xml:space="preserve" text-anchor="start" x="186" y="-413.92" font-family="Times,serif" font-size="10.00">326 / 8.5KB</text>
+<title>github.com/original&#45;flipster69/koko/internal/terminal</title>
+<g id="a_node15"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/terminal" xlink:title="github.com/original&#45;flipster69/koko/internal/terminal" target="_graphviz">
+<polygon fill="none" stroke="#91071d" stroke-width="2" stroke-opacity="0.698039" points="412,-441.42 160,-441.42 160,-405.42 412,-405.42 412,-441.42"/>
+<text xml:space="preserve" text-anchor="start" x="168" y="-425.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/terminal</text>
+<text xml:space="preserve" text-anchor="start" x="168" y="-413.92" font-family="Times,serif" font-size="10.00">336 / 8.7KB</text>
 </a>
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/terminal -->
 <g id="edge11" class="edge">
-<title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/tui</title>
-<g id="a_edge11"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/tui">
-<path fill="none" stroke="#079111" stroke-width="2" stroke-opacity="0.698039" d="M52,-293.42C116.82,-293.42 102.93,-360.7 160,-391.42 165.77,-394.52 171.85,-397.34 178.1,-399.88"/>
-<polygon fill="#079111" fill-opacity="0.698039" stroke="#079111" stroke-width="2" stroke-opacity="0.698039" points="176.86,-403.16 187.45,-403.4 179.32,-396.6 176.86,-403.16"/>
+<title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/terminal</title>
+<g id="a_edge11"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/terminal">
+<path fill="none" stroke="#91071d" stroke-width="2" stroke-opacity="0.698039" d="M52,-293.42C116.82,-293.42 102.93,-360.7 160,-391.42 165.77,-394.52 171.85,-397.34 178.1,-399.88"/>
+<polygon fill="#91071d" fill-opacity="0.698039" stroke="#91071d" stroke-width="2" stroke-opacity="0.698039" points="176.86,-403.16 187.45,-403.4 179.32,-396.6 176.86,-403.16"/>
 </a>
 </g>
 </g>
@@ -240,7 +240,7 @@
 <g id="a_node16"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/ui" xlink:title="github.com/original&#45;flipster69/koko/internal/ui" target="_graphviz">
 <polygon fill="none" stroke="#519107" stroke-width="2" stroke-opacity="0.698039" points="1114,-546.42 898,-546.42 898,-510.42 1114,-510.42 1114,-546.42"/>
 <text xml:space="preserve" text-anchor="start" x="906" y="-530.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/ui</text>
-<text xml:space="preserve" text-anchor="start" x="906" y="-518.92" font-family="Times,serif" font-size="10.00">772 / 18.9KB</text>
+<text xml:space="preserve" text-anchor="start" x="906" y="-518.92" font-family="Times,serif" font-size="10.00">618 / 15.0KB</text>
 </a>
 </g>
 </g>
@@ -285,9 +285,9 @@
 <g id="node6" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/editor</title>
 <g id="a_node6"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/editor" xlink:title="github.com/original&#45;flipster69/koko/internal/editor" target="_graphviz">
-<polygon fill="none" stroke="#918407" stroke-width="2" stroke-opacity="0.698039" points="1132,-438.42 880,-438.42 880,-402.42 1132,-402.42 1132,-438.42"/>
-<text xml:space="preserve" text-anchor="start" x="888" y="-422.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/editor</text>
-<text xml:space="preserve" text-anchor="start" x="888" y="-410.92" font-family="Times,serif" font-size="10.00">389 / 11.7KB</text>
+<polygon fill="none" stroke="#918407" stroke-width="2" stroke-opacity="0.698039" points="1132,-310.42 880,-310.42 880,-274.42 1132,-274.42 1132,-310.42"/>
+<text xml:space="preserve" text-anchor="start" x="888" y="-294.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/editor</text>
+<text xml:space="preserve" text-anchor="start" x="888" y="-282.92" font-family="Times,serif" font-size="10.00">389 / 11.7KB</text>
 </a>
 </g>
 </g>
@@ -295,8 +295,8 @@
 <g id="edge15" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/editor</title>
 <g id="a_edge15"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/editor">
-<path fill="none" stroke="#918407" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C826.7,-329.42 829.11,-368.37 880,-388.42 888.53,-391.78 897.52,-394.88 906.61,-397.72"/>
-<polygon fill="#918407" fill-opacity="0.698039" stroke="#918407" stroke-width="2" stroke-opacity="0.698039" points="905.55,-401.06 916.14,-400.57 907.56,-394.35 905.55,-401.06"/>
+<path fill="none" stroke="#918407" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C795.64,-329.42 845.34,-321.89 892.78,-313.63"/>
+<polygon fill="#918407" fill-opacity="0.698039" stroke="#918407" stroke-width="2" stroke-opacity="0.698039" points="893.21,-317.11 902.45,-311.93 891.99,-310.22 893.21,-317.11"/>
 </a>
 </g>
 </g>
@@ -322,45 +322,45 @@
 <g id="edge18" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/policy</title>
 <g id="a_edge18"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/policy">
-<path fill="none" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C843.09,-329.42 818.34,-412.02 880,-447.42 881.54,-448.3 883.11,-449.16 884.7,-449.99"/>
-<polygon fill="#911d07" fill-opacity="0.698039" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" points="883.07,-453.09 893.61,-454.14 886.03,-446.75 883.07,-453.09"/>
+<path fill="none" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C841.47,-329.42 820.04,-407.34 880,-442.42 885.22,-445.47 890.74,-448.24 896.42,-450.75"/>
+<polygon fill="#911d07" fill-opacity="0.698039" stroke="#911d07" stroke-width="2" stroke-opacity="0.698039" points="894.9,-453.91 905.48,-454.4 897.51,-447.41 894.9,-453.91"/>
+</a>
+</g>
+</g>
+<!-- github.com/original&#45;flipster69/koko/internal/privacy -->
+<g id="node11" class="node">
+<title>github.com/original&#45;flipster69/koko/internal/privacy</title>
+<g id="a_node11"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/privacy" xlink:title="github.com/original&#45;flipster69/koko/internal/privacy" target="_graphviz">
+<polygon fill="none" stroke="#189107" stroke-width="2" stroke-opacity="0.698039" points="1132,-418.42 880,-418.42 880,-382.42 1132,-382.42 1132,-418.42"/>
+<text xml:space="preserve" text-anchor="start" x="888" y="-402.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/privacy</text>
+<text xml:space="preserve" text-anchor="start" x="888" y="-390.92" font-family="Times,serif" font-size="10.00">161 / 4.7KB</text>
+</a>
+</g>
+</g>
+<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy -->
+<g id="edge19" class="edge">
+<title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy</title>
+<g id="a_edge19"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/privacy">
+<path fill="none" stroke="#189107" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C823.83,-329.42 830.48,-358.11 880,-373.42 885.4,-375.09 890.95,-376.69 896.59,-378.22"/>
+<polygon fill="#189107" fill-opacity="0.698039" stroke="#189107" stroke-width="2" stroke-opacity="0.698039" points="895.52,-381.56 906.08,-380.71 897.29,-374.79 895.52,-381.56"/>
 </a>
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/provider -->
-<g id="edge19" class="edge">
+<g id="edge20" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/provider</title>
-<g id="a_edge19"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/provider">
+<g id="a_edge20"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/provider">
 <path fill="none" stroke="#8c0791" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C827.8,-329.42 828.06,-285.79 880,-265.42 883.65,-263.98 887.4,-262.62 891.21,-261.32"/>
 <polygon fill="#8c0791" fill-opacity="0.698039" stroke="#8c0791" stroke-width="2" stroke-opacity="0.698039" points="892.18,-264.68 900.65,-258.32 890.06,-258.01 892.18,-264.68"/>
 </a>
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox -->
-<g id="edge20" class="edge">
-<title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox</title>
-<g id="a_edge20"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/sandbox">
-<path fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C823.83,-329.42 829.57,-361.45 880,-373.42 989.32,-399.36 1020.18,-382.5 1132,-393.42 1162.55,-396.4 1195.3,-399.96 1226.32,-403.51"/>
-<polygon fill="#07911b" fill-opacity="0.698039" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1225.68,-406.96 1236.02,-404.63 1226.49,-400.01 1225.68,-406.96"/>
-</a>
-</g>
-</g>
-<!-- github.com/original&#45;flipster69/koko/internal/privacy -->
-<g id="node14" class="node">
-<title>github.com/original&#45;flipster69/koko/internal/secrets</title>
-<g id="a_node14"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/secrets" xlink:title="github.com/original&#45;flipster69/koko/internal/secrets" target="_graphviz">
-<polygon fill="none" stroke="#469107" stroke-width="2" stroke-opacity="0.698039" points="1132,-310.42 880,-310.42 880,-274.42 1132,-274.42 1132,-310.42"/>
-<text xml:space="preserve" text-anchor="start" x="888" y="-294.17" font-family="Times,serif" font-size="10.00">github.com/original&#45;flipster69/koko/internal/secrets</text>
-<text xml:space="preserve" text-anchor="start" x="888" y="-282.92" font-family="Times,serif" font-size="10.00">125 / 3.7KB</text>
-</a>
-</g>
-</g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy -->
 <g id="edge21" class="edge">
-<title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/secrets</title>
-<g id="a_edge21"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/secrets">
-<path fill="none" stroke="#469107" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C795.64,-329.42 845.34,-321.89 892.78,-313.63"/>
-<polygon fill="#469107" fill-opacity="0.698039" stroke="#469107" stroke-width="2" stroke-opacity="0.698039" points="893.21,-317.11 902.45,-311.93 891.99,-310.22 893.21,-317.11"/>
+<title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox</title>
+<g id="a_edge21"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/sandbox">
+<path fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" d="M772,-329.42C836.82,-329.42 819.78,-403.45 880,-427.42 911.4,-439.92 1094.13,-440.67 1226.05,-439.5"/>
+<polygon fill="#07911b" fill-opacity="0.698039" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1226.06,-443 1236.03,-439.4 1226,-436 1226.06,-443"/>
 </a>
 </g>
 </g>
@@ -377,8 +377,8 @@
 <g id="edge23" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/editor:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox</title>
 <g id="a_edge23"><a xlink:title="github.com/original&#45;flipster69/koko/internal/editor &#45;&gt; github.com/original&#45;flipster69/koko/internal/sandbox">
-<path fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" d="M1132,-420.42C1162.58,-420.42 1195.41,-420.42 1226.5,-420.42"/>
-<polygon fill="#07911b" fill-opacity="0.698039" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1226.21,-423.92 1236.21,-420.42 1226.21,-416.92 1226.21,-423.92"/>
+<path fill="none" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" d="M1132,-292.42C1219.34,-292.42 1301.06,-366.76 1340.43,-408.98"/>
+<polygon fill="#07911b" fill-opacity="0.698039" stroke="#07911b" stroke-width="2" stroke-opacity="0.698039" points="1337.71,-411.19 1347.03,-416.22 1342.88,-406.47 1337.71,-411.19"/>
 </a>
 </g>
 </g>
@@ -393,19 +393,19 @@
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/terminal&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent -->
 <g id="edge25" class="edge">
-<title>github.com/original&#45;flipster69/koko/internal/tui:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent</title>
-<g id="a_edge25"><a xlink:title="github.com/original&#45;flipster69/koko/internal/tui &#45;&gt; github.com/original&#45;flipster69/koko/internal/agent">
-<path fill="none" stroke="#910766" stroke-width="2" stroke-opacity="0.698039" d="M395,-423.42C473.18,-423.42 556.82,-382.65 604.81,-354.81"/>
-<polygon fill="#910766" fill-opacity="0.698039" stroke="#910766" stroke-width="2" stroke-opacity="0.698039" points="606.51,-357.87 613.33,-349.76 602.95,-351.85 606.51,-357.87"/>
+<title>github.com/original&#45;flipster69/koko/internal/terminal:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent</title>
+<g id="a_edge25"><a xlink:title="github.com/original&#45;flipster69/koko/internal/terminal &#45;&gt; github.com/original&#45;flipster69/koko/internal/agent">
+<path fill="none" stroke="#910766" stroke-width="2" stroke-opacity="0.698039" d="M412,-423.42C485.23,-423.42 562.62,-382.99 607.22,-355.16"/>
+<polygon fill="#910766" fill-opacity="0.698039" stroke="#910766" stroke-width="2" stroke-opacity="0.698039" points="609,-358.18 615.54,-349.84 605.23,-352.28 609,-358.18"/>
 </a>
 </g>
 </g>
 <!-- github.com/original&#45;flipster69/koko/internal/terminal&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui -->
 <g id="edge26" class="edge">
-<title>github.com/original&#45;flipster69/koko/internal/tui:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui</title>
-<g id="a_edge26"><a xlink:title="github.com/original&#45;flipster69/koko/internal/tui &#45;&gt; github.com/original&#45;flipster69/koko/internal/ui">
-<path fill="none" stroke="#519107" stroke-width="2" stroke-opacity="0.698039" d="M395,-423.42C492.43,-423.42 757.91,-476.1 904.47,-506.83"/>
-<polygon fill="#519107" fill-opacity="0.698039" stroke="#519107" stroke-width="2" stroke-opacity="0.698039" points="903.51,-510.21 914.02,-508.84 904.95,-503.36 903.51,-510.21"/>
+<title>github.com/original&#45;flipster69/koko/internal/terminal:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui</title>
+<g id="a_edge26"><a xlink:title="github.com/original&#45;flipster69/koko/internal/terminal &#45;&gt; github.com/original&#45;flipster69/koko/internal/ui">
+<path fill="none" stroke="#519107" stroke-width="2" stroke-opacity="0.698039" d="M412,-423.42C459.49,-423.42 738.32,-476.32 896.15,-507.02"/>
+<polygon fill="#519107" fill-opacity="0.698039" stroke="#519107" stroke-width="2" stroke-opacity="0.698039" points="895.25,-510.41 905.73,-508.89 896.58,-503.54 895.25,-510.41"/>
 </a>
 </g>
 </g>

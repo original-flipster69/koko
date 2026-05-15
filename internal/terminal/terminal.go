@@ -13,7 +13,7 @@ func Run(
 	a *agent.Agent,
 	providerName string,
 	kokoDir string,
-	splash string,
+	splashes []string,
 	slashHandler CmdHandler,
 ) error {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -33,10 +33,13 @@ func Run(
 	a.SetSuppressSpinner(true)
 
 	if providerName == "ollama" {
-		splash += ui.Dim + ui.Gray + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		suffix := ui.Dim + ui.Gray + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		for i := range splashes {
+			splashes[i] += suffix
+		}
 	}
 
-	m := newModel(a, ctx, cancel, kokoDir, splash, slashHandler, confirmCh)
+	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	w.program = p

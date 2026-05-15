@@ -18,6 +18,17 @@ import (
 type agentDoneMsg struct{ err error }
 type confirmRequestMsg string
 type spinnerTickMsg struct{}
+type splashTickMsg struct{}
+
+const splashFrameDuration = 400 * time.Millisecond
+
+var splashSequence = []int{1, 0, 2, 0}
+
+func splashTickCmd() tea.Cmd {
+	return tea.Tick(splashFrameDuration, func(time.Time) tea.Msg {
+		return splashTickMsg{}
+	})
+}
 
 var (
 	zodiac      = []string{"♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"}
@@ -36,7 +47,9 @@ type model struct {
 	cancel    context.CancelFunc
 	runCancel context.CancelFunc
 	kokoDir   string
-	splash    string
+	splashes  []string
+	splashIdx int
+	splashHit int
 
 	confirmCh    chan bool
 	confirmMode  bool
@@ -52,7 +65,7 @@ type model struct {
 
 type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
 
-func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splash string, cmdHandler CmdHandler, confirmCh chan bool) model {
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool) model {
 	ta := textarea.New()
 	ta.Placeholder = "ask koko anything... (shift+enter for newline)"
 	ta.Focus()
@@ -70,7 +83,7 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 		ctx:        ctx,
 		cancel:     cancel,
 		kokoDir:    kokoDir,
-		splash:     splash,
+		splashes:   splashes,
 		confirmCh:  confirmCh,
 		cmdHandler: cmdHandler,
 	}
@@ -78,7 +91,11 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 }
 
 func (m model) Init() tea.Cmd {
-	return textarea.Blink
+	cmds := []tea.Cmd{textarea.Blink}
+	if len(m.splashes) > 1 {
+		cmds = append(cmds, splashTickCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 func spinnerTickCmd(tick int) tea.Cmd {
@@ -96,7 +113,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		chrome := 5
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, msg.Height-chrome)
-			m.content.WriteString(m.splash)
 			m.syncViewport()
 			m.ready = true
 		} else {
@@ -194,6 +210,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 
+	case splashTickMsg:
+		if m.splashHit < len(splashSequence) {
+			m.splashIdx = splashSequence[m.splashHit]
+			m.splashHit++
+			m.syncViewport()
+			if m.splashHit < len(splashSequence) {
+				return m, splashTickCmd()
+			}
+		}
+		return m, nil
+
 	case outputMsg:
 		atBottom := m.viewport.AtBottom()
 		m.content.WriteString(string(msg))
@@ -244,7 +271,11 @@ func (m *model) appendOutput(s string) {
 }
 
 func (m *model) syncViewport() {
-	content := m.content.String()
+	splash := ""
+	if m.splashIdx < len(m.splashes) {
+		splash = m.splashes[m.splashIdx]
+	}
+	content := splash + m.content.String()
 	if m.viewport.Width > 0 {
 		content = lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
 	}
@@ -277,11 +308,6 @@ var userEchoStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("234")).
 	Foreground(lipgloss.Color("141")).
 	Padding(0, 1)
-
-var userLabelStyle = lipgloss.NewStyle().
-	Background(lipgloss.Color("135")).
-	Foreground(lipgloss.Color("214")).
-	Bold(true)
 
 var statusBarStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("243"))

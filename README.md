@@ -2,9 +2,9 @@
 
 ![GitHub License](https://img.shields.io/github/license/original-flipster69/seifenkehrer)
 ![Go](https://img.shields.io/badge/-Go-00ADD8?logo=go&logoColor=00add8&labelColor=grey&style=flat)
-![original.flipster](https://img.shields.io/badge/-original.flipster-grey?logo=data%3Aimage%2Fgif%3Bbase64%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&logoSize=auto&labelColor=grey&color=292524)
+![original.flipster](https://img.shields.io/badge/-original.flipster-grey?logo=data%3Aimage%2Fgif%3Bbase64%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&logoSize=auto&labelColor=grey&color=292524)
 
-A secure, sandboxed coding assistant for the terminal. koko connects to LLM providers and gives them controlled access to your filesystem, shell, and git — all within strict security boundaries.
+A secure, sandboxed coding assistant for the terminal. koko connects to LLM providers and gives them controlled access to your filesystem and shell — all within strict security boundaries.
 
 ## Features
 
@@ -12,112 +12,135 @@ A secure, sandboxed coding assistant for the terminal. koko connects to LLM prov
 
 koko supports three LLM backends:
 
-- **Anthropic** — Claude models via the Anthropic API
-- **Mistral** — Mistral models via the Mistral API (or any compatible endpoint)
+- **Claude** — Claude models via the Anthropic API (`CLAUDE_API_KEY`)
+- **Mistral** — Mistral models via the Mistral API or any compatible endpoint (`MISTRAL_API_KEY`)
 - **Ollama** — Local models with no API key required (default: `http://localhost:11434`)
 
-Switch providers and models at runtime with `/model` or configure them in `~/.koko/config.json`.
+Switch the active model at runtime with `:model <name>` or set defaults in `~/.koko/config.toml`.
 
 ### Sandbox
 
-The sandbox is the core security boundary in koko. Every file operation the agent performs is validated against the sandbox before execution.
+The sandbox is the core security boundary. Every file operation is validated against it before execution.
 
-The sandbox enforces:
-
-- **Directory allowlist** — The agent can only read, write, or list files within explicitly allowed directories. By default this is the current working directory. Any path that resolves outside the allowlist is rejected.
-- **Symlink resolution** — Paths are resolved through symlinks before validation, preventing symlink-based escapes.
-- **Denied file patterns** — Sensitive files are blocked by glob pattern regardless of directory. The defaults are:
+- **Directory allowlist** — the agent can only read, write, or list inside explicitly allowed directories. Default is the current working directory; additional dirs can be configured.
+- **Symlink-safe path resolution** — paths are canonicalized through symlinks before validation. Final-component opens use `O_NOFOLLOW` to prevent TOCTOU swaps.
+- **Typed validation token** — paths must pass `ValidatePath` (which returns a typed `ValidPath`) before reaching any I/O method. The compiler enforces "no raw paths in editor."
+- **Denied file patterns** — sensitive files are blocked by glob regardless of directory. Defaults:
   - `.env`, `.env.*`
   - `*.pem`, `*.key`, `id_rsa*`
   - `credentials.json`
   - `*.secret`, `*.password`
-- **File size limits** — Reads and writes are capped at a configurable maximum (default: 1 MB).
+- **File size limit** — reads/writes capped at a configurable maximum (default: 1 MB).
 
-Use `-sandbox /path/to/project` to set the sandbox root, or configure `sandbox_root` and `allowed_dirs` in the config file.
+### Command Policy
+
+Shell commands run through `exec_command` are gated by a regex-based policy:
+
+- **Default deny list** covers privilege escalation (`sudo`, `su`), remote network (`ssh`, `scp`, `nc`, `telnet`), shell evaluation (`eval`, `source`, backticks, `$(…)`), pipe-to-shell (`curl|sh`, `wget|sh`), and other classic footguns.
+- **Optional allowlist** — when set, the first token of every command must appear in the list. Deny patterns take precedence.
+- **User confirmation** — every `exec_command` invocation prompts for explicit approval before running.
+- **Exec hardening** — commands run with `ulimit` caps on CPU seconds, memory, and output file size. Stdout/stderr are bounded.
 
 ### Agent Tools
 
-The agent has 14 tools available, all mediated through the sandbox:
+The agent has 12 tools, all mediated through the sandbox:
 
-**File Operations**
+**Files**
+
 | Tool | Description |
 |------|-------------|
-| `read_file` | Read file contents with optional line offset and limit |
-| `write_file` | Create or overwrite a file |
+| `read_file` | Read file contents with optional line offset/limit |
+| `write_file` | Create a new file (refuses to overwrite unless `overwrite=true`) |
 | `replace_in_file` | Find-and-replace requiring a unique match |
-| `delete_file` | Remove a file (supports undo) |
 | `rename_file` | Move or rename a file |
-| `list_dir` | List directory contents with recursive tree view |
-| `search_files` | Regex search across files with context lines |
+| `delete_file` | Remove a file (supports `/undo`) |
+| `list_dir` | List directory contents with optional recursive tree |
+| `search_files` | Pattern search across files with context lines |
 
 **Shell**
+
 | Tool | Description |
 |------|-------------|
-| `exec_command` | Run a shell command (requires user confirmation) |
+| `exec_command` | Run a shell command (policy-gated, requires user confirmation) |
 
-**Git**
+**Memory**
+
 | Tool | Description |
 |------|-------------|
-| `git_status` | Show modified and untracked files |
-| `git_diff` | Show staged or unstaged diffs |
-| `git_log` | Show recent commit history |
-| `git_commit` | Stage and commit changes (requires user confirmation) |
-| `git_branch` | List, create, or checkout branches |
+| `save_memory` | Save a persistent memory across sessions |
+| `delete_memory` | Remove a stored memory |
+| `list_memories` | List all stored memories with bodies |
 
-Destructive operations (`exec_command`, `git_commit`) always prompt for user approval before running.
+**Planning**
+
+| Tool | Description |
+|------|-------------|
+| `exit_plan_mode` | Present a plan for user approval (only callable in plan mode) |
+
+### Privacy & Redaction
+
+Two layers of automatic redaction:
+
+- **Secrets** — scans for and redacts known token formats: AWS keys, GitHub PATs (`ghp_`/`gho_`/`ghu_`/`ghr_`/`ghs_`), Google API keys, Slack tokens, Stripe keys, OpenAI/Anthropic keys, JWTs, PEM private key headers, and assignment-style secrets (`API_KEY=...`).
+- **PII** — emails, US SSNs, NANP-format US phone numbers, Luhn-verified credit cards, and public IPv4 addresses (loopback / RFC1918 / link-local are excluded).
+
+Redaction runs on the outbound message stream to the LLM (when `scrub_pii=true`, the default) and on session writes to disk. `write_file` and `replace_in_file` also run a secret scan on their new content.
 
 ### Project Detection
 
-koko automatically detects the languages, frameworks, and build tools in your project by scanning for marker files (`go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, etc.). This context is passed to the LLM to improve the relevance of its responses.
+koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, etc.) and surfaces the result both in the splash banner and as part of the LLM system prompt for orientation.
 
 ### Audit Logging
 
-Every tool invocation is recorded to `~/.koko/audit.jsonl` with a UTC timestamp, tool name, arguments, and result. The audit log is append-only and thread-safe.
+Every tool invocation is recorded to `~/.koko/audit.jsonl` with timestamp, tool name, arguments, result, and a SHA-256 hash chained to the previous entry. The chain is verified at startup — broken or missing hashes fail loudly.
 
-### Session Management
+### Memory
 
-Conversation history can be saved to disk and resumed later:
+Persistent cross-session memories live at `~/.koko/memory/`. The agent can save (`save_memory`) and delete (`delete_memory`) typed entries (user / feedback / project / reference) that surface as context in future sessions.
 
-- `/save` — Write the current session to `~/.koko/session.json`
-- `/resume` — Load a previously saved session
-- `/compact` — Summarize history to reclaim context window space
+### Plays
+
+Markdown files in `~/.koko/plays/` register as named playbooks. Invoke any play by name as a slash command (e.g., `:review` runs the `review.md` play). `:plays` lists installed plays.
+
+### Plan Mode
+
+Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.
 
 ### Interactive REPL
 
 | Command | Description |
 |---------|-------------|
-| `/help` | Show available commands |
-| `/clear` | Reset conversation history |
-| `/history` | Show message count |
-| `/undo` | Revert the last file change |
-| `/run <cmd>` | Run a shell command directly |
-| `/diff` | Show uncommitted git changes |
-| `/tokens` | Display token usage |
-| `/compact` | Compress history |
-| `/model [name]` | Show or switch the active model |
-| `/save` | Save session to disk |
-| `/resume` | Restore a saved session |
-| `"""` | Start/end multi-line input |
+| `:help` | Show available commands |
+| `:koko` | Print the koko mascot |
+| `:clear` | Reset conversation history |
+| `:history` | Show message count |
+| `:tokens` | Show token usage stats |
+| `:undo` | Revert the last file change |
+| `:run <cmd>` | Run a shell command directly (bypasses agent) |
+| `:compact` | Summarize history to reclaim context |
+| `:model [name]` | Show or switch the active model |
+| `:config` | Display the active configuration |
+| `:save` | Save the current session to disk |
+| `:resume` | Restore a saved session |
+| `:plays` | List installed plays |
+| `:plan` | Toggle plan mode |
+| `:<play>` | Run a named play (e.g., `:review`) |
 
-### Non-Interactive Mode
-
-Pass `-prompt` to run a single query and exit:
-
-```
-koko -prompt "Add error handling to main.go"
-```
+Sessions are auto-saved when the agent finishes a turn.
 
 ## Installation
 
 ```
-go install github.com/meeseeks/koko@latest
+go install github.com/original-flipster69/koko@latest
 ```
 
 ## Building from Source
 
 ```
-go build -buildvcs=false && ./koko
+./build.sh
 ```
+
+The build script runs `go build -buildvcs=false` and (if `goda` is on `PATH`) regenerates `docs/deps.svg`.
 
 ## Usage
 
@@ -127,43 +150,61 @@ koko [flags]
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-provider` | LLM provider: `anthropic`, `mistral`, `ollama` | `mistral` |
+| `-provider` | LLM provider: `Claude`, `mistral`, `ollama` | `mistral` |
 | `-model` | Model name | `mistral-large-latest` |
-| `-base-url` | API base URL (for local or custom endpoints) | Provider default |
+| `-llm-url` | API URL (for local or custom endpoints) | Provider default |
 | `-sandbox` | Sandbox root directory | Current working directory |
-| `-config` | Config file path | `~/.koko/config.json` |
-| `-prompt` | Single prompt for non-interactive mode | |
+| `-config` | Config file path | `~/.koko/config.toml` |
 
 ## Configuration
 
-koko reads configuration from `~/.koko/config.json`:
+koko reads configuration from `~/.koko/config.toml`:
 
-```json
-{
-  "provider": "anthropic",
-  "model": "claude-sonnet-4-20250514",
-  "base_url": "",
-  "max_tokens": 16384,
-  "sandbox_root": "/home/user/projects",
-  "allowed_dirs": ["/home/user/projects"],
-  "deny_files": [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "credentials.json", "*.secret", "*.password"],
-  "max_file_size": 1048576
-}
+```toml
+[llm]
+provider = "Claude"
+model = "claude-sonnet-4-20250514"
+url = ""
+max_tokens = 16384
+max_session_tokens = 1000000
+
+[sandbox]
+root = "/home/user/projects"
+additional_dirs = []
+deny_files = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "credentials.json", "*.secret", "*.password"]
+max_file_size = 1048576
+scrub_pii = true
+
+[sandbox.exec]
+profile = "default"
+allow = []
+deny = []
+
+[ignore]
+mode = "gitignore"
+files = []
+
+[style]
+thinking_verbs = ["thinking", "pondering", "scheming"]
 ```
 
-API keys are read from environment variables:
+API keys come from environment variables:
 
-- `ANTHROPIC_API_KEY` for Anthropic
+- `CLAUDE_API_KEY` for Claude
 - `MISTRAL_API_KEY` for Mistral
 - Ollama requires no key
+
+Command-line flags override config values; environment variables fill in only what's still empty after config + flags.
 
 ## Data Directory
 
 koko stores runtime data in `~/.koko/`:
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
-| `config.json` | User configuration |
-| `audit.jsonl` | Tool invocation audit log |
+| `config.toml` | User configuration |
+| `audit.jsonl` | Hash-chained tool invocation log |
 | `koko.log` | Application log (JSON format) |
-| `session.json` | Saved conversation history |
+| `session.json` | Saved conversation history (redacted) |
+| `memory/` | Persistent cross-session memories |
+| `plays/` | Markdown playbooks invokable as `:<name>` |
