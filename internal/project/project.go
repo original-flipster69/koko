@@ -68,7 +68,7 @@ func (p Stack) Summary() string {
 	}
 	var parts []string
 	if len(p.Detected) > 0 {
-		parts = append(parts, "Stack: "+strings.Join(p.Detected, ", "))
+		parts = append(parts, "Repository contains: "+strings.Join(p.Detected, ", "))
 	}
 	if p.HasGit {
 		parts = append(parts, "Version control: git")
