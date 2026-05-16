@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="270" height="208" font-family="ui-monospace,'SF Mono',Menlo,Consolas,monospace" font-size="14" font-weight="bold">
+  <rect width="100%" height="100%" rx="8" fill="#0a0a0a"/>
+  <g xml:space="preserve" fill="#875fff">
+    <text x="10" y="22">                 /<tspan fill="#5f00af">▇▇▇</tspan>\</text>
+    <text x="10" y="40">               /[<tspan fill="#5f00af">▇▇▇▇▇</tspan>]\</text>
+    <text x="10" y="58">              /[<tspan fill="#5f00af">▇▇▇▇▇▇▇</tspan>]\</text>
+    <text x="10" y="76">             <tspan fill="#d7afff">██████████</tspan>|\_</text>
+    <text x="10" y="94">            _ <tspan fill="#d7afff">██</tspan> <tspan fill="#d7afff">█</tspan> <tspan fill="#d7afff">███</tspan>(<tspan fill="#5f00af">▇▇</tspan>|</text>
+    <text x="10" y="112">           _/<tspan fill="#d7afff">███████</tspan>(<tspan fill="#5f00af">▇▇</tspan>)<tspan fill="#5f00af">▇</tspan>|_</text>
+    <text x="10" y="130">           /<tspan fill="#5f00af">▇</tspan><tspan fill="#d7afff">███████</tspan>|<tspan fill="#5f00af">▇▇</tspan>/<tspan fill="#5f00af">▇▇</tspan>)\_</text>
+    <text x="10" y="148">           |<tspan fill="#5f00af">▇▇</tspan>\<tspan fill="#5f00af">▇▇▇▇</tspan>/<tspan fill="#5f00af">▇▇</tspan>/(<tspan fill="#5f00af">▇▇▇▇</tspan>)</text>
+    <text x="10" y="166">           |<tspan fill="#5f00af">▇▇▇</tspan>/  \<tspan fill="#5f00af">▇▇</tspan>/ |<tspan fill="#5f00af">▇▇▇▇</tspan>|</text>
+    <text x="10" y="184">            <tspan fill="#d7afff">████</tspan>  <tspan fill="#d7afff">████</tspan>   \| ]</text>
+  </g>
+</svg>
