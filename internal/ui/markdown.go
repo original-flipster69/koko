@@ -178,12 +178,12 @@ func highlightCode(lang, code string) string {
 
 	iterator, err := lexer.Tokenise(nil, code)
 	if err != nil {
-		return Amber + code + Reset
+		return PureOrange + code + Reset
 	}
 
 	var buf strings.Builder
 	if err := formatter.Format(&buf, style, iterator); err != nil {
-		return Amber + code + Reset
+		return PureOrange + code + Reset
 	}
 	return buf.String()
 }
@@ -195,15 +195,15 @@ func renderLine(line string) string {
 	if h := headingLevel(trimmed); h > 0 {
 		text := strings.TrimSpace(trimmed[h:])
 		text = stripBoldMarkers(text)
-		color := BrightPurp
+		color := Blueberry
 		if h >= 2 {
-			color = Purple
+			color = LavenderIndigo
 		}
 		return fmt.Sprintf("%s%s%s%s%s", indent, Bold, color, text, Reset)
 	}
 
 	if after, ok := trimListMarker(trimmed); ok {
-		return fmt.Sprintf("%s%s•%s %s", indent, Violet, Reset, renderInline(after))
+		return fmt.Sprintf("%s%s•%s %s", indent, BrightLavender, Reset, renderInline(after))
 	}
 
 	if after, ok := trimOrderedMarker(trimmed); ok {
@@ -266,7 +266,7 @@ func renderInline(s string) string {
 		if c == '`' {
 			end := strings.IndexByte(s[i+1:], '`')
 			if end >= 0 {
-				out.WriteString(Amber)
+				out.WriteString(PureOrange)
 				out.WriteString(s[i+1 : i+1+end])
 				out.WriteString(Reset)
 				i += end + 2
@@ -278,7 +278,7 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "**")
 			if end >= 0 {
 				out.WriteString(Bold)
-				out.WriteString(LightPurp)
+				out.WriteString(Mauve)
 				out.WriteString(s[i+2 : i+2+end])
 				out.WriteString(Reset)
 				i += end + 4
@@ -301,7 +301,7 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "__")
 			if end >= 0 {
 				out.WriteString(Bold)
-				out.WriteString(LightPurp)
+				out.WriteString(Mauve)
 				out.WriteString(s[i+2 : i+2+end])
 				out.WriteString(Reset)
 				i += end + 4
@@ -341,7 +341,7 @@ func renderInline(s string) string {
 						text := s[i+1 : i+1+closeBracket]
 						url := s[afterBracket+1 : afterBracket+1+closeParen]
 						out.WriteString(Underline)
-						out.WriteString(Amber)
+						out.WriteString(PureOrange)
 						out.WriteString(text)
 						out.WriteString(Reset)
 						out.WriteString(Dim)

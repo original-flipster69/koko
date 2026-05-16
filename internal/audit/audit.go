@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
 )
 
-type Entry struct {
+type entry struct {
 	Timestamp string            `json:"timestamp"`
 	Tool      string            `json:"tool"`
 	Args      map[string]string `json:"args"`
@@ -54,18 +55,17 @@ func loadLastHash(path string) (string, error) {
 	line := 0
 	for scanner.Scan() {
 		line++
-		var e Entry
+		var e entry
 		if err := json.Unmarshal(scanner.Bytes(), &e); err != nil {
 			return "", fmt.Errorf("audit: corrupt entry at line %d: %w", line, err)
 		}
 		if e.Hash == "" {
-			prev = ""
-			continue
+			return "", fmt.Errorf("audit: missing hash at line %d", line)
 		}
 		if e.PrevHash != prev {
 			return "", fmt.Errorf("audit: chain broken at line %d (expected prev_hash %q, got %q)", line, prev, e.PrevHash)
 		}
-		expected := hashEntry(e)
+		expected := e.hash()
 		if expected != e.Hash {
 			return "", fmt.Errorf("audit: tampered entry at line %d (hash mismatch)", line)
 		}
@@ -77,7 +77,7 @@ func loadLastHash(path string) (string, error) {
 	return prev, nil
 }
 
-func hashEntry(e Entry) string {
+func (e entry) hash() string {
 	h := sha256.New()
 	h.Write([]byte(e.PrevHash))
 	h.Write([]byte(e.Timestamp))
@@ -95,21 +95,21 @@ func (l *Log) Record(tool string, args map[string]string, result string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	entry := Entry{
+	entry := entry{
 		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Tool:      tool,
 		Args:      args,
 		Result:    truncate(result, 2048),
 		PrevHash:  l.lastHash,
 	}
-	entry.Hash = hashEntry(entry)
+	entry.Hash = entry.hash()
 	data, err := json.Marshal(entry)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "audit: marshal error: %v\n", err)
+		slog.Warn("audit marshal failed", "tool", tool, "err", err)
 		return
 	}
 	if _, err := l.file.Write(append(data, '\n')); err != nil {
-		fmt.Fprintf(os.Stderr, "audit: write error: %v\n", err)
+		slog.Warn("audit write failed", "tool", tool, "err", err)
 		return
 	}
 	l.lastHash = entry.Hash

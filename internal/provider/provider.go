@@ -1,29 +1,34 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
 
-	"github.com/meeseeks/koko/internal/config"
+	"github.com/original-flipster69/koko/internal/config"
 )
 
-type Role string
+type role string
 
 const (
-	RoleUser      Role = "user"
-	RoleAssistant Role = "assistant"
-	RoleSystem    Role = "system"
+	User      role = "user"
+	Assistant role = "assistant"
+	System    role = "system"
 )
 
-type Image struct {
-	MimeType string `json:"mime_type"`
-	Data     string `json:"data"`
+type Img struct {
+	Mime string `json:"mime_type"`
+	Data string `json:"data"`
 }
 
-type Message struct {
-	Role    Role    `json:"role"`
-	Content string  `json:"content"`
-	Images  []Image `json:"images,omitempty"`
+type Msg struct {
+	Role    role   `json:"role"`
+	Content string `json:"content"`
+	Imgs    []Img  `json:"images,omitempty"`
 }
 
 type ToolCall struct {
@@ -31,7 +36,18 @@ type ToolCall struct {
 	Args map[string]string `json:"args"`
 }
 
-type Usage struct {
+func (tc ToolCall) ArgsFormat() string {
+	args := ""
+	for k, v := range tc.Args {
+		if args != "" {
+			args += ", "
+		}
+		args += "'" + k + "': \"" + v + "\""
+	}
+	return args
+}
+
+type Usg struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
 }
@@ -39,7 +55,7 @@ type Usage struct {
 type Response struct {
 	Content   string     `json:"content"`
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
-	Usage     Usage      `json:"usage"`
+	Usage     Usg        `json:"usage"`
 }
 
 type StreamDelta struct {
@@ -49,34 +65,70 @@ type StreamDelta struct {
 }
 
 type Provider interface {
-	Chat(ctx context.Context, messages []Message, tools []ToolDef) (*Response, error)
-	ChatStream(ctx context.Context, messages []Message, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error)
+	ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error)
 	Name() string
 	Model() string
 	SetModel(model string)
 }
 
 type ToolDef struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Params      Schema `json:"parameters"`
 }
 
-func chatStreamFallback(ctx context.Context, p Provider, messages []Message, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
-	resp, err := p.Chat(ctx, messages, tools)
+type Schema struct {
+	Type       string              `json:"type"`
+	Properties map[string]Property `json:"properties,omitempty"`
+	Required   []string            `json:"required,omitempty"`
+}
+
+type Property struct {
+	Type        string `json:"type"`
+	Description string `json:"description,omitempty"`
+}
+
+func StringParam(desc string) Property {
+	return Property{Type: "string", Description: desc}
+}
+
+func IntParam(desc string) Property {
+	return Property{Type: "integer", Description: desc}
+}
+
+func BoolParam(desc string) Property {
+	return Property{Type: "boolean", Description: desc}
+}
+
+func sendReq(ctx context.Context, client *http.Client, url string, body any, headers map[string]string) (*http.Response, error) {
+	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
-	if onDelta != nil && resp.Content != "" {
-		onDelta(StreamDelta{Text: resp.Content})
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
-	if onDelta != nil {
-		onDelta(StreamDelta{Done: true, Response: resp})
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
+	}
+	resp, err := withRetry(ctx, client, req, 5)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, truncate(b, 512))
 	}
 	return resp, nil
 }
 
-func sanitizeErrorBody(body []byte, maxLen int) string {
+func truncate(body []byte, maxLen int) string {
 	s := string(body)
 	if len(s) > maxLen {
 		s = s[:maxLen] + "...(truncated)"
@@ -84,14 +136,35 @@ func sanitizeErrorBody(body []byte, maxLen int) string {
 	return s
 }
 
-func New(cfg *config.Config) (Provider, error) {
+func coerceArgs(input map[string]interface{}) map[string]string {
+	args := make(map[string]string, len(input))
+	for k, v := range input {
+		if v == nil {
+			continue
+		}
+		switch vv := v.(type) {
+		case string:
+			args[k] = vv
+		case float64:
+			args[k] = strconv.FormatFloat(vv, 'f', -1, 64)
+		case bool:
+			args[k] = strconv.FormatBool(vv)
+		default:
+			b, _ := json.Marshal(vv)
+			args[k] = string(b)
+		}
+	}
+	return args
+}
+
+func New(cfg *config.LlmConfig) (Provider, error) {
 	switch cfg.Provider {
-	case config.ProviderAnthropic:
-		return NewAnthropic(cfg.APIKey, cfg.Model, cfg.MaxTokens)
-	case config.ProviderMistral:
-		return NewMistral(cfg.APIKey, cfg.Model, cfg.BaseURL)
-	case config.ProviderOllama:
-		return NewOllama(cfg.Model, cfg.BaseURL)
+	case config.Claude:
+		return newClaude(cfg.ApiKey, cfg.Model, cfg.Url, cfg.MaxTokens)
+	case config.Mistral:
+		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url)
+	case config.Ollama:
+		return newOllama(cfg.Model, cfg.Url)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %q", cfg.Provider)
 	}

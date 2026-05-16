@@ -1,4 +1,4 @@
-package tui
+package terminal
 
 import (
 	"context"
@@ -11,13 +11,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/meeseeks/koko/internal/agent"
-	"github.com/meeseeks/koko/internal/ui"
+	"github.com/original-flipster69/koko/internal/agent"
+	"github.com/original-flipster69/koko/internal/ui"
 )
 
 type agentDoneMsg struct{ err error }
 type confirmRequestMsg string
 type spinnerTickMsg struct{}
+type splashTickMsg struct{}
+
+const splashFrameDuration = 400 * time.Millisecond
+
+var splashSequence = []int{1, 0, 1, 0, 2, 0}
+
+func splashTickCmd() tea.Cmd {
+	return tea.Tick(splashFrameDuration, func(time.Time) tea.Msg {
+		return splashTickMsg{}
+	})
+}
 
 var (
 	zodiac      = []string{"♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"}
@@ -36,7 +47,9 @@ type model struct {
 	cancel    context.CancelFunc
 	runCancel context.CancelFunc
 	kokoDir   string
-	splash    string
+	splashes  []string
+	splashIdx int
+	splashHit int
 
 	confirmCh    chan bool
 	confirmMode  bool
@@ -47,38 +60,42 @@ type model struct {
 	spinnerTick  int
 	spinnerLabel string
 
-	slashHandler SlashHandler
+	cmdHandler CmdHandler
 }
 
-type SlashHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
+type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
 
-func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splash string, slashHandler SlashHandler, confirmCh chan bool) model {
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool) model {
 	ta := textarea.New()
-	ta.Placeholder = "ask koko anything... (shift+enter for newline)"
+	ta.Placeholder = "ask koko anything... (alt+enter or ctrl+j for newline)"
 	ta.Focus()
 	ta.CharLimit = 8192
 	ta.SetHeight(1)
 	ta.SetWidth(80)
 	ta.ShowLineNumbers = false
 	ta.Prompt = ""
-	ta.KeyMap.InsertNewline.SetKeys("shift+enter")
+	ta.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j", "shift+enter")
 
 	m := model{
-		input:        ta,
-		content:      &strings.Builder{},
-		agent:        a,
-		ctx:          ctx,
-		cancel:       cancel,
-		kokoDir:      kokoDir,
-		splash:       splash,
-		confirmCh:    confirmCh,
-		slashHandler: slashHandler,
+		input:      ta,
+		content:    &strings.Builder{},
+		agent:      a,
+		ctx:        ctx,
+		cancel:     cancel,
+		kokoDir:    kokoDir,
+		splashes:   splashes,
+		confirmCh:  confirmCh,
+		cmdHandler: cmdHandler,
 	}
 	return m
 }
 
 func (m model) Init() tea.Cmd {
-	return textarea.Blink
+	cmds := []tea.Cmd{textarea.Blink}
+	if len(m.splashes) > 1 {
+		cmds = append(cmds, splashTickCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 func spinnerTickCmd(tick int) tea.Cmd {
@@ -96,7 +113,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		chrome := 5
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, msg.Height-chrome)
-			m.content.WriteString(m.splash)
 			m.syncViewport()
 			m.ready = true
 		} else {
@@ -150,15 +166,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-			display := input
+			display := "▼ " + input
 			if strings.Contains(display, "\n") {
 				lines := strings.Split(display, "\n")
 				display = lines[0] + fmt.Sprintf(" (+%d lines)", len(lines)-1)
 			}
-			m.appendOutput(fmt.Sprintf("\n%s%s▶ %s%s\n", ui.Bold, ui.BrightPurp, display, ui.Reset))
+			block := userEchoStyle.Width(m.viewport.Width - 2).Render(display)
+			m.appendOutput("\n" + block + "\n\n")
 
-			if strings.HasPrefix(input, ":") && m.slashHandler != nil {
-				handled, prompt, output := m.slashHandler(input, m.agent)
+			if strings.HasPrefix(input, ":") && m.cmdHandler != nil {
+				handled, prompt, output := m.cmdHandler(input, m.agent)
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}
@@ -192,6 +209,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, spinnerTickCmd(m.spinnerTick))
 		}
 		return m, tea.Batch(cmds...)
+
+	case splashTickMsg:
+		if m.splashHit < len(splashSequence) {
+			m.splashIdx = splashSequence[m.splashHit]
+			m.splashHit++
+			m.syncViewport()
+			if m.splashHit < len(splashSequence) {
+				return m, splashTickCmd()
+			}
+		}
+		return m, nil
 
 	case outputMsg:
 		atBottom := m.viewport.AtBottom()
@@ -243,7 +271,15 @@ func (m *model) appendOutput(s string) {
 }
 
 func (m *model) syncViewport() {
-	m.viewport.SetContent(m.content.String())
+	splash := ""
+	if m.splashIdx < len(m.splashes) {
+		splash = m.splashes[m.splashIdx]
+	}
+	content := splash + m.content.String()
+	if m.viewport.Width > 0 {
+		content = lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
+	}
+	m.viewport.SetContent(content)
 }
 
 func (m model) spinnerView() string {
@@ -260,13 +296,18 @@ func (m model) spinnerView() string {
 		frame = zodiac[cycle%len(zodiac)]
 	}
 	dot := dots[cycle%len(dots)]
-	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.BrightPurp, frame, ui.Reset, ui.BrightPurp, m.spinnerLabel, dot, ui.Reset)
+	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.Blueberry, frame, ui.Reset, ui.Blueberry, m.spinnerLabel, dot, ui.Reset)
 }
 
 var inputBarStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderTop(true).
 	BorderForeground(lipgloss.Color("135"))
+
+var userEchoStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("234")).
+	Foreground(lipgloss.Color("141")).
+	Padding(0, 1)
 
 var statusBarStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("243"))
@@ -286,9 +327,9 @@ func (m model) View() string {
 
 	var inputLine string
 	if m.confirmMode {
-		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.Purple, ui.Reset, m.confirmText, m.input.View())
+		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.LavenderIndigo, ui.Reset, m.confirmText, m.input.View())
 	} else {
-		inputLine = fmt.Sprintf("%s▶%s %s", ui.BrightPurp, ui.Reset, m.input.View())
+		inputLine = fmt.Sprintf("%s▶%s %s", ui.Blueberry, ui.Reset, m.input.View())
 	}
 
 	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)

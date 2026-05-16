@@ -12,11 +12,6 @@ type Spinner struct {
 	label  string
 	stopCh chan struct{}
 	done   chan struct{}
-	once   sync.Once
-}
-
-func NewSpinner() *Spinner {
-	return &Spinner{label: "thinking"}
 }
 
 func NewLabeledSpinner(label string) *Spinner {
@@ -32,7 +27,6 @@ func (s *Spinner) Start() {
 	s.active = true
 	s.stopCh = make(chan struct{})
 	s.done = make(chan struct{})
-	s.once = sync.Once{}
 	label := s.label
 	s.mu.Unlock()
 
@@ -70,7 +64,7 @@ func (s *Spinner) Start() {
 				}
 				dot := dots[cycle%len(dots)]
 				fmt.Printf("\r\033[K  %s%s%s%s\033[7G%s%s%s%s",
-					Bold, BrightPurp, frame, Reset,
+					Bold, Blueberry, frame, Reset,
 					Gray, label, dot, Reset,
 				)
 				time.Sleep(beats[phase])
@@ -86,11 +80,9 @@ func (s *Spinner) Stop() {
 		s.mu.Unlock()
 		return
 	}
+	s.active = false
+	close(s.stopCh)
 	done := s.done
-	s.once.Do(func() {
-		s.active = false
-		close(s.stopCh)
-	})
 	s.mu.Unlock()
 	<-done
 }

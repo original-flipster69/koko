@@ -1,4 +1,4 @@
-package httputil
+package provider
 
 import (
 	"context"
@@ -14,7 +14,7 @@ const (
 	maxBackoff  = 30 * time.Second
 )
 
-func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request, maxAttempts int) (*http.Response, error) {
+func withRetry(ctx context.Context, client *http.Client, req *http.Request, maxAttempts int) (*http.Response, error) {
 	var lastErr error
 	var lastStatus int
 	var nextWait time.Duration
@@ -49,7 +49,7 @@ func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request, ma
 			continue
 		}
 
-		if isRetryableStatus(resp.StatusCode) {
+		if isRetryStatus(resp.StatusCode) {
 			lastStatus = resp.StatusCode
 			lastErr = nil
 			nextWait = parseRetryAfter(resp.Header.Get("Retry-After"))
@@ -66,7 +66,7 @@ func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request, ma
 	return nil, fmt.Errorf("request failed after %d attempts (last status: %d)", maxAttempts, lastStatus)
 }
 
-func isRetryableStatus(code int) bool {
+func isRetryStatus(code int) bool {
 	switch code {
 	case http.StatusTooManyRequests,
 		http.StatusBadGateway,

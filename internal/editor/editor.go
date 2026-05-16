@@ -3,13 +3,15 @@ package editor
 import (
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 
-	"github.com/meeseeks/koko/internal/sandbox"
+	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
 var lockfiles = map[string]string{
@@ -27,8 +29,8 @@ var lockfiles = map[string]string{
 	"uv.lock":           "uv lock",
 }
 
-func lockfileGuard(path string) error {
-	base := filepath.Base(path)
+func lockfileGuard(path sandbox.ValidPath) error {
+	base := filepath.Base(string(path))
 	if manager, ok := lockfiles[base]; ok {
 		return fmt.Errorf("refusing to modify lockfile %q directly — run `%s` via exec_command instead", base, manager)
 	}
@@ -36,7 +38,7 @@ func lockfileGuard(path string) error {
 }
 
 type undoEntry struct {
-	path    string
+	path    sandbox.ValidPath
 	content string
 	existed bool
 }
@@ -45,26 +47,26 @@ type Editor struct {
 	sandbox   *sandbox.Sandbox
 	mu        sync.Mutex
 	undoStack []undoEntry
-	reads     map[string][32]byte
+	reads     map[sandbox.ValidPath][32]byte
 }
 
 func New(sb *sandbox.Sandbox) *Editor {
-	return &Editor{sandbox: sb, reads: make(map[string][32]byte)}
+	return &Editor{sandbox: sb, reads: make(map[sandbox.ValidPath][32]byte)}
 }
 
-func (e *Editor) MarkRead(path, content string) {
+func (e *Editor) MarkRead(path sandbox.ValidPath, content string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.reads[path] = sha256.Sum256([]byte(content))
 }
 
-func (e *Editor) ForgetRead(path string) {
+func (e *Editor) ForgetRead(path sandbox.ValidPath) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	delete(e.reads, path)
 }
 
-func (e *Editor) readHash(path string) ([32]byte, bool) {
+func (e *Editor) readHash(path sandbox.ValidPath) ([32]byte, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	h, ok := e.reads[path]
@@ -80,23 +82,24 @@ func (e *Editor) Undo() (string, error) {
 	}
 	entry := e.undoStack[len(e.undoStack)-1]
 	e.undoStack = e.undoStack[:len(e.undoStack)-1]
+	pathStr := string(entry.path)
 	if !entry.existed {
-		if err := os.Remove(entry.path); err != nil && !os.IsNotExist(err) {
-			return entry.path, fmt.Errorf("removing %s: %w", entry.path, err)
+		if err := os.Remove(pathStr); err != nil && !os.IsNotExist(err) {
+			return pathStr, fmt.Errorf("removing %s: %w", pathStr, err)
 		}
-		return entry.path, nil
+		return pathStr, nil
 	}
-	if err := e.sandbox.WriteFile(entry.path, entry.content); err != nil {
-		return entry.path, fmt.Errorf("restoring %s: %w", entry.path, err)
+	if err := e.writeBytes(entry.path, entry.content); err != nil {
+		return pathStr, fmt.Errorf("restoring %s: %w", pathStr, err)
 	}
-	return entry.path, nil
+	return pathStr, nil
 }
 
-func (e *Editor) saveUndo(path string) {
+func (e *Editor) saveUndo(path sandbox.ValidPath) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	content, err := e.sandbox.ReadFile(path)
+	content, err := e.readBytes(path)
 	if err != nil {
 		e.undoStack = append(e.undoStack, undoEntry{path: path, existed: false})
 		return
@@ -104,26 +107,115 @@ func (e *Editor) saveUndo(path string) {
 	e.undoStack = append(e.undoStack, undoEntry{path: path, content: content, existed: true})
 }
 
-func (e *Editor) ReadFile(path string) (string, error) {
-	return e.sandbox.ReadFile(path)
+func (e *Editor) readBytes(path sandbox.ValidPath) (string, error) {
+	resolved := string(path)
+	file, err := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return "", fmt.Errorf("reading file: %w", err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("stat: %w", err)
+	}
+	if info.Size() > e.sandbox.MaxFileSize() {
+		return "", fmt.Errorf("file %q exceeds max size (%d bytes)", resolved, e.sandbox.MaxFileSize())
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return "", fmt.Errorf("reading file: %w", err)
+	}
+	return string(data), nil
 }
 
-func (e *Editor) WriteFile(path string, content string, overwrite bool) error {
+func (e *Editor) writeBytes(path sandbox.ValidPath, content string) error {
+	resolved := string(path)
+	max := e.sandbox.MaxFileSize()
+	if int64(len(content)) > max {
+		return fmt.Errorf("content exceeds max file size (%d bytes)", max)
+	}
+	dir := filepath.Dir(resolved)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("creating directories: %w", err)
+	}
+	existed := false
+	if _, err := os.Lstat(resolved); err == nil {
+		existed = true
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat: %w", err)
+	}
+	file, err := os.OpenFile(resolved, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|syscall.O_NOFOLLOW, 0640)
+	if err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+	if _, err := file.Write([]byte(content)); err != nil {
+		file.Close()
+		return fmt.Errorf("writing file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("writing file: %w", err)
+	}
+	if !existed {
+		return os.Chmod(resolved, 0640)
+	}
+	return nil
+}
+
+func (e *Editor) Read(path sandbox.ValidPath) (string, error) {
+	content, err := e.readBytes(path)
+	if err != nil {
+		return "", err
+	}
+	if looksBinary([]byte(content)) {
+		return "", fmt.Errorf("refusing to read %q: content appears to be binary", path)
+	}
+	return content, nil
+}
+
+func (e *Editor) ReadImg(path sandbox.ValidPath) ([]byte, string, error) {
+	mime, ok := sandbox.ImgMimeType(string(path))
+	if !ok {
+		return nil, "", fmt.Errorf("%q is not a supported image format", path)
+	}
+	resolved := string(path)
+	file, err := os.OpenFile(resolved, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading image: %w", err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, "", fmt.Errorf("stat: %w", err)
+	}
+	if info.Size() > e.sandbox.MaxFileSize() {
+		return nil, "", fmt.Errorf("image %q exceeds max size (%d bytes)", resolved, e.sandbox.MaxFileSize())
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading image: %w", err)
+	}
+	return data, mime, nil
+}
+
+func (e *Editor) Write(path sandbox.ValidPath, content string, overwrite bool) error {
 	if err := lockfileGuard(path); err != nil {
 		return err
 	}
-	if _, err := e.sandbox.ReadFile(path); err == nil && !overwrite {
+	if looksBinary([]byte(content)) {
+		return fmt.Errorf("refusing to write %q: content appears to be binary", path)
+	}
+	if _, err := os.Stat(string(path)); err == nil && !overwrite {
 		return fmt.Errorf("refusing to write %s: file already exists. Use replace_in_file for modifications, or pass overwrite=true ONLY when you explicitly intend a full rewrite", path)
 	}
 	e.saveUndo(path)
-	if err := e.sandbox.WriteFile(path, content); err != nil {
+	if err := e.writeBytes(path, content); err != nil {
 		return err
 	}
 	e.MarkRead(path, content)
 	return nil
 }
 
-func (e *Editor) ReplaceInFile(path, oldText, newText string) (before string, after string, err error) {
+func (e *Editor) Replace(path sandbox.ValidPath, oldText, newText string) (before string, after string, err error) {
 	if err := lockfileGuard(path); err != nil {
 		return "", "", err
 	}
@@ -131,7 +223,7 @@ func (e *Editor) ReplaceInFile(path, oldText, newText string) (before string, af
 	if !ok {
 		return "", "", fmt.Errorf("refusing to edit %s — file has not been read in this session. Call read_file on this path first (with no offset/limit, so you see the full content), then retry replace_in_file with byte-exact old_text copied from the read output", path)
 	}
-	content, err := e.sandbox.ReadFile(path)
+	content, err := e.readBytes(path)
 	if err != nil {
 		return "", "", err
 	}
@@ -142,8 +234,11 @@ func (e *Editor) ReplaceInFile(path, oldText, newText string) (before string, af
 	}
 
 	commit := func(updated string) (string, string, error) {
+		if looksBinary([]byte(updated)) {
+			return "", "", fmt.Errorf("refusing to write %q: content appears to be binary", path)
+		}
 		e.saveUndo(path)
-		if err := e.sandbox.WriteFile(path, updated); err != nil {
+		if err := e.writeBytes(path, updated); err != nil {
 			return "", "", err
 		}
 		e.MarkRead(path, updated)
@@ -264,9 +359,13 @@ func fuzzyWhitespaceMatch(content, oldText string) (int, int, int, bool) {
 	return 0, 0, len(matches), false
 }
 
-func (e *Editor) RenameFile(oldPath, newPath string) error {
+func (e *Editor) Rename(oldPath, newPath sandbox.ValidPath) error {
 	e.saveUndo(oldPath)
-	if err := e.sandbox.RenameFile(oldPath, newPath); err != nil {
+	dir := filepath.Dir(string(newPath))
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("creating directories: %w", err)
+	}
+	if err := os.Rename(string(oldPath), string(newPath)); err != nil {
 		return err
 	}
 	e.ForgetRead(oldPath)
@@ -274,20 +373,46 @@ func (e *Editor) RenameFile(oldPath, newPath string) error {
 	return nil
 }
 
-func (e *Editor) DeleteFile(path string) error {
+func (e *Editor) Delete(path sandbox.ValidPath) error {
 	if err := lockfileGuard(path); err != nil {
 		return err
 	}
 	e.saveUndo(path)
-	if err := e.sandbox.DeleteFile(path); err != nil {
+	if err := os.Remove(string(path)); err != nil {
 		return err
 	}
 	e.ForgetRead(path)
 	return nil
 }
 
-func (e *Editor) ListDir(path string) ([]string, error) {
-	return e.sandbox.ListDir(path)
+func (e *Editor) List(path sandbox.ValidPath) (string, []os.DirEntry, error) {
+	resolved := string(path)
+	entries, err := os.ReadDir(resolved)
+	if err != nil {
+		return "", nil, fmt.Errorf("reading directory: %w", err)
+	}
+	return resolved, entries, nil
+}
+
+func looksBinary(data []byte) bool {
+	n := len(data)
+	if n == 0 {
+		return false
+	}
+	if n > 512 {
+		n = 512
+	}
+	nonPrint := 0
+	for i := 0; i < n; i++ {
+		c := data[i]
+		if c == 0 {
+			return true
+		}
+		if c < 9 || (c > 13 && c < 32) || c == 127 {
+			nonPrint++
+		}
+	}
+	return nonPrint*100/n > 30
 }
 
 func previewForError(content string) string {
