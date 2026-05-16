@@ -22,7 +22,7 @@ type splashTickMsg struct{}
 
 const splashFrameDuration = 400 * time.Millisecond
 
-var splashSequence = []int{1, 0, 2, 0}
+var splashSequence = []int{1, 0, 1, 0, 2, 0}
 
 func splashTickCmd() tea.Cmd {
 	return tea.Tick(splashFrameDuration, func(time.Time) tea.Msg {
@@ -67,14 +67,14 @@ type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string,
 
 func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool) model {
 	ta := textarea.New()
-	ta.Placeholder = "ask koko anything... (shift+enter for newline)"
+	ta.Placeholder = "ask koko anything... (alt+enter or ctrl+j for newline)"
 	ta.Focus()
 	ta.CharLimit = 8192
 	ta.SetHeight(1)
 	ta.SetWidth(80)
 	ta.ShowLineNumbers = false
 	ta.Prompt = ""
-	ta.KeyMap.InsertNewline.SetKeys("shift+enter")
+	ta.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j", "shift+enter")
 
 	m := model{
 		input:      ta,
