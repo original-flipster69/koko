@@ -36,9 +36,15 @@ func main() {
 	llmUrlFlag := flag.String("llm-url", "", "URL for LLM API (useful for local LLMs)")
 	sandboxFlag := flag.String("sandbox", "", "Sandbox root directory (defaults to cwd)")
 	configFlag := flag.String("config", "", "Config file path")
+	versionFlag := flag.String("version", "", "Installed version of koko")
 	flag.Parse()
 
 	kokoDir := getKokoDir()
+
+	if *versionFlag != "" {
+		fmt.Fprintln(os.Stdout, version)
+		os.Exit(0)
+	}
 
 	cfgPath := config.Path(kokoDir)
 	if *configFlag != "" {
