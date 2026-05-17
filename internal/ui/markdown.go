@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
@@ -11,10 +12,14 @@ import (
 )
 
 type MarkdownStream struct {
-	buf       strings.Builder
-	inFence   bool
-	fenceLang string
-	fenceBuf  strings.Builder
+	buf            strings.Builder
+	inFence        bool
+	fenceLang      string
+	fenceBuf       strings.Builder
+	pendingTableHd string
+	inTable        bool
+	tableHeaders   []string
+	tableRows      [][]string
 }
 
 func NewMarkdownStream() *MarkdownStream {
@@ -41,12 +46,34 @@ func (m *MarkdownStream) Flush() string {
 	if rem != "" {
 		out = m.renderBlock(rem)
 	}
+	out += m.flushTable()
+	out += m.flushPendingTableHd()
 	if m.inFence && m.fenceBuf.Len() > 0 {
 		out += highlightCode(m.fenceLang, m.fenceBuf.String())
 		m.fenceBuf.Reset()
 	}
 	m.inFence = false
 	return out
+}
+
+func (m *MarkdownStream) flushTable() string {
+	if !m.inTable {
+		return ""
+	}
+	out := renderTable(m.tableHeaders, m.tableRows)
+	m.inTable = false
+	m.tableHeaders = nil
+	m.tableRows = nil
+	return out
+}
+
+func (m *MarkdownStream) flushPendingTableHd() string {
+	if m.pendingTableHd == "" {
+		return ""
+	}
+	line := m.pendingTableHd
+	m.pendingTableHd = ""
+	return renderLine(line) + "\n"
 }
 
 func isFenceMarker(line string) bool {
@@ -103,6 +130,8 @@ func (m *MarkdownStream) renderBlock(block string) string {
 		trimmed := strings.TrimSpace(body)
 
 		if body == "" {
+			out.WriteString(m.flushTable())
+			out.WriteString(m.flushPendingTableHd())
 			if hasNL {
 				if m.inFence {
 					m.fenceBuf.WriteString("\n")
@@ -114,6 +143,8 @@ func (m *MarkdownStream) renderBlock(block string) string {
 		}
 
 		if isFenceMarker(trimmed) {
+			out.WriteString(m.flushTable())
+			out.WriteString(m.flushPendingTableHd())
 			if !m.inFence {
 				m.inFence = true
 				m.fenceLang = fenceLanguage(trimmed)
@@ -136,11 +167,38 @@ func (m *MarkdownStream) renderBlock(block string) string {
 		}
 
 		if isHorizontalRule(trimmed) {
+			out.WriteString(m.flushTable())
+			out.WriteString(m.flushPendingTableHd())
 			rule := Dim + Gray + strings.Repeat("─", 40) + Reset
 			out.WriteString(rule)
 			if hasNL {
 				out.WriteString("\n")
 			}
+			continue
+		}
+
+		if m.inTable {
+			if looksLikeTableRow(trimmed) {
+				m.tableRows = append(m.tableRows, parseTableRow(trimmed))
+				continue
+			}
+			out.WriteString(m.flushTable())
+		}
+
+		if m.pendingTableHd != "" {
+			if isTableSeparator(trimmed) {
+				m.inTable = true
+				m.tableHeaders = parseTableRow(m.pendingTableHd)
+				m.pendingTableHd = ""
+				continue
+			}
+			out.WriteString(renderLine(m.pendingTableHd))
+			out.WriteString("\n")
+			m.pendingTableHd = ""
+		}
+
+		if looksLikeTableRow(trimmed) && len(parseTableRow(trimmed)) >= 2 {
+			m.pendingTableHd = body
 			continue
 		}
 
@@ -257,7 +315,350 @@ func trimOrderedMarker(s string) (string, bool) {
 	return "", false
 }
 
+func looksLikeTableRow(line string) bool {
+	return strings.Contains(line, "|")
+}
+
+func parseTableRow(line string) []string {
+	line = strings.TrimSpace(line)
+	line = strings.TrimPrefix(line, "|")
+	line = strings.TrimSuffix(line, "|")
+	parts := strings.Split(line, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+func isTableSeparator(line string) bool {
+	cells := parseTableRow(line)
+	if len(cells) < 1 {
+		return false
+	}
+	for _, c := range cells {
+		c = strings.TrimPrefix(c, ":")
+		c = strings.TrimSuffix(c, ":")
+		if len(c) < 3 || strings.Trim(c, "-") != "" {
+			return false
+		}
+	}
+	return true
+}
+
+func visibleWidth(s string) int {
+	w := 0
+	state := 0
+	for _, r := range s {
+		switch state {
+		case 0:
+			if r == 0x1b {
+				state = 1
+			} else {
+				w++
+			}
+		case 1:
+			if r == '[' {
+				state = 2
+			} else {
+				state = 0
+			}
+		case 2:
+			if r >= 0x40 && r <= 0x7e {
+				state = 0
+			}
+		}
+	}
+	return w
+}
+
+const (
+	defaultTermWidth = 100
+	minTableColWidth = 6
+	tableMargin      = 2
+)
+
+var termWidth = defaultTermWidth
+
+func SetTermWidth(w int) {
+	if w > 0 {
+		termWidth = w
+	}
+}
+
+func wrapText(s string, width int) []string {
+	if width <= 0 || visibleWidth(s) <= width {
+		return []string{s}
+	}
+	hasAnsi := strings.Contains(s, "\x1b[")
+
+	var lines []string
+	var cur, word strings.Builder
+	var activeStyle strings.Builder
+	var wordVis, lineVis int
+
+	consumeAnsi := func(rs []rune, i int) (string, int) {
+		j := i + 2
+		for j < len(rs) && !(rs[j] >= 0x40 && rs[j] <= 0x7e) {
+			j++
+		}
+		if j < len(rs) {
+			j++
+		}
+		return string(rs[i:j]), j
+	}
+
+	updateStyle := func(seq string) {
+		if seq == "\x1b[0m" || seq == "\x1b[m" {
+			activeStyle.Reset()
+		} else {
+			activeStyle.WriteString(seq)
+		}
+	}
+
+	flushLine := func() {
+		if cur.Len() == 0 {
+			return
+		}
+		out := cur.String()
+		if hasAnsi {
+			out += Reset
+		}
+		lines = append(lines, out)
+		cur.Reset()
+		lineVis = 0
+		if hasAnsi && activeStyle.Len() > 0 {
+			cur.WriteString(activeStyle.String())
+		}
+	}
+
+	writeWord := func(wr []rune) {
+		j := 0
+		for j < len(wr) {
+			r := wr[j]
+			if r == 0x1b && j+1 < len(wr) && wr[j+1] == '[' {
+				seq, next := consumeAnsi(wr, j)
+				cur.WriteString(seq)
+				updateStyle(seq)
+				j = next
+				continue
+			}
+			cur.WriteRune(r)
+			j++
+		}
+	}
+
+	appendWord := func() {
+		if wordVis == 0 {
+			return
+		}
+		wr := []rune(word.String())
+		sep := 0
+		if lineVis > 0 {
+			sep = 1
+		}
+		if lineVis+sep+wordVis <= width {
+			if sep > 0 {
+				cur.WriteRune(' ')
+				lineVis++
+			}
+			writeWord(wr)
+			lineVis += wordVis
+		} else if lineVis == 0 && wordVis > width {
+			j, seen := 0, 0
+			for j < len(wr) {
+				r := wr[j]
+				if r == 0x1b && j+1 < len(wr) && wr[j+1] == '[' {
+					seq, next := consumeAnsi(wr, j)
+					cur.WriteString(seq)
+					updateStyle(seq)
+					j = next
+					continue
+				}
+				if seen == width {
+					flushLine()
+					seen = 0
+				}
+				cur.WriteRune(r)
+				seen++
+				j++
+			}
+			lineVis = seen
+		} else {
+			flushLine()
+			writeWord(wr)
+			lineVis = wordVis
+		}
+		word.Reset()
+		wordVis = 0
+	}
+
+	runes := []rune(s)
+	i := 0
+	for i < len(runes) {
+		r := runes[i]
+		if r == 0x1b && i+1 < len(runes) && runes[i+1] == '[' {
+			seq, next := consumeAnsi(runes, i)
+			word.WriteString(seq)
+			i = next
+			continue
+		}
+		if r == ' ' {
+			appendWord()
+			i++
+			continue
+		}
+		word.WriteRune(r)
+		wordVis++
+		i++
+	}
+	appendWord()
+	flushLine()
+
+	if len(lines) == 0 {
+		return []string{""}
+	}
+	return lines
+}
+
+func renderTable(headers []string, rows [][]string) string {
+	if len(headers) == 0 {
+		return ""
+	}
+	cols := len(headers)
+
+	colW := make([]int, cols)
+	for i, h := range headers {
+		if w := visibleWidth(h); w > colW[i] {
+			colW[i] = w
+		}
+	}
+	for _, row := range rows {
+		for i := 0; i < cols && i < len(row); i++ {
+			if w := visibleWidth(row[i]); w > colW[i] {
+				colW[i] = w
+			}
+		}
+	}
+
+	avail := termWidth - (3*cols + 1) - tableMargin
+	if avail < cols*minTableColWidth {
+		avail = cols * minTableColWidth
+	}
+	sum := 0
+	for _, w := range colW {
+		sum += w
+	}
+	if sum > avail {
+		used := 0
+		for i := range colW {
+			colW[i] = avail * colW[i] / sum
+			if colW[i] < minTableColWidth {
+				colW[i] = minTableColWidth
+			}
+			used += colW[i]
+		}
+		for i := range colW {
+			if used >= avail {
+				break
+			}
+			colW[i]++
+			used++
+		}
+	}
+
+	border := func(left, mid, right string) string {
+		var b strings.Builder
+		b.WriteString(Gray + left)
+		for i, w := range colW {
+			b.WriteString(strings.Repeat("─", w+2))
+			if i < cols-1 {
+				b.WriteString(mid)
+			}
+		}
+		b.WriteString(right + Reset + "\n")
+		return b.String()
+	}
+
+	dataRow := func(row []string, header bool) string {
+		wrapped := make([][]string, cols)
+		for i := 0; i < cols; i++ {
+			raw := ""
+			if i < len(row) {
+				raw = row[i]
+			}
+			rendered := renderInline(raw)
+			if header {
+				rendered = Bold + Mauve + rendered + Reset
+			}
+			wrapped[i] = wrapText(rendered, colW[i])
+		}
+		maxLines := 1
+		for _, c := range wrapped {
+			if len(c) > maxLines {
+				maxLines = len(c)
+			}
+		}
+		var b strings.Builder
+		for line := 0; line < maxLines; line++ {
+			b.WriteString(Gray + "│" + Reset)
+			for i := 0; i < cols; i++ {
+				cell := ""
+				if line < len(wrapped[i]) {
+					cell = wrapped[i][line]
+				}
+				pad := colW[i] - visibleWidth(cell)
+				if pad < 0 {
+					pad = 0
+				}
+				b.WriteString(" " + cell)
+				if pad > 0 {
+					b.WriteString(strings.Repeat(" ", pad))
+				}
+				b.WriteString(" " + Gray + "│" + Reset)
+			}
+			b.WriteString("\n")
+		}
+		return b.String()
+	}
+
+	var out strings.Builder
+	out.WriteString(border("┌", "┬", "┐"))
+	out.WriteString(dataRow(headers, true))
+	out.WriteString(border("├", "┼", "┤"))
+	for _, row := range rows {
+		out.WriteString(dataRow(row, false))
+	}
+	out.WriteString(border("└", "┴", "┘"))
+	return out.String()
+}
+
+var backtickLookalikes = strings.NewReplacer(
+	"‘", "`",
+	"‵", "`",
+	"‛", "`",
+)
+
+func normalizeCurlyApostrophe(s string) string {
+	if !strings.ContainsRune(s, '’') {
+		return s
+	}
+	runes := []rune(s)
+	for i, r := range runes {
+		if r != '’' {
+			continue
+		}
+		prevLetter := i > 0 && unicode.IsLetter(runes[i-1])
+		nextLetter := i+1 < len(runes) && unicode.IsLetter(runes[i+1])
+		if !(prevLetter && nextLetter) {
+			runes[i] = '`'
+		}
+	}
+	return string(runes)
+}
+
 func renderInline(s string) string {
+	s = backtickLookalikes.Replace(s)
+	s = normalizeCurlyApostrophe(s)
 	var out strings.Builder
 	i := 0
 	for i < len(s) {
@@ -279,7 +680,7 @@ func renderInline(s string) string {
 			if end >= 0 {
 				out.WriteString(Bold)
 				out.WriteString(Mauve)
-				out.WriteString(s[i+2 : i+2+end])
+				out.WriteString(renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
 				continue
@@ -290,7 +691,7 @@ func renderInline(s string) string {
 			end := strings.IndexByte(s[i+1:], '*')
 			if end > 0 && s[i+end] != ' ' {
 				out.WriteString(Italic)
-				out.WriteString(s[i+1 : i+1+end])
+				out.WriteString(renderInline(s[i+1 : i+1+end]))
 				out.WriteString(Reset)
 				i += end + 2
 				continue
@@ -302,7 +703,7 @@ func renderInline(s string) string {
 			if end >= 0 {
 				out.WriteString(Bold)
 				out.WriteString(Mauve)
-				out.WriteString(s[i+2 : i+2+end])
+				out.WriteString(renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
 				continue
@@ -313,7 +714,7 @@ func renderInline(s string) string {
 			end := strings.IndexByte(s[i+1:], '_')
 			if end > 0 && s[i+end] != ' ' {
 				out.WriteString(Italic)
-				out.WriteString(s[i+1 : i+1+end])
+				out.WriteString(renderInline(s[i+1 : i+1+end]))
 				out.WriteString(Reset)
 				i += end + 2
 				continue
@@ -324,7 +725,7 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "~~")
 			if end >= 0 {
 				out.WriteString(Strikethrough)
-				out.WriteString(s[i+2 : i+2+end])
+				out.WriteString(renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
 				continue

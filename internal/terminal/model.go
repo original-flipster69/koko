@@ -111,6 +111,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		chrome := 5
+		ui.SetTermWidth(msg.Width)
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, msg.Height-chrome)
 			m.syncViewport()
