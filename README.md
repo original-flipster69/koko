@@ -132,6 +132,23 @@ Sessions are auto-saved when the agent finishes a turn.
 
 ## Installation
 
+**One-liner (macOS / Linux, amd64 / arm64):**
+
+```
+curl -fsSL https://raw.githubusercontent.com/original-flipster69/koko/main/install.sh | sh
+```
+
+The script downloads the latest GitHub release matching your platform, verifies its SHA-256 checksum against `checksums.txt`, and installs the binary to `/usr/local/bin/koko` (uses `sudo` if the directory isn't writable).
+
+Override the install location with `KOKO_INSTALL_DIR`, or pin a version with `KOKO_VERSION`:
+
+```
+KOKO_INSTALL_DIR=$HOME/.local/bin sh install.sh
+KOKO_VERSION=v0.1.0 sh install.sh
+```
+
+**Via Go:**
+
 ```
 go install github.com/original-flipster69/koko@latest
 ```
