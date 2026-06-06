@@ -55,6 +55,7 @@ type Agent struct {
 
 	mu              sync.Mutex
 	history         []provider.Msg
+	nextProvider    provider.Provider
 	planMode        bool
 	toolCallCount   int
 	lastInputTokens int
@@ -79,6 +80,12 @@ func (a *Agent) SetSuppressSpinner(on bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.suppressSpinner = on
+}
+
+func (a *Agent) SetNextProvider(p provider.Provider) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.nextProvider = p
 }
 
 func (a *Agent) ThinkingVerb() string {
@@ -192,6 +199,12 @@ const (
 func (a *Agent) Run(ctx context.Context, userInput string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.nextProvider != nil {
+		prev := a.provider
+		a.provider = a.nextProvider
+		a.nextProvider = nil
+		defer func() { a.provider = prev }()
+	}
 	slog.Info("user input received", "length", len(userInput), "plan_mode", a.planMode)
 	if a.planMode {
 		userInput = "[PLAN MODE — read-only] Investigate using read_file, list_dir, search_files, and list_memories. Do NOT attempt to modify anything. When you have a concrete plan, call exit_plan_mode with the plan as markdown (steps, files to change, high-level approach). The user will approve or reject it.\n\n" + userInput

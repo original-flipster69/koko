@@ -149,6 +149,19 @@ func (c *Config) ApplyEnv() {
 	}
 }
 
+func (c *Config) LlmConfigFor(p Provider, model string) LlmConfig {
+	lc := c.Llm
+	if p != c.Llm.Provider {
+		lc.Url = ""
+	}
+	lc.Provider = p
+	if model != "" {
+		lc.Model = model
+	}
+	lc.ApiKey = os.Getenv(apiKeyEnvName(p))
+	return lc
+}
+
 func (c *Config) Validate() error {
 	if err := c.Llm.Validate(); err != nil {
 		return err
