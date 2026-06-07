@@ -88,6 +88,18 @@ func (a *Agent) ThinkingVerb() string {
 	return a.thinkingVerbs[rand.Intn(len(a.thinkingVerbs))]
 }
 
+func (a *Agent) SetThinkingVerbs(verbs []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.thinkingVerbs = verbs
+}
+
+func (a *Agent) SetMaxSessionTokens(n int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.maxSessionTokens = n
+}
+
 func (a *Agent) TogglePlanMode() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()

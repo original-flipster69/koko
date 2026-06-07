@@ -106,6 +106,10 @@ Markdown files in `~/.koko/plays/` register as named playbooks. The play name is
 
 **Arguments** — text typed after the play name is passed in. If the play body contains a `{{args}}` placeholder, the argument is substituted in place; otherwise it is appended under a `User request:` heading. Example: `:review focus on auth` runs `review.md` with `focus on auth` as the argument.
 
+### Config Reload
+
+`:reload` re-reads configuration from its sources (config file, then environment, then the original launch flags — same precedence as startup) without leaving the session. Changes that can be applied live are applied immediately and reported under `applied`: the model (when the provider is unchanged), the thinking verbs, and the session token budget. Changes that require a fresh process — provider, API URL, sandbox root/dirs/limits, `scrub_pii`, exec profile, ignore mode — are detected and listed under `restart` rather than silently ignored. If the reloaded config is invalid, the current config is kept and the error is reported.
+
 ### Plan Mode
 
 Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.
@@ -130,6 +134,7 @@ As you type, koko recognizes when the current line is a known command or install
 | `:config` | Display the active configuration |
 | `:save` | Save the current session to disk |
 | `:resume` | Restore a saved session |
+| `:reload` | Reload config from its sources without restarting |
 | `:plays` | List installed plays |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
