@@ -28,7 +28,7 @@ func TestGenerateLinux(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"useradd", "groupadd", "chpasswd", `GROUP="collabo"`, "chmod -R 2770"} {
+	for _, want := range []string{"useradd", "groupadd", "chpasswd", `GROUP="collabo"`, "chmod -R 2770", "PREFERRED_ID=69", "pick_id", `-u "$NEW_UID"`, `-g "$NEW_GID"`} {
 		if !strings.Contains(s.Body, want) {
 			t.Errorf("linux script missing %q", want)
 		}
@@ -43,8 +43,8 @@ func TestGenerateDefaultGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Group != DefaultGroup {
-		t.Errorf("group = %q, want default %q", s.Group, DefaultGroup)
+	if s.Group != defaultGroup {
+		t.Errorf("group = %q, want default %q", s.Group, defaultGroup)
 	}
 }
 
