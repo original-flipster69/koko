@@ -34,6 +34,10 @@ The sandbox is the core security boundary. Every file operation is validated aga
   - `*.secret`, `*.password`
 - **File size limit** — reads/writes capped at a configurable maximum (default: 1 MB).
 
+### Elevated-Privilege Guard
+
+If koko is launched by a user with root privileges (effective UID 0), it prints a warning that running a non-deterministic agent with elevated privileges is strongly discouraged and requires explicit `y` confirmation before starting. Declining aborts the launch.
+
 ### Command Policy
 
 Shell commands run through `exec_command` are gated by a regex-based policy:
