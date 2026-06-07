@@ -114,7 +114,13 @@ Markdown files in `~/.koko/plays/` register as named playbooks. The play name is
 
 ### Caging the Agent
 
-`:cage <username>` generates a reviewable shell script that provisions a dedicated low-privilege user to run koko under, following the [caging-the-agent](https://originalflipster.com/playbooks/caging-the-agent/) playbook. It detects the OS and emits the matching variant (`dscl` on macOS, `useradd`/`groupadd` on Linux), creates a shared `collabo` group and a `2770` workspace, and embeds a freshly generated random password with a note to change it before running. The script is written to `~/.koko/cage-<username>.sh` (mode `0700`) and **never executed** — review it, then run `sudo sh ~/.koko/cage-<username>.sh` yourself.
+`:cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]` generates a reviewable shell script that provisions a dedicated low-privilege user to run koko under, following the [caging-the-agent](https://originalflipster.com/playbooks/caging-the-agent/) playbook. It detects the OS and emits the matching variant (`dscl` on macOS, `useradd`/`groupadd` on Linux), creates a shared group and a `2770` workspace, and embeds a freshly generated random password with a note to change it before running. The script is written to `~/.koko/cage-<username>.sh` (mode `0700`) and **never executed** — review it, then run `sudo sh <path>` yourself.
+
+Optional parameters (`key=value`, any order):
+
+- `dir=PATH` — where to write the script (default `~/.koko`; relative paths resolve against the sandbox root).
+- `group=NAME` — the shared group to create and add both users to (default `collabo`).
+- `os=darwin|linux` — override OS detection to generate a script for the other platform.
 
 ### Plan Mode
 
@@ -142,7 +148,7 @@ As you type, koko recognizes when the current line is a known command or install
 | `:resume` | Restore a saved session |
 | `:reload` | Reload config from its sources without restarting |
 | `:plays` | List installed plays |
-| `:cage <username>` | Generate a low-privilege user setup script |
+| `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
 
