@@ -6,12 +6,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/original-flipster69/koko/internal/agent"
-	"github.com/original-flipster69/koko/internal/ui"
 )
 
 func Run(
 	a *agent.Agent,
-	providerName string,
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,
@@ -31,19 +29,6 @@ func Run(
 		}
 	})
 	a.SetSuppressSpinner(true)
-
-	if providerName == "ollama" {
-		suffix := ui.Dim + ui.Gray + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
-		for i := range splashes {
-			splashes[i] += suffix
-		}
-	}
-
-	if warning := ui.PrivacyWarning(providerName); warning != "" {
-		for i := range splashes {
-			splashes[i] += warning + "\n\n"
-		}
-	}
 
 	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh)
 

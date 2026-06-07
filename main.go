@@ -156,12 +156,19 @@ func main() {
 	mascotFrames := ui.MascotFrames()
 	splashes := make([]string, len(mascotFrames))
 	for i, m := range mascotFrames {
-		splashes[i] = "\n" + ui.Splash(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
+		splash := "\n" + ui.Splash(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
+		if llm.Name() == "ollama" {
+			splash += ui.Dim + ui.Gray + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		}
+		if warning := ui.PrivacyWarning(llm.Name()); warning != "" {
+			splash += warning + "\n\n"
+		}
+		splashes[i] = splash
 	}
 
 	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry)
 
-	if err := terminal.Run(a, llm.Name(), kokoDir, splashes, cmdHandlers); err != nil {
+	if err := terminal.Run(a, kokoDir, splashes, cmdHandlers); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 		os.Exit(1)
 	}
