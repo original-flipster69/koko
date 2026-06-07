@@ -243,20 +243,44 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 			oldTokens, newTokens := a.Compact()
 			return true, "", scheme.Info("compact", fmt.Sprintf("~%d → ~%d tokens", oldTokens, newTokens))
 		}},
-		":cage": {desc: "generate a low-privilege user setup script", args: "<username>", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
+		":cage": {desc: "generate a low-privilege user setup script", args: "<username> [dir=…] [group=…] [os=darwin|linux]", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
 			if len(parts) < 2 {
-				return true, "", scheme.Error("usage: :cage <username>")
+				return true, "", scheme.Error("usage: :cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]")
 			}
-			script, err := cage.Generate(parts[1], runtime.GOOS)
+			opts := cage.Options{Username: parts[1], GOOS: runtime.GOOS}
+			outDir := dataDir
+			for _, tok := range parts[2:] {
+				k, v, ok := strings.Cut(tok, "=")
+				if !ok || v == "" {
+					return true, "", scheme.Error(fmt.Sprintf("invalid option %q (use key=value)", tok))
+				}
+				switch k {
+				case "dir":
+					outDir = v
+				case "group":
+					opts.Group = v
+				case "os":
+					opts.GOOS = v
+				default:
+					return true, "", scheme.Error(fmt.Sprintf("unknown option %q (allowed: dir, group, os)", k))
+				}
+			}
+			if !filepath.IsAbs(outDir) {
+				outDir = filepath.Join(sandboxRoot, outDir)
+			}
+			script, err := cage.Generate(opts)
 			if err != nil {
 				return true, "", scheme.Error(err.Error())
 			}
-			dest := filepath.Join(dataDir, script.Filename)
+			if err := os.MkdirAll(outDir, 0o700); err != nil {
+				return true, "", scheme.Error(fmt.Sprintf("cannot create output dir: %v", err))
+			}
+			dest := filepath.Join(outDir, script.Filename)
 			if err := os.WriteFile(dest, []byte(script.Body), 0o700); err != nil {
 				return true, "", scheme.Error(fmt.Sprintf("cannot write cage script: %v", err))
 			}
 			var b strings.Builder
-			b.WriteString(scheme.Info("cage", fmt.Sprintf("setup script for user %q", script.Username)) + "\n")
+			b.WriteString(scheme.Info("cage", fmt.Sprintf("setup script for user %q (group %q, %s)", script.Username, script.Group, opts.GOOS)) + "\n")
 			b.WriteString(scheme.Info("path", dest) + "\n")
 			b.WriteString(scheme.Info("note", "a random password was generated inside — change it there before running") + "\n")
 			b.WriteString(scheme.Info("run", fmt.Sprintf("review it, then: sudo sh %s", dest)))
