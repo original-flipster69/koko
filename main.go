@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/audit"
+	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/memory"
@@ -240,6 +242,25 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		":compact": {desc: "compress history to free context", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			oldTokens, newTokens := a.Compact()
 			return true, "", scheme.Info("compact", fmt.Sprintf("~%d → ~%d tokens", oldTokens, newTokens))
+		}},
+		":cage": {desc: "generate a low-privilege user setup script", args: "<username>", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
+			if len(parts) < 2 {
+				return true, "", scheme.Error("usage: :cage <username>")
+			}
+			script, err := cage.Generate(parts[1], runtime.GOOS)
+			if err != nil {
+				return true, "", scheme.Error(err.Error())
+			}
+			dest := filepath.Join(dataDir, script.Filename)
+			if err := os.WriteFile(dest, []byte(script.Body), 0o700); err != nil {
+				return true, "", scheme.Error(fmt.Sprintf("cannot write cage script: %v", err))
+			}
+			var b strings.Builder
+			b.WriteString(scheme.Info("cage", fmt.Sprintf("setup script for user %q", script.Username)) + "\n")
+			b.WriteString(scheme.Info("path", dest) + "\n")
+			b.WriteString(scheme.Info("note", "a random password was generated inside — change it there before running") + "\n")
+			b.WriteString(scheme.Info("run", fmt.Sprintf("review it, then: sudo sh %s", dest)))
+			return true, "", b.String()
 		}},
 		":model": {desc: "show or switch model", args: "[name]", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
 			if len(parts) < 2 {
