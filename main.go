@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -44,6 +45,11 @@ func main() {
 	if *versionFlag {
 		fmt.Println(version)
 		return
+	}
+
+	if isElevated() && !confirmElevated(os.Stdin, os.Stdout) {
+		fmt.Println(ui.Info("aborted", "not starting with elevated privileges"))
+		os.Exit(1)
 	}
 
 	kokoDir := getKokoDir()
@@ -480,6 +486,19 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func isElevated() bool {
+	return os.Geteuid() == 0
+}
+
+func confirmElevated(in io.Reader, out io.Writer) bool {
+	fmt.Fprintln(out, ui.Error("running with elevated privileges (root)"))
+	fmt.Fprintln(out, "  LLMs are non-deterministic; granting an agent root access is strongly discouraged.")
+	fmt.Fprintf(out, "  start koko anyway? [y/N] ")
+	answer, _ := bufio.NewReader(in).ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
 }
 
 func getKokoDir() string {
