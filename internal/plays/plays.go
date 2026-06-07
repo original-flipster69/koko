@@ -16,6 +16,18 @@ type Play struct {
 	Path        string
 }
 
+const argsPlaceholder = "{{args}}"
+
+func (p Play) Render(args string) string {
+	if strings.Contains(p.Body, argsPlaceholder) {
+		return strings.ReplaceAll(p.Body, argsPlaceholder, args)
+	}
+	if args == "" {
+		return p.Body
+	}
+	return p.Body + "\n\nUser request:\n" + args
+}
+
 type Registry struct {
 	dir   string
 	plays map[string]Play
@@ -41,9 +53,7 @@ func Load(dir string) (*Registry, error) {
 			continue
 		}
 		p := parse(string(data))
-		if p.Name == "" {
-			p.Name = strings.TrimSuffix(e.Name(), ".md")
-		}
+		p.Name = strings.TrimSuffix(e.Name(), ".md")
 		p.Path = path
 		r.plays[p.Name] = p
 	}
@@ -97,8 +107,6 @@ func parse(raw string) Play {
 					continue
 				}
 				switch strings.ToLower(k) {
-				case "name":
-					p.Name = v
 				case "description":
 					p.Description = v
 				}

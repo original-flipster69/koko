@@ -309,10 +309,7 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		playName := strings.TrimPrefix(name, ":")
 		if p, ok := playRegistry.Get(playName); ok {
 			extra := strings.TrimSpace(strings.TrimPrefix(input, name))
-			prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Body)
-			if extra != "" {
-				prompt += "\n\nUser request:\n" + extra
-			}
+			prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Render(extra))
 			return false, prompt, ""
 		}
 		return true, "", ui.Error(fmt.Sprintf("unknown command: %s (try :help)", name))

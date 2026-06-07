@@ -102,7 +102,9 @@ Persistent cross-session memories live at `~/.koko/memory/`. The agent can save 
 
 ### Plays
 
-Markdown files in `~/.koko/plays/` register as named playbooks. Invoke any play by name as a slash command (e.g., `:review` runs the `review.md` play). `:plays` lists installed plays.
+Markdown files in `~/.koko/plays/` register as named playbooks. The play name is the filename without `.md` — `review.md` is invoked as `:review`. `:plays` lists installed plays.
+
+**Arguments** — text typed after the play name is passed in. If the play body contains a `{{args}}` placeholder, the argument is substituted in place; otherwise it is appended under a `User request:` heading. Example: `:review focus on auth` runs `review.md` with `focus on auth` as the argument.
 
 ### Plan Mode
 
