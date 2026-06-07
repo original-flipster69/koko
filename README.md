@@ -88,6 +88,8 @@ Two layers of automatic redaction:
 
 Redaction runs on the outbound message stream to the LLM (when `scrub_pii=true`, the default) and on session writes to disk. `write_file` and `replace_in_file` also run a secret scan on their new content.
 
+**Remote-provider warning** — when the active provider is anything other than Ollama (i.e. Claude or Mistral, which send data to a remote service), koko shows a privacy warning on startup noting that data may be retained by the provider and recommending Ollama for fully local inference. Ollama runs entirely locally and triggers no warning.
+
 ### Project Detection
 
 koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, etc.) and surfaces the result both in the splash banner and as part of the LLM system prompt for orientation.

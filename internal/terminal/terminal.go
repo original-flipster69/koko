@@ -39,6 +39,12 @@ func Run(
 		}
 	}
 
+	if warning := ui.PrivacyWarning(providerName); warning != "" {
+		for i := range splashes {
+			splashes[i] += warning + "\n\n"
+		}
+	}
+
 	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

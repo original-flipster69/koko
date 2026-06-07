@@ -78,6 +78,14 @@ func TokenStats(input, output int) string {
 	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, Gray, input, output, Reset)
 }
 
+func PrivacyWarning(providerName string) string {
+	if providerName == "ollama" {
+		return ""
+	}
+	return fmt.Sprintf("  %s%s⚠ privacy:%s %sanything you send is processed by a remote provider (%s) and may be retained by it. Avoid sharing secrets or sensitive data — use Ollama for fully local, private inference.%s",
+		Bold, PureOrange, Reset, PureOrange, providerName, Reset)
+}
+
 const (
 	diffBgRed   = "\033[48;5;52m"
 	diffFgRed   = "\033[38;5;210m"
