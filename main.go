@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -64,6 +65,11 @@ func main() {
 
 	if err := cfg.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
+		os.Exit(1)
+	}
+
+	if !cfg.Sandbox.SuppressElevatedWarning && isElevated() && !confirmElevated(os.Stdin, os.Stdout) {
+		fmt.Println(ui.Info("aborted", "not starting with elevated privileges"))
 		os.Exit(1)
 	}
 
@@ -366,6 +372,19 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		}
 		return true, "", ui.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
+}
+
+func isElevated() bool {
+	return os.Geteuid() == 0
+}
+
+func confirmElevated(in io.Reader, out io.Writer) bool {
+	fmt.Fprintln(out, ui.Error("running with elevated privileges (root)"))
+	fmt.Fprintln(out, "  LLMs are non-deterministic; granting an agent root access is strongly discouraged.")
+	fmt.Fprintf(out, "  start koko anyway? [y/N] ")
+	answer, _ := bufio.NewReader(in).ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
 }
 
 func getKokoDir() string {
