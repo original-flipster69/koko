@@ -241,6 +241,9 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 			cpuSec, memMB, fileMB := cfg.Sandbox.Exec.Limits()
 			b.WriteString(ui.Info("exec", fmt.Sprintf("%s (%ds cpu, %dMB mem, %dMB file)", cfg.Sandbox.Exec.Profile, cpuSec, memMB, fileMB)) + "\n")
 			b.WriteString(ui.Info("scrub_pii", fmt.Sprintf("%v", cfg.Sandbox.ScrubPII)) + "\n")
+			if cfg.Llm.Provider == config.Mistral {
+				b.WriteString(ui.Info("convos", fmt.Sprintf("%v", cfg.Llm.Conversations)) + "\n")
+			}
 			b.WriteString(ui.Info("verbs", strings.Join(cfg.Style.ThinkingVerbs, ", ")) + "\n")
 			b.WriteString(ui.Info("config", config.Path(dataDir)))
 			return true, "", b.String()

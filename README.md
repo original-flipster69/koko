@@ -20,6 +20,10 @@ koko supports three LLM backends:
 
 Switch the active model at runtime with `:model <name>` or set defaults in `~/.koko/config.toml`.
 
+**Always-on efficiency:** Claude requests carry `cache_control` breakpoints on the tools, system prompt, and growing conversation prefix, so the cached prefix costs ~10% of normal input tokens and skips recompute (5-minute auto-refreshing TTL). Ollama requests keep the model resident for 30 minutes so its KV prefix cache survives between turns. Output-token accounting is corrected for Claude, and a `truncated` hint is shown when a response stops at the max-token limit.
+
+**Mistral — `conversations`** (default `true`; set `conversations = false` to opt out): uses Mistral's server-side Conversations API (`/v1/conversations`) so only the new turn is sent each request instead of the full history. koko tracks the `conversation_id` and self-heals (re-creates the conversation) whenever the local history is rewritten by `:clear`, `:compact`, `:resume`, or auto-trim. **Note:** this stores your conversation on Mistral's servers — a trade-off against koko's local-first stance, which is why it can be disabled. Tool-call round-trips and image inputs over the Conversations API are not yet validated against a live key.
+
 ### Sandbox
 
 The sandbox is the core security boundary. Every file operation is validated against it before execution.
@@ -188,6 +192,7 @@ model = "claude-sonnet-4-20250514"
 url = ""
 max_tokens = 16384
 max_session_tokens = 1000000
+conversations = true     # Mistral: server-side conversation state; set false to opt out (see below)
 
 [sandbox]
 root = "/home/user/projects"

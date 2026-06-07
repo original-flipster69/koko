@@ -274,6 +274,9 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 
 		if len(toolCalls) == 0 {
 			fmt.Fprintln(a.output)
+			if resp.StopReason == "max_tokens" || resp.StopReason == "length" {
+				fmt.Fprintf(a.output, "%s\n", ui.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
+			}
 			a.history = append(a.history, provider.Msg{
 				Role:    provider.Assistant,
 				Content: resp.Content,

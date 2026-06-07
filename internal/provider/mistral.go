@@ -11,13 +11,16 @@ import (
 )
 
 type mistral struct {
-	apiKey  string
-	model   string
-	baseURL string
-	client  *http.Client
+	apiKey        string
+	model         string
+	baseURL       string
+	conversations bool
+	convID        string
+	committed     []Msg
+	client        *http.Client
 }
 
-func newMistral(apiKey, model, baseURL string) (*mistral, error) {
+func newMistral(apiKey, model, baseURL string, conversations bool) (*mistral, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("MISTRAL_API_KEY not set")
 	}
@@ -25,16 +28,32 @@ func newMistral(apiKey, model, baseURL string) (*mistral, error) {
 		baseURL = "https://api.mistral.ai/v1"
 	}
 	return &mistral{
-		apiKey:  apiKey,
-		model:   model,
-		baseURL: baseURL,
-		client:  &http.Client{},
+		apiKey:        apiKey,
+		model:         model,
+		baseURL:       baseURL,
+		conversations: conversations,
+		client:        &http.Client{},
 	}, nil
 }
 
-func (m *mistral) Name() string      { return "mistral" }
-func (m *mistral) Model() string     { return m.model }
-func (m *mistral) SetModel(s string) { m.model = s }
+func (m *mistral) Name() string  { return "mistral" }
+func (m *mistral) Model() string { return m.model }
+func (m *mistral) SetModel(s string) {
+	m.model = s
+	m.resetConversation()
+}
+
+func (m *mistral) resetConversation() {
+	m.convID = ""
+	m.committed = nil
+}
+
+func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
+	if m.conversations {
+		return m.chatConversation(ctx, msgs, tools, onDelta)
+	}
+	return m.chatCompletions(ctx, msgs, tools, onDelta)
+}
 
 func toMistralMsgs(msgs []Msg) []mistralMsg {
 	var out []mistralMsg
@@ -63,7 +82,7 @@ func toMistralMsgs(msgs []Msg) []mistralMsg {
 	return out
 }
 
-func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
+func (m *mistral) chatCompletions(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
 	reqBody := mistralReq{
 		Model:  m.model,
 		Msgs:   toMistralMsgs(msgs),
@@ -96,6 +115,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 
 	var content strings.Builder
 	var usage Usg
+	var finishReason string
 	toolAccs := make(map[int]*toolAcc)
 
 	scanner := bufio.NewScanner(resp.Body)
@@ -114,6 +134,9 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 			continue
 		}
 		if len(chunk.Choices) > 0 {
+			if chunk.Choices[0].FinishReason != "" {
+				finishReason = chunk.Choices[0].FinishReason
+			}
 			delta := chunk.Choices[0].Delta
 			if delta.Content != "" {
 				content.WriteString(delta.Content)
@@ -146,7 +169,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		return nil, fmt.Errorf("reading stream: %w", err)
 	}
 
-	result := &Response{Content: content.String(), Usage: usage}
+	result := &Response{Content: content.String(), Usage: usage, StopReason: finishReason}
 
 	for i := 0; i < len(toolAccs); i++ {
 		acc, ok := toolAccs[i]
@@ -201,6 +224,7 @@ type mistralStreamChunk struct {
 			Content   string            `json:"content"`
 			ToolCalls []mistralToolCall `json:"tool_calls,omitempty"`
 		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usg mistralUsg `json:"usage"`
 }

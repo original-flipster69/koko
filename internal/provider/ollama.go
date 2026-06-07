@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const ollamaKeepAlive = "30m"
+
 type ollama struct {
 	model   string
 	baseURL string
@@ -49,9 +51,10 @@ func toOllamaMsgs(messages []Msg) []ollamaMsg {
 
 func (o *ollama) ChatStream(ctx context.Context, messages []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
 	reqBody := ollamaReq{
-		Model:    o.model,
-		Messages: toOllamaMsgs(messages),
-		Stream:   true,
+		Model:     o.model,
+		Messages:  toOllamaMsgs(messages),
+		Stream:    true,
+		KeepAlive: ollamaKeepAlive,
 	}
 	if len(tools) > 0 {
 		reqBody.Tools = toOllama(tools)
@@ -74,6 +77,7 @@ func (o *ollama) ChatStream(ctx context.Context, messages []Msg, tools []ToolDef
 func (o *ollama) parseStreamingResponse(body io.Reader, onDelta func(StreamDelta)) (*Response, error) {
 	var content strings.Builder
 	var usage Usg
+	var doneReason string
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
@@ -96,13 +100,14 @@ func (o *ollama) parseStreamingResponse(body io.Reader, onDelta func(StreamDelta
 				InputTokens:  chunk.PromptEvalCount,
 				OutputTokens: chunk.EvalCount,
 			}
+			doneReason = chunk.DoneReason
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("reading stream: %w", err)
 	}
 
-	result := &Response{Content: content.String(), Usage: usage}
+	result := &Response{Content: content.String(), Usage: usage, StopReason: doneReason}
 	if onDelta != nil {
 		onDelta(StreamDelta{Done: true, Response: result})
 	}
@@ -126,6 +131,7 @@ func (o *ollama) parseNonStreamingResponse(body io.Reader, onDelta func(StreamDe
 			InputTokens:  ollamaResp.PromptEvalCount,
 			OutputTokens: ollamaResp.EvalCount,
 		},
+		StopReason: ollamaResp.DoneReason,
 	}
 
 	if ollamaResp.Message.Content != "" && onDelta != nil {
@@ -189,15 +195,17 @@ type ollamaFunc struct {
 }
 
 type ollamaReq struct {
-	Model    string       `json:"model"`
-	Messages []ollamaMsg  `json:"messages"`
-	Stream   bool         `json:"stream"`
-	Tools    []ollamaTool `json:"tools,omitempty"`
+	Model     string       `json:"model"`
+	Messages  []ollamaMsg  `json:"messages"`
+	Stream    bool         `json:"stream"`
+	Tools     []ollamaTool `json:"tools,omitempty"`
+	KeepAlive string       `json:"keep_alive,omitempty"`
 }
 
 type ollamaResp struct {
 	Message         ollamaMsg `json:"message"`
 	Done            bool      `json:"done"`
+	DoneReason      string    `json:"done_reason"`
 	PromptEvalCount int       `json:"prompt_eval_count"`
 	EvalCount       int       `json:"eval_count"`
 }
