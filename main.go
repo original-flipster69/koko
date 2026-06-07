@@ -65,6 +65,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := ui.ApplyColors(cfg.Style.Colors); err != nil {
+		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
+		os.Exit(1)
+	}
+
 	llm, err := provider.New(&cfg.Llm)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
