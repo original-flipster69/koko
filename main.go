@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/audit"
+	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/memory"
@@ -230,6 +232,49 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		":compact": {desc: "compress history to free context", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			oldTokens, newTokens := a.Compact()
 			return true, "", ui.Info("compact", fmt.Sprintf("~%d → ~%d tokens", oldTokens, newTokens))
+		}},
+		":cage": {desc: "generate a low-privilege user setup script", args: "<username> [dir=…] [group=…] [os=darwin|linux]", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
+			if len(parts) < 2 {
+				return true, "", ui.Error("usage: :cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]")
+			}
+			opts := cage.Options{Username: parts[1], GOOS: runtime.GOOS}
+			outDir := dataDir
+			for _, tok := range parts[2:] {
+				k, v, ok := strings.Cut(tok, "=")
+				if !ok || v == "" {
+					return true, "", ui.Error(fmt.Sprintf("invalid option %q (use key=value)", tok))
+				}
+				switch k {
+				case "dir":
+					outDir = v
+				case "group":
+					opts.Group = v
+				case "os":
+					opts.GOOS = v
+				default:
+					return true, "", ui.Error(fmt.Sprintf("unknown option %q (allowed: dir, group, os)", k))
+				}
+			}
+			if !filepath.IsAbs(outDir) {
+				outDir = filepath.Join(sandboxRoot, outDir)
+			}
+			script, err := cage.Generate(opts)
+			if err != nil {
+				return true, "", ui.Error(err.Error())
+			}
+			if err := os.MkdirAll(outDir, 0o700); err != nil {
+				return true, "", ui.Error(fmt.Sprintf("cannot create output dir: %v", err))
+			}
+			dest := filepath.Join(outDir, script.Filename)
+			if err := os.WriteFile(dest, []byte(script.Body), 0o700); err != nil {
+				return true, "", ui.Error(fmt.Sprintf("cannot write cage script: %v", err))
+			}
+			var b strings.Builder
+			b.WriteString(ui.Info("cage", fmt.Sprintf("setup script for user %q (group %q, %s)", script.Username, script.Group, opts.GOOS)) + "\n")
+			b.WriteString(ui.Info("path", dest) + "\n")
+			b.WriteString(ui.Info("note", "a random password was generated inside — change it there before running") + "\n")
+			b.WriteString(ui.Info("run", fmt.Sprintf("review it, then: sudo sh %s", dest)))
+			return true, "", b.String()
 		}},
 		":model": {desc: "show or switch model", args: "[name]", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
 			if len(parts) < 2 {
