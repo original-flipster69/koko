@@ -144,12 +144,21 @@ func (s Scheme) TokenStats(input, output int) string {
 	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, s.Muted, input, output, Reset)
 }
 
+var privacyBox = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("214")).
+	Foreground(lipgloss.Color("214")).
+	Bold(true).
+	Padding(0, 1).
+	Width(74)
+
 func PrivacyWarning(providerName string) string {
 	if providerName == "ollama" {
 		return ""
 	}
-	return fmt.Sprintf("  %s%s⚠ privacy:%s %sanything you send is processed by a remote provider (%s) and may be retained by it. Avoid sharing secrets or sensitive data — use Ollama for fully local, private inference.%s",
-		Bold, fg(PureOrange), Reset, fg(PureOrange), providerName, Reset)
+	header := fmt.Sprintf("  %s%s⚠️  PRIVACY WARNING%s", Bold, fg(PureOrange), Reset)
+	body := fmt.Sprintf("anything you send is processed by a remote provider (%s) and may or may not be retained and used by it (transparently or undisclosed). Avoid sharing secrets or sensitive data in any case and also reconsider if that make you feel uneasy with your intellectual property!", providerName)
+	return header + "\n" + privacyBox.Render(body)
 }
 
 func (s Scheme) ColorDiff(diffText string) string {
