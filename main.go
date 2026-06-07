@@ -163,7 +163,14 @@ func main() {
 	mascotFrames := ui.MascotFrames(scheme)
 	splashes := make([]string, len(mascotFrames))
 	for i, m := range mascotFrames {
-		splashes[i] = "\n" + scheme.Splashscreen(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
+		splash := "\n" + scheme.Splashscreen(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
+		if llm.Name() == "ollama" {
+			splash += ui.Dim + scheme.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		}
+		if warning := ui.PrivacyWarning(llm.Name()); warning != "" {
+			splash += warning + "\n\n"
+		}
+		splashes[i] = splash
 	}
 
 	cmdHandlers, knownCommands := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, src, scheme)
@@ -171,7 +178,7 @@ func main() {
 		knownCommands = append(knownCommands, ":"+p.Name)
 	}
 
-	if err := terminal.Run(a, llm.Name(), kokoDir, splashes, cmdHandlers, knownCommands, scheme); err != nil {
+	if err := terminal.Run(a, kokoDir, splashes, cmdHandlers, knownCommands, scheme); err != nil {
 		fmt.Fprintln(os.Stderr, scheme.Error(err.Error()))
 		os.Exit(1)
 	}
