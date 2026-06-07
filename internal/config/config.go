@@ -64,7 +64,8 @@ type IgnoreConfig struct {
 }
 
 type StyleConfig struct {
-	ThinkingVerbs []string `toml:"thinking_verbs"`
+	ThinkingVerbs []string       `toml:"thinking_verbs"`
+	Colors        map[string]int `toml:"colors"`
 }
 
 type Config struct {

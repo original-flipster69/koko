@@ -207,6 +207,15 @@ files = []
 
 [style]
 thinking_verbs = ["thinking", "pondering", "scheming"]
+
+# Optional color overrides. Each value is an ANSI 256-color code (0-255).
+# Any key omitted keeps koko's default color.
+[style.colors]
+# lavender_indigo, mauve, blueberry, medium_purple, bright_lavender, dark_violet,
+# pure_violet, electric_purple, gray, white, red, green, pure_orange,
+# diff_add_fg, diff_add_bg, diff_del_fg, diff_del_bg, diff_gutter, splash
+red = 160
+blueberry = 27
 ```
 
 API keys come from environment variables:
