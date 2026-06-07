@@ -7,7 +7,7 @@ import (
 	"regexp"
 )
 
-const DefaultGroup = "collabo"
+const defaultGroup = "collabo"
 
 var namePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 
@@ -30,7 +30,7 @@ func Generate(opts Options) (Script, error) {
 	}
 	group := opts.Group
 	if group == "" {
-		group = DefaultGroup
+		group = defaultGroup
 	}
 	if !namePattern.MatchString(group) {
 		return Script{}, fmt.Errorf("invalid group %q (use lowercase letters, digits, '-' or '_', starting with a letter or '_')", group)
@@ -81,8 +81,20 @@ PASSWORD="%s"
 
 func darwinScript(username, password, group string) string {
 	return header(username, password, group) + `
-NEW_UID=$(( $(dscl . -list /Users UniqueID | awk '{print $2}' | sort -n | tail -n1) + 1 ))
-NEW_GID=$(( $(dscl . -list /Groups PrimaryGroupID | awk '{print $2}' | sort -n | tail -n1) + 1 ))
+PREFERRED_ID=69
+
+# Prefer PREFERRED_ID; fall back to (highest existing + 1) if it is taken.
+pick_id() {
+	taken=$1
+	if ! printf '%s\n' "$taken" | grep -qx "$PREFERRED_ID"; then
+		echo "$PREFERRED_ID"
+		return
+	fi
+	printf '%s\n' "$taken" | sort -n | tail -n1 | awk '{print $1 + 1}'
+}
+
+NEW_UID=$(pick_id "$(dscl . -list /Users UniqueID | awk '{print $2}')")
+NEW_GID=$(pick_id "$(dscl . -list /Groups PrimaryGroupID | awk '{print $2}')")
 
 dscl . -create "/Users/$NEW_USER"
 dscl . -create "/Users/$NEW_USER" UserShell /bin/zsh
@@ -109,8 +121,23 @@ echo "Done. Add 'umask 002' to your shell rc so shared files stay group-writable
 
 func linuxScript(username, password, group string) string {
 	return header(username, password, group) + `
-groupadd -f "$GROUP"
-useradd -m -s /bin/bash -c "caged agent" -G "$GROUP" "$NEW_USER"
+PREFERRED_ID=69
+
+# Prefer PREFERRED_ID; fall back to (highest existing + 1) if it is taken.
+pick_id() {
+	taken=$1
+	if ! printf '%s\n' "$taken" | grep -qx "$PREFERRED_ID"; then
+		echo "$PREFERRED_ID"
+		return
+	fi
+	printf '%s\n' "$taken" | sort -n | tail -n1 | awk '{print $1 + 1}'
+}
+
+NEW_UID=$(pick_id "$(getent passwd | awk -F: '{print $3}')")
+NEW_GID=$(pick_id "$(getent group | awk -F: '{print $3}')")
+
+groupadd -g "$NEW_GID" -f "$GROUP"
+useradd -m -u "$NEW_UID" -s /bin/bash -c "caged agent" -G "$GROUP" "$NEW_USER"
 printf '%s:%s\n' "$NEW_USER" "$PASSWORD" | chpasswd
 usermod -aG "$GROUP" "$(logname)"
 
