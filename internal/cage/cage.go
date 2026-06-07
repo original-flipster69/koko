@@ -7,34 +7,51 @@ import (
 	"regexp"
 )
 
-var usernamePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
+const DefaultGroup = "collabo"
+
+var namePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
+
+type Options struct {
+	Username string
+	Group    string
+	GOOS     string
+}
 
 type Script struct {
 	Username string
+	Group    string
 	Filename string
 	Body     string
 }
 
-func Generate(username, goos string) (Script, error) {
-	if !usernamePattern.MatchString(username) {
-		return Script{}, fmt.Errorf("invalid username %q (use lowercase letters, digits, '-' or '_', starting with a letter or '_')", username)
+func Generate(opts Options) (Script, error) {
+	if !namePattern.MatchString(opts.Username) {
+		return Script{}, fmt.Errorf("invalid username %q (use lowercase letters, digits, '-' or '_', starting with a letter or '_')", opts.Username)
+	}
+	group := opts.Group
+	if group == "" {
+		group = DefaultGroup
+	}
+	if !namePattern.MatchString(group) {
+		return Script{}, fmt.Errorf("invalid group %q (use lowercase letters, digits, '-' or '_', starting with a letter or '_')", group)
 	}
 	password, err := generatePassword()
 	if err != nil {
 		return Script{}, err
 	}
 	var body string
-	switch goos {
+	switch opts.GOOS {
 	case "darwin":
-		body = darwinScript(username, password)
+		body = darwinScript(opts.Username, password, group)
 	case "linux":
-		body = linuxScript(username, password)
+		body = linuxScript(opts.Username, password, group)
 	default:
-		return Script{}, fmt.Errorf("unsupported platform %q (cage supports darwin and linux)", goos)
+		return Script{}, fmt.Errorf("unsupported platform %q (cage supports darwin and linux)", opts.GOOS)
 	}
 	return Script{
-		Username: username,
-		Filename: "cage-" + username + ".sh",
+		Username: opts.Username,
+		Group:    group,
+		Filename: "cage-" + opts.Username + ".sh",
 		Body:     body,
 	}, nil
 }
@@ -47,7 +64,7 @@ func generatePassword() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-func header(username, password string) string {
+func header(username, password, group string) string {
 	return fmt.Sprintf(`#!/bin/sh
 # koko :cage setup for a dedicated low-privilege user.
 # Review every line before running. Run with:  sudo sh %s
@@ -57,12 +74,13 @@ func header(username, password string) string {
 set -eu
 
 NEW_USER="%s"
+GROUP="%s"
 PASSWORD="%s"
-`, "cage-"+username+".sh", username, password)
+`, "cage-"+username+".sh", username, group, password)
 }
 
-func darwinScript(username, password string) string {
-	return header(username, password) + `
+func darwinScript(username, password, group string) string {
+	return header(username, password, group) + `
 NEW_UID=$(( $(dscl . -list /Users UniqueID | awk '{print $2}' | sort -n | tail -n1) + 1 ))
 NEW_GID=$(( $(dscl . -list /Groups PrimaryGroupID | awk '{print $2}' | sort -n | tail -n1) + 1 ))
 
@@ -76,28 +94,28 @@ dscl . -create "/Users/$NEW_USER" IsHidden 1
 dscl . -passwd "/Users/$NEW_USER" "$PASSWORD"
 createhomedir -c -u "$NEW_USER"
 
-dscl . -create /Groups/collabo
-dscl . -create /Groups/collabo PrimaryGroupID "$NEW_GID"
-dscl . -append /Groups/collabo GroupMembership "$(logname)"
-dscl . -append /Groups/collabo GroupMembership "$NEW_USER"
+dscl . -create "/Groups/$GROUP"
+dscl . -create "/Groups/$GROUP" PrimaryGroupID "$NEW_GID"
+dscl . -append "/Groups/$GROUP" GroupMembership "$(logname)"
+dscl . -append "/Groups/$GROUP" GroupMembership "$NEW_USER"
 
 mkdir -p "/Users/$NEW_USER/workshop"
-chown -R "$NEW_USER:collabo" "/Users/$NEW_USER/workshop"
+chown -R "$NEW_USER:$GROUP" "/Users/$NEW_USER/workshop"
 chmod -R 2770 "/Users/$NEW_USER/workshop"
 
 echo "Done. Add 'umask 002' to your shell rc so shared files stay group-writable."
 `
 }
 
-func linuxScript(username, password string) string {
-	return header(username, password) + `
-groupadd -f collabo
-useradd -m -s /bin/bash -c "caged agent" -G collabo "$NEW_USER"
+func linuxScript(username, password, group string) string {
+	return header(username, password, group) + `
+groupadd -f "$GROUP"
+useradd -m -s /bin/bash -c "caged agent" -G "$GROUP" "$NEW_USER"
 printf '%s:%s\n' "$NEW_USER" "$PASSWORD" | chpasswd
-usermod -aG collabo "$(logname)"
+usermod -aG "$GROUP" "$(logname)"
 
 mkdir -p "/home/$NEW_USER/workshop"
-chown -R "$NEW_USER:collabo" "/home/$NEW_USER/workshop"
+chown -R "$NEW_USER:$GROUP" "/home/$NEW_USER/workshop"
 chmod -R 2770 "/home/$NEW_USER/workshop"
 
 echo "Done. Add 'umask 002' to your shell rc so shared files stay group-writable."
