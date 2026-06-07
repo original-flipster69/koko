@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -67,11 +68,12 @@ func (a *Agent) Compact() (int, int) {
 		{Role: provider.Assistant, Content: compactAck},
 	}
 	a.lastInputTokens = 0
-	newTokens := a.estimateTokens()
+	newTokens := a.measureTokens(context.Background())
+	a.lastInputTokens = newTokens
 	return oldTokens, newTokens
 }
 
-func (a *Agent) trimHistory() {
+func (a *Agent) trimHistory(ctx context.Context) {
 	if a.estimateTokens() <= maxHistoryTokens {
 		return
 	}
@@ -106,7 +108,7 @@ func (a *Agent) trimHistory() {
 	newHist = append(newHist, provider.Msg{Role: provider.Assistant, Content: trimAck})
 	newHist = append(newHist, kept...)
 	a.history = newHist
-	a.lastInputTokens = 0
+	a.lastInputTokens = a.measureTokens(ctx)
 	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept))
 }
 

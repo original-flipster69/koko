@@ -72,6 +72,10 @@ type Provider interface {
 	SetModel(model string)
 }
 
+type TokenCounter interface {
+	CountTokens(ctx context.Context, msgs []Msg, tools []ToolDef) (int, error)
+}
+
 type ToolDef struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

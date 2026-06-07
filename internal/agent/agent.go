@@ -35,6 +35,7 @@ type OutboundFilter func([]provider.Msg) []provider.Msg
 
 type Agent struct {
 	provider         provider.Provider
+	counter          provider.TokenCounter
 	editor           *editor.Editor
 	sandbox          *sandbox.Sandbox
 	ignore           *ignore.Matcher
@@ -135,6 +136,9 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		execMemoryMB:     opts.ExecMemoryMB,
 		execMaxFileMB:    opts.ExecMaxFileMB,
 	}
+	if c, ok := p.(provider.TokenCounter); ok {
+		a.counter = c
+	}
 	a.tools = a.buildTools()
 
 	systemPrompt := `You're koko, secure coding assistant. You help users edit files in sandboxed environment.
@@ -171,6 +175,21 @@ SECURITY:
 
 func (a *Agent) Undo() (string, error) {
 	return a.editor.Undo()
+}
+
+func (a *Agent) measureTokens(ctx context.Context) int {
+	if a.counter != nil {
+		outbound := a.history
+		for _, f := range a.outboundFilters {
+			outbound = f(outbound)
+		}
+		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		if n, err := a.counter.CountTokens(cctx, outbound, a.tools); err == nil && n > 0 {
+			return n
+		}
+	}
+	return estimateMessagesTokens(a.history)
 }
 
 const (
@@ -211,7 +230,7 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 		if a.toolCallCount >= maxSessionToolCalls {
 			return fmt.Errorf("session tool-call ceiling reached (%d) — start a new session", maxSessionToolCalls)
 		}
-		a.trimHistory()
+		a.trimHistory(ctx)
 		var spinner *ui.Spinner
 		if !a.suppressSpinner {
 			spinner = ui.NewLabeledSpinner(a.ThinkingVerb())

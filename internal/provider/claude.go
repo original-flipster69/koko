@@ -39,6 +39,8 @@ func newClaude(apiKey, model, baseURL string, maxTokens int) (*claude, error) {
 
 var ephemeral = map[string]string{"type": "ephemeral"}
 
+var _ TokenCounter = (*claude)(nil)
+
 func (a *claude) Name() string      { return "claude" }
 func (a *claude) Model() string     { return a.model }
 func (a *claude) SetModel(m string) { a.model = m }
@@ -122,11 +124,32 @@ func markCacheBreakpoints(reqBody *claudeReq) {
 	}
 }
 
+func (a *claude) headers() map[string]string {
+	return map[string]string{
+		"x-api-key":         a.apiKey,
+		"anthropic-version": "2023-06-01",
+	}
+}
+
+func (a *claude) CountTokens(ctx context.Context, msgs []Msg, tools []ToolDef) (int, error) {
+	r := a.request(msgs, tools, false)
+	body := claudeCountReq{Model: r.Model, System: r.System, Msgs: r.Msgs, Tools: r.Tools}
+	resp, err := sendReq(ctx, a.client, a.baseURL+"/messages/count_tokens", body, a.headers())
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		InputTokens int `json:"input_tokens"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return 0, fmt.Errorf("parsing token count: %w", err)
+	}
+	return out.InputTokens, nil
+}
+
 func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
-	resp, err := sendReq(ctx, a.client, a.baseURL+"/msgs", a.request(msgs, tools, true), map[string]string{
-		"x-api-key":      a.apiKey,
-		"claude-version": "2023-06-01",
-	})
+	resp, err := sendReq(ctx, a.client, a.baseURL+"/messages", a.request(msgs, tools, true), a.headers())
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +271,13 @@ type claudeReq struct {
 	Msgs      []claudeMsg  `json:"messages"`
 	Tools     []claudeTool `json:"tools,omitempty"`
 	Stream    bool         `json:"stream,omitempty"`
+}
+
+type claudeCountReq struct {
+	Model  string       `json:"model"`
+	System interface{}  `json:"system,omitempty"`
+	Msgs   []claudeMsg  `json:"messages"`
+	Tools  []claudeTool `json:"tools,omitempty"`
 }
 
 type claudeUsg struct {
