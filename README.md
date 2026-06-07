@@ -106,6 +106,10 @@ Markdown files in `~/.koko/plays/` register as named playbooks. The play name is
 
 **Arguments** — text typed after the play name is passed in. If the play body contains a `{{args}}` placeholder, the argument is substituted in place; otherwise it is appended under a `User request:` heading. Example: `:review focus on auth` runs `review.md` with `focus on auth` as the argument.
 
+### Caging the Agent
+
+`:cage <username>` generates a reviewable shell script that provisions a dedicated low-privilege user to run koko under, following the [caging-the-agent](https://originalflipster.com/playbooks/caging-the-agent/) playbook. It detects the OS and emits the matching variant (`dscl` on macOS, `useradd`/`groupadd` on Linux), creates a shared `collabo` group and a `2770` workspace, and embeds a freshly generated random password with a note to change it before running. The script is written to `~/.koko/cage-<username>.sh` (mode `0700`) and **never executed** — review it, then run `sudo sh ~/.koko/cage-<username>.sh` yourself.
+
 ### Plan Mode
 
 Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.
@@ -127,6 +131,7 @@ Toggle with `:plan` to switch into a read-only investigation mode. Write tools a
 | `:save` | Save the current session to disk |
 | `:resume` | Restore a saved session |
 | `:plays` | List installed plays |
+| `:cage <username>` | Generate a low-privilege user setup script |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
 
