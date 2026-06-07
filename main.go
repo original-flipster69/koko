@@ -47,11 +47,6 @@ func main() {
 		return
 	}
 
-	if isElevated() && !confirmElevated(os.Stdin, os.Stdout) {
-		fmt.Println(ui.Info("aborted", "not starting with elevated privileges"))
-		os.Exit(1)
-	}
-
 	kokoDir := getKokoDir()
 
 	cfgPath := config.Path(kokoDir)
@@ -76,6 +71,11 @@ func main() {
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(err.Error()))
+		os.Exit(1)
+	}
+
+	if !cfg.Sandbox.SuppressElevatedWarning && isElevated() && !confirmElevated(os.Stdin, os.Stdout) {
+		fmt.Println(ui.Info("aborted", "not starting with elevated privileges"))
 		os.Exit(1)
 	}
 
