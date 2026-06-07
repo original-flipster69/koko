@@ -12,8 +12,6 @@ import (
 type Play struct {
 	Name        string
 	Description string
-	Provider    string
-	Model       string
 	Body        string
 	Path        string
 }
@@ -111,10 +109,6 @@ func parse(raw string) Play {
 				switch strings.ToLower(k) {
 				case "description":
 					p.Description = v
-				case "provider":
-					p.Provider = v
-				case "model":
-					p.Model = v
 				}
 			}
 		}

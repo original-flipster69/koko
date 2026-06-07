@@ -106,19 +106,6 @@ Markdown files in `~/.koko/plays/` register as named playbooks. The play name is
 
 **Arguments** — text typed after the play name is passed in. If the play body contains a `{{args}}` placeholder, the argument is substituted in place; otherwise it is appended under a `User request:` heading. Example: `:review focus on auth` runs `review.md` with `focus on auth` as the argument.
 
-**Optional frontmatter** — a play may declare a preferred model (and provider) to switch to when invoked:
-
-```markdown
----
-description: Deep code review
-provider: Claude
-model: claude-sonnet-4-20250514
----
-Review {{args}} for correctness and security.
-```
-
-`model` alone switches the model on the current provider; adding `provider` switches both (requires the matching API key). The switch applies **only to that play's run** — once the turn finishes, koko reverts to your default model and provider.
-
 ### Plan Mode
 
 Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.

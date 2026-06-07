@@ -174,26 +174,6 @@ type command struct {
 	fn   func(input string, parts []string, a *agent.Agent) (handled bool, prompt string, output string)
 }
 
-func applyPlayModel(cfg *config.Config, a *agent.Agent, p plays.Play) (string, error) {
-	if p.Provider == "" && p.Model == "" {
-		return "", nil
-	}
-	target := cfg.Llm.Provider
-	if p.Provider != "" {
-		target = config.Provider(p.Provider)
-	}
-	newCfg := cfg.LlmConfigFor(target, p.Model)
-	if err := newCfg.Validate(); err != nil {
-		return "", err
-	}
-	np, err := provider.New(&newCfg)
-	if err != nil {
-		return "", err
-	}
-	a.SetNextProvider(np)
-	return ui.Info("model", fmt.Sprintf("play → %s / %s (this run)", newCfg.Provider, newCfg.Model)), nil
-}
-
 func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry) terminal.CmdHandler {
 	var commands map[string]command
 	commands = map[string]command{
@@ -328,13 +308,9 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		}
 		playName := strings.TrimPrefix(name, ":")
 		if p, ok := playRegistry.Get(playName); ok {
-			switchMsg, err := applyPlayModel(cfg, a, p)
-			if err != nil {
-				return true, "", ui.Error(fmt.Sprintf("play %q model: %v", p.Name, err))
-			}
 			extra := strings.TrimSpace(strings.TrimPrefix(input, name))
 			prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Render(extra))
-			return false, prompt, switchMsg
+			return false, prompt, ""
 		}
 		return true, "", ui.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}

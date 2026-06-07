@@ -9,19 +9,11 @@ import (
 func TestParseFrontmatter(t *testing.T) {
 	raw := "---\n" +
 		"description: A review play\n" +
-		"provider: Claude\n" +
-		"model: claude-sonnet-4-20250514\n" +
 		"---\n" +
 		"Review the code.\n"
 	p := parse(raw)
 	if p.Description != "A review play" {
 		t.Errorf("description = %q", p.Description)
-	}
-	if p.Provider != "Claude" {
-		t.Errorf("provider = %q", p.Provider)
-	}
-	if p.Model != "claude-sonnet-4-20250514" {
-		t.Errorf("model = %q", p.Model)
 	}
 	if p.Body != "Review the code." {
 		t.Errorf("body = %q", p.Body)
