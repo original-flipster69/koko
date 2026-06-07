@@ -144,6 +144,14 @@ func (s Scheme) TokenStats(input, output int) string {
 	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, s.Muted, input, output, Reset)
 }
 
+func PrivacyWarning(providerName string) string {
+	if providerName == "ollama" {
+		return ""
+	}
+	return fmt.Sprintf("  %s%s⚠ privacy:%s %sanything you send is processed by a remote provider (%s) and may be retained by it. Avoid sharing secrets or sensitive data — use Ollama for fully local, private inference.%s",
+		Bold, fg(PureOrange), Reset, fg(PureOrange), providerName, Reset)
+}
+
 func (s Scheme) ColorDiff(diffText string) string {
 	if diffText == "" {
 		return ""
