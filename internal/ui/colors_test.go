@@ -3,14 +3,17 @@ package ui
 import "testing"
 
 func TestApplyColorsOverridesPalette(t *testing.T) {
-	orig := Red
-	defer func() { Red = orig }()
+	origErr, origPrimary := Red, Blueberry
+	defer func() { Red, Blueberry = origErr, origPrimary }()
 
-	if err := ApplyColors(map[string]int{"red": 1}); err != nil {
+	if err := ApplyColors(map[string]int{"error": 1, "primary": 2}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if Red != fg(1) {
-		t.Errorf("red not overridden: got %q, want %q", Red, fg(1))
+		t.Errorf("error role not applied: got %q, want %q", Red, fg(1))
+	}
+	if Blueberry != fg(2) {
+		t.Errorf("primary role not applied: got %q, want %q", Blueberry, fg(2))
 	}
 }
 
@@ -32,7 +35,7 @@ func TestApplyColorsRejectsUnknownKey(t *testing.T) {
 
 func TestApplyColorsRejectsOutOfRange(t *testing.T) {
 	for _, code := range []int{-1, 256} {
-		if err := ApplyColors(map[string]int{"red": code}); err == nil {
+		if err := ApplyColors(map[string]int{"error": code}); err == nil {
 			t.Errorf("expected out-of-range error for code %d", code)
 		}
 	}
