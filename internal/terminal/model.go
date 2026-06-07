@@ -60,12 +60,13 @@ type model struct {
 	spinnerTick  int
 	spinnerLabel string
 
-	cmdHandler CmdHandler
+	cmdHandler    CmdHandler
+	knownCommands map[string]bool
 }
 
 type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
 
-func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool) model {
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, knownCommands []string) model {
 	ta := textarea.New()
 	ta.Placeholder = "ask koko anything... (alt+enter or ctrl+j for newline)"
 	ta.Focus()
@@ -76,18 +77,36 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 	ta.Prompt = ""
 	ta.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j", "shift+enter")
 
+	known := make(map[string]bool, len(knownCommands))
+	for _, name := range knownCommands {
+		known[name] = true
+	}
+
 	m := model{
-		input:      ta,
-		content:    &strings.Builder{},
-		agent:      a,
-		ctx:        ctx,
-		cancel:     cancel,
-		kokoDir:    kokoDir,
-		splashes:   splashes,
-		confirmCh:  confirmCh,
-		cmdHandler: cmdHandler,
+		input:         ta,
+		content:       &strings.Builder{},
+		agent:         a,
+		ctx:           ctx,
+		cancel:        cancel,
+		kokoDir:       kokoDir,
+		splashes:      splashes,
+		confirmCh:     confirmCh,
+		cmdHandler:    cmdHandler,
+		knownCommands: known,
 	}
 	return m
+}
+
+func (m model) recognizedCommand() (string, bool) {
+	in := strings.TrimSpace(m.input.Value())
+	if !strings.HasPrefix(in, ":") {
+		return "", false
+	}
+	name := strings.Fields(in)[0]
+	if m.knownCommands[name] {
+		return name, true
+	}
+	return "", false
 }
 
 func (m model) Init() tea.Cmd {
@@ -329,6 +348,8 @@ func (m model) View() string {
 	var inputLine string
 	if m.confirmMode {
 		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.LavenderIndigo, ui.Reset, m.confirmText, m.input.View())
+	} else if name, ok := m.recognizedCommand(); ok {
+		inputLine = fmt.Sprintf("%s%s▶%s %s   %s%s%s%s", ui.Bold, ui.Green, ui.Reset, m.input.View(), ui.Dim, ui.Green, name, ui.Reset)
 	} else {
 		inputLine = fmt.Sprintf("%s▶%s %s", ui.Blueberry, ui.Reset, m.input.View())
 	}

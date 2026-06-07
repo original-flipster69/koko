@@ -15,6 +15,7 @@ func Run(
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,
+	knownCommands []string,
 ) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	confirmCh := make(chan bool, 1)
@@ -39,7 +40,7 @@ func Run(
 		}
 	}
 
-	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh)
+	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, knownCommands)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	w.program = p
