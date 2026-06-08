@@ -33,7 +33,7 @@ func Run(
 	a.SetSuppressSpinner(true)
 
 	if providerName == "ollama" {
-		suffix := ui.Dim + ui.Gray + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		suffix := ui.Dim + ui.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
 		for i := range splashes {
 			splashes[i] += suffix
 		}

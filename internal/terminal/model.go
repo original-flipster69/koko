@@ -132,7 +132,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.runCancel()
 				}
 				m.agentBusy = false
-				m.appendOutput(fmt.Sprintf("\n%s%sinterrupted%s\n", ui.Dim, ui.Gray, ui.Reset))
+				m.appendOutput(fmt.Sprintf("\n%s%sinterrupted%s\n", ui.Dim, ui.Muted, ui.Reset))
 				return m, nil
 			}
 			m.quitting = true
@@ -297,7 +297,7 @@ func (m model) spinnerView() string {
 		frame = zodiac[cycle%len(zodiac)]
 	}
 	dot := dots[cycle%len(dots)]
-	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.Blueberry, frame, ui.Reset, ui.Blueberry, m.spinnerLabel, dot, ui.Reset)
+	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.Primary, frame, ui.Reset, ui.Primary, m.spinnerLabel, dot, ui.Reset)
 }
 
 var inputBarStyle = lipgloss.NewStyle().
@@ -328,9 +328,9 @@ func (m model) View() string {
 
 	var inputLine string
 	if m.confirmMode {
-		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.LavenderIndigo, ui.Reset, m.confirmText, m.input.View())
+		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.Secondary, ui.Reset, m.confirmText, m.input.View())
 	} else {
-		inputLine = fmt.Sprintf("%s▶%s %s", ui.Blueberry, ui.Reset, m.input.View())
+		inputLine = fmt.Sprintf("%s▶%s %s", ui.Primary, ui.Reset, m.input.View())
 	}
 
 	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)

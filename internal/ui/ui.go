@@ -20,31 +20,38 @@ const (
 func fg(code int) string { return fmt.Sprintf("\033[38;5;%dm", code) }
 func bg(code int) string { return fmt.Sprintf("\033[48;5;%dm", code) }
 
-var (
-	LavenderIndigo = fg(135)
-	Mauve          = fg(183)
-	Blueberry      = fg(99)
-	MediumPurple   = fg(98)
-	BrightLavender = fg(141)
-	DarkViolet     = fg(55)
-
-	PureViolet     = fg(93)
-	ElectricPurple = fg(129)
-
-	Gray  = fg(243)
-	White = fg(255)
-
-	Red        = fg(197)
-	Green      = fg(114)
-	PureOrange = fg(214)
+const (
+	LavenderIndigo = "\033[38;5;135m"
+	Mauve          = "\033[38;5;183m"
+	Blueberry      = "\033[38;5;99m"
+	MediumPurple   = "\033[38;5;98m"
+	BrightLavender = "\033[38;5;141m"
+	DarkViolet     = "\033[38;5;55m"
+	PureViolet     = "\033[38;5;93m"
+	ElectricPurple = "\033[38;5;129m"
+	Gray           = "\033[38;5;243m"
+	White          = "\033[38;5;255m"
+	Red            = "\033[38;5;197m"
+	Green          = "\033[38;5;114m"
+	PureOrange     = "\033[38;5;214m"
 )
 
 var (
-	diffBgRed   = bg(52)
-	diffFgRed   = fg(210)
-	diffBgGreen = bg(22)
-	diffFgGreen = fg(156)
-	diffGutter  = fg(240)
+	Primary   = Blueberry
+	Secondary = LavenderIndigo
+	Highlight = Mauve
+	Label     = BrightLavender
+	Value     = White
+	Muted     = Gray
+	Danger    = Red
+	Success   = Green
+	Code      = PureOrange
+
+	DiffAddFg  = "\033[38;5;156m"
+	DiffAddBg  = "\033[48;5;22m"
+	DiffDelFg  = "\033[38;5;210m"
+	DiffDelBg  = "\033[48;5;52m"
+	DiffGutter = "\033[38;5;240m"
 )
 
 var splashColorCode = 99
@@ -70,20 +77,20 @@ func rebuildSplashStyles() {
 
 func ApplyColors(overrides map[string]int) error {
 	setters := map[string]func(int){
-		"primary":     func(c int) { Blueberry = fg(c) },
-		"secondary":   func(c int) { LavenderIndigo = fg(c) },
-		"tool_output": func(c int) { Mauve = fg(c) },
-		"label":       func(c int) { BrightLavender = fg(c) },
-		"value":       func(c int) { White = fg(c) },
-		"muted":       func(c int) { Gray = fg(c) },
-		"error":       func(c int) { Red = fg(c) },
-		"success":     func(c int) { Green = fg(c) },
-		"code":        func(c int) { PureOrange = fg(c) },
-		"diff_add_fg": func(c int) { diffFgGreen = fg(c) },
-		"diff_add_bg": func(c int) { diffBgGreen = bg(c) },
-		"diff_del_fg": func(c int) { diffFgRed = fg(c) },
-		"diff_del_bg": func(c int) { diffBgRed = bg(c) },
-		"diff_gutter": func(c int) { diffGutter = fg(c) },
+		"primary":     func(c int) { Primary = fg(c) },
+		"secondary":   func(c int) { Secondary = fg(c) },
+		"highlight":   func(c int) { Highlight = fg(c) },
+		"label":       func(c int) { Label = fg(c) },
+		"value":       func(c int) { Value = fg(c) },
+		"muted":       func(c int) { Muted = fg(c) },
+		"error":       func(c int) { Danger = fg(c) },
+		"success":     func(c int) { Success = fg(c) },
+		"code":        func(c int) { Code = fg(c) },
+		"diff_add_fg": func(c int) { DiffAddFg = fg(c) },
+		"diff_add_bg": func(c int) { DiffAddBg = bg(c) },
+		"diff_del_fg": func(c int) { DiffDelFg = fg(c) },
+		"diff_del_bg": func(c int) { DiffDelBg = bg(c) },
+		"diff_gutter": func(c int) { DiffGutter = fg(c) },
 		"splash":      func(c int) { splashColorCode = c },
 	}
 	for key, code := range overrides {
@@ -122,15 +129,15 @@ func Splash(mascot, provider, model, sandbox, version string, detected []string)
 }
 
 func Info(label string, value string) string {
-	return fmt.Sprintf("  %s%-9s%s %s%s%s", Bold+BrightLavender, label, Reset, White, value, Reset)
+	return fmt.Sprintf("  %s%-9s%s %s%s%s", Bold+Label, label, Reset, Value, value, Reset)
 }
 
 func Error(text string) string {
-	return fmt.Sprintf("%s%serror:%s %s", Bold, Red, Reset, text)
+	return fmt.Sprintf("%s%serror:%s %s", Bold, Danger, Reset, text)
 }
 
 func TokenStats(input, output int) string {
-	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, Gray, input, output, Reset)
+	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, Muted, input, output, Reset)
 }
 
 func ColorDiff(diffText string) string {
@@ -152,14 +159,14 @@ func ColorDiff(diffText string) string {
 				path = p
 			}
 			if !headerPrinted {
-				out.WriteString(fmt.Sprintf("  %s%s╭─ %s%s\n", Bold, Blueberry, path, Reset))
+				out.WriteString(fmt.Sprintf("  %s%s╭─ %s%s\n", Bold, Primary, path, Reset))
 				headerPrinted = true
 			}
 			continue
 		case strings.HasPrefix(line, "@@"):
 			var oc, nc int
 			fmt.Sscanf(line, "@@ -%d,%d +%d,%d @@", &oldLine, &oc, &newLine, &nc)
-			out.WriteString(fmt.Sprintf("  %s│ %s%s%s\n", Blueberry, Dim+Gray, line, Reset))
+			out.WriteString(fmt.Sprintf("  %s│ %s%s%s\n", Primary, Dim+Muted, line, Reset))
 			continue
 		case line == "":
 			continue
@@ -176,30 +183,30 @@ func ColorDiff(diffText string) string {
 		switch sign {
 		case "-":
 			gutter = fmt.Sprintf("%4d     ", oldLine)
-			bg, fg, prefix = diffBgRed, diffFgRed, " - "
+			bg, fg, prefix = DiffDelBg, DiffDelFg, " - "
 			oldLine++
 		case "+":
 			gutter = fmt.Sprintf("     %4d", newLine)
-			bg, fg, prefix = diffBgGreen, diffFgGreen, " + "
+			bg, fg, prefix = DiffAddBg, DiffAddFg, " + "
 			newLine++
 		default:
 			gutter = fmt.Sprintf("%4d %4d", oldLine, newLine)
-			bg, fg, prefix = "", Gray, "   "
+			bg, fg, prefix = "", Muted, "   "
 			oldLine++
 			newLine++
 		}
 
 		if bg != "" {
 			out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s%s\n",
-				Blueberry, diffGutter, gutter, bg, fg, prefix, content, Reset))
+				Primary, DiffGutter, gutter, bg, fg, prefix, content, Reset))
 		} else {
 			out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s\n",
-				Blueberry, diffGutter, gutter, fg, prefix, content, Reset))
+				Primary, DiffGutter, gutter, fg, prefix, content, Reset))
 		}
 	}
 
 	if headerPrinted {
-		out.WriteString(fmt.Sprintf("  %s╰─%s\n", Blueberry, Reset))
+		out.WriteString(fmt.Sprintf("  %s╰─%s\n", Primary, Reset))
 	}
 	return out.String()
 }

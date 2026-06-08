@@ -127,7 +127,7 @@ func main() {
 	}
 
 	confirm := func(action string) bool {
-		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.LavenderIndigo, ui.Reset, ui.BrightLavender, action, ui.Reset)
+		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, ui.Secondary, ui.Reset, ui.Label, action, ui.Reset)
 		reader := bufio.NewReader(os.Stdin)
 		answer, _ := reader.ReadString('\n')
 		answer = strings.TrimSpace(strings.ToLower(answer))
