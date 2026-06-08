@@ -2,28 +2,43 @@ package ui
 
 import "testing"
 
-func TestApplyColorsOverridesPalette(t *testing.T) {
-	origErr, origPrimary := Red, Blueberry
-	defer func() { Red, Blueberry = origErr, origPrimary }()
+func TestApplyColorsOverridesRoles(t *testing.T) {
+	origErr, origPrimary := Danger, Primary
+	defer func() { Danger, Primary = origErr, origPrimary }()
 
 	if err := ApplyColors(map[string]int{"error": 1, "primary": 2}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if Red != fg(1) {
-		t.Errorf("error role not applied: got %q, want %q", Red, fg(1))
+	if Danger != fg(1) {
+		t.Errorf("error role not applied: got %q, want %q", Danger, fg(1))
 	}
-	if Blueberry != fg(2) {
-		t.Errorf("primary role not applied: got %q, want %q", Blueberry, fg(2))
+	if Primary != fg(2) {
+		t.Errorf("primary role not applied: got %q, want %q", Primary, fg(2))
+	}
+}
+
+func TestApplyColorsLeavesPaletteUntouched(t *testing.T) {
+	origPrimary := Primary
+	defer func() { Primary = origPrimary }()
+
+	if err := ApplyColors(map[string]int{"primary": 2}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if Blueberry != "\033[38;5;99m" {
+		t.Errorf("pigment constant Blueberry was mutated: %q", Blueberry)
+	}
+	if Primary == Blueberry {
+		t.Error("primary role should now differ from its default pigment")
 	}
 }
 
 func TestApplyColorsNilIsNoop(t *testing.T) {
-	orig := Blueberry
+	orig := Primary
 	if err := ApplyColors(nil); err != nil {
 		t.Fatalf("nil overrides should be a no-op, got %v", err)
 	}
-	if Blueberry != orig {
-		t.Errorf("palette changed on nil input")
+	if Primary != orig {
+		t.Errorf("roles changed on nil input")
 	}
 }
 
@@ -42,17 +57,17 @@ func TestApplyColorsRejectsOutOfRange(t *testing.T) {
 }
 
 func TestApplyColorsBackgroundAndSplash(t *testing.T) {
-	origBg, origSplash := diffBgGreen, splashColorCode
+	origBg, origSplash := DiffAddBg, splashColorCode
 	defer func() {
-		diffBgGreen, splashColorCode = origBg, origSplash
+		DiffAddBg, splashColorCode = origBg, origSplash
 		rebuildSplashStyles()
 	}()
 
 	if err := ApplyColors(map[string]int{"diff_add_bg": 28, "splash": 200}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if diffBgGreen != bg(28) {
-		t.Errorf("diff_add_bg not overridden: got %q", diffBgGreen)
+	if DiffAddBg != bg(28) {
+		t.Errorf("diff_add_bg not overridden: got %q", DiffAddBg)
 	}
 	if splashColorCode != 200 {
 		t.Errorf("splash code not set: got %d", splashColorCode)

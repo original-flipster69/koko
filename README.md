@@ -221,8 +221,9 @@ thinking_verbs = ["thinking", "pondering", "scheming"]
 # an ANSI 256-color code (0-255); any role omitted keeps koko's default.
 [style.colors]
 # Roles: primary (headings/prompt/spinner/diff-frame), secondary (confirm/tool-tag/
-# sub-headings), tool_output, label, value, muted, error, success, code,
-# diff_add_fg, diff_add_bg, diff_del_fg, diff_del_bg, diff_gutter, splash
+# sub-headings), highlight (tool output + emphasis), label, value, muted,
+# error, success, code, diff_add_fg, diff_add_bg, diff_del_fg, diff_del_bg,
+# diff_gutter, splash
 error = 160
 primary = 27
 ```

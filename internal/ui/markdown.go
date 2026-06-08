@@ -169,7 +169,7 @@ func (m *MarkdownStream) renderBlock(block string) string {
 		if isHorizontalRule(trimmed) {
 			out.WriteString(m.flushTable())
 			out.WriteString(m.flushPendingTableHd())
-			rule := Dim + Gray + strings.Repeat("─", 40) + Reset
+			rule := Dim + Muted + strings.Repeat("─", 40) + Reset
 			out.WriteString(rule)
 			if hasNL {
 				out.WriteString("\n")
@@ -236,12 +236,12 @@ func highlightCode(lang, code string) string {
 
 	iterator, err := lexer.Tokenise(nil, code)
 	if err != nil {
-		return PureOrange + code + Reset
+		return Code + code + Reset
 	}
 
 	var buf strings.Builder
 	if err := formatter.Format(&buf, style, iterator); err != nil {
-		return PureOrange + code + Reset
+		return Code + code + Reset
 	}
 	return buf.String()
 }
@@ -253,15 +253,15 @@ func renderLine(line string) string {
 	if h := headingLevel(trimmed); h > 0 {
 		text := strings.TrimSpace(trimmed[h:])
 		text = stripBoldMarkers(text)
-		color := Blueberry
+		color := Primary
 		if h >= 2 {
-			color = LavenderIndigo
+			color = Secondary
 		}
 		return fmt.Sprintf("%s%s%s%s%s", indent, Bold, color, text, Reset)
 	}
 
 	if after, ok := trimListMarker(trimmed); ok {
-		return fmt.Sprintf("%s%s•%s %s", indent, BrightLavender, Reset, renderInline(after))
+		return fmt.Sprintf("%s%s•%s %s", indent, Label, Reset, renderInline(after))
 	}
 
 	if after, ok := trimOrderedMarker(trimmed); ok {
@@ -270,7 +270,7 @@ func renderLine(line string) string {
 
 	if strings.HasPrefix(trimmed, "> ") {
 		inner := strings.TrimPrefix(trimmed, "> ")
-		return fmt.Sprintf("%s%s│%s %s", indent, Gray, Reset, renderInline(inner))
+		return fmt.Sprintf("%s%s│%s %s", indent, Muted, Reset, renderInline(inner))
 	}
 
 	return indent + renderInline(trimmed)
@@ -568,7 +568,7 @@ func renderTable(headers []string, rows [][]string) string {
 
 	border := func(left, mid, right string) string {
 		var b strings.Builder
-		b.WriteString(Gray + left)
+		b.WriteString(Muted + left)
 		for i, w := range colW {
 			b.WriteString(strings.Repeat("─", w+2))
 			if i < cols-1 {
@@ -588,7 +588,7 @@ func renderTable(headers []string, rows [][]string) string {
 			}
 			rendered := renderInline(raw)
 			if header {
-				rendered = Bold + Mauve + rendered + Reset
+				rendered = Bold + Highlight + rendered + Reset
 			}
 			wrapped[i] = wrapText(rendered, colW[i])
 		}
@@ -600,7 +600,7 @@ func renderTable(headers []string, rows [][]string) string {
 		}
 		var b strings.Builder
 		for line := 0; line < maxLines; line++ {
-			b.WriteString(Gray + "│" + Reset)
+			b.WriteString(Muted + "│" + Reset)
 			for i := 0; i < cols; i++ {
 				cell := ""
 				if line < len(wrapped[i]) {
@@ -614,7 +614,7 @@ func renderTable(headers []string, rows [][]string) string {
 				if pad > 0 {
 					b.WriteString(strings.Repeat(" ", pad))
 				}
-				b.WriteString(" " + Gray + "│" + Reset)
+				b.WriteString(" " + Muted + "│" + Reset)
 			}
 			b.WriteString("\n")
 		}
@@ -667,7 +667,7 @@ func renderInline(s string) string {
 		if c == '`' {
 			end := strings.IndexByte(s[i+1:], '`')
 			if end >= 0 {
-				out.WriteString(PureOrange)
+				out.WriteString(Code)
 				out.WriteString(s[i+1 : i+1+end])
 				out.WriteString(Reset)
 				i += end + 2
@@ -679,7 +679,7 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "**")
 			if end >= 0 {
 				out.WriteString(Bold)
-				out.WriteString(Mauve)
+				out.WriteString(Highlight)
 				out.WriteString(renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
@@ -702,7 +702,7 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "__")
 			if end >= 0 {
 				out.WriteString(Bold)
-				out.WriteString(Mauve)
+				out.WriteString(Highlight)
 				out.WriteString(renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
@@ -742,11 +742,11 @@ func renderInline(s string) string {
 						text := s[i+1 : i+1+closeBracket]
 						url := s[afterBracket+1 : afterBracket+1+closeParen]
 						out.WriteString(Underline)
-						out.WriteString(PureOrange)
+						out.WriteString(Code)
 						out.WriteString(text)
 						out.WriteString(Reset)
 						out.WriteString(Dim)
-						out.WriteString(Gray)
+						out.WriteString(Muted)
 						out.WriteString(" (")
 						out.WriteString(url)
 						out.WriteString(")")
