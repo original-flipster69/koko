@@ -65,7 +65,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := ui.ApplyColors(cfg.Style.Colors); err != nil {
+	if err := ui.ApplyColors(cfg.Style.ColorScheme); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Error(err.Error()))
 		os.Exit(1)
 	}
