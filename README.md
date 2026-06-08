@@ -210,7 +210,7 @@ thinking_verbs = ["thinking", "pondering", "scheming"]
 
 # Optional color overrides, keyed by semantic role (not pigment). Each value is
 # an ANSI 256-color code (0-255); any role omitted keeps koko's default.
-[style.colors]
+[style.color_scheme]
 # Roles: primary (headings/prompt/spinner/diff-frame), secondary (confirm/tool-tag/
 # sub-headings), highlight (tool output + emphasis), label, value, muted,
 # error, success, code, diff_add_fg, diff_add_bg, diff_del_fg, diff_del_bg,
