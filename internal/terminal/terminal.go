@@ -14,6 +14,7 @@ func Run(
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,
+	knownCommands []string,
 	scheme ui.Scheme,
 ) error {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -32,7 +33,7 @@ func Run(
 	})
 	a.SetSuppressSpinner(true)
 
-	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, scheme)
+	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, knownCommands, scheme)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	w.program = p

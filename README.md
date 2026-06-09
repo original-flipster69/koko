@@ -130,6 +130,10 @@ Optional parameters (`key=value`, any order):
 
 Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.
 
+### Command Highlighting
+
+As you type, koko recognizes when the current line is a known command or installed play (e.g. `:help`, `:review`). When it matches, the input caret turns green and the recognized name is echoed beside the prompt — live feedback that the command will run before you press enter.
+
 ### Interactive REPL
 
 | Command | Description |

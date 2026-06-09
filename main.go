@@ -181,9 +181,12 @@ func main() {
 		splashes[i] = splash
 	}
 
-	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, src, scheme)
+	cmdHandlers, knownCommands := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, src, scheme)
+	for _, p := range playRegistry.List() {
+		knownCommands = append(knownCommands, ":"+p.Name)
+	}
 
-	if err := terminal.Run(a, kokoDir, splashes, cmdHandlers, scheme); err != nil {
+	if err := terminal.Run(a, kokoDir, splashes, cmdHandlers, knownCommands, scheme); err != nil {
 		fmt.Fprintln(os.Stderr, scheme.Error(err.Error()))
 		os.Exit(1)
 	}
@@ -196,7 +199,7 @@ type command struct {
 	fn   func(input string, parts []string, a *agent.Agent) (handled bool, prompt string, output string)
 }
 
-func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, src reloadSources, scheme ui.Scheme) terminal.CmdHandler {
+func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, src reloadSources, scheme ui.Scheme) (terminal.CmdHandler, []string) {
 	var commands map[string]command
 	commands = map[string]command{
 		":koko": {desc: "print the koko mascot", fn: func(string, []string, *agent.Agent) (bool, string, string) {
@@ -380,7 +383,12 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		}},
 	}
 
-	return func(input string, a *agent.Agent) (bool, string, string) {
+	names := make([]string, 0, len(commands))
+	for n := range commands {
+		names = append(names, n)
+	}
+
+	handler := func(input string, a *agent.Agent) (bool, string, string) {
 		parts := strings.Fields(input)
 		if len(parts) == 0 {
 			return true, "", ""
@@ -397,6 +405,7 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		}
 		return true, "", scheme.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
+	return handler, names
 }
 
 type reloadSources struct {

@@ -60,13 +60,14 @@ type model struct {
 	spinnerTick  int
 	spinnerLabel string
 
-	cmdHandler CmdHandler
-	scheme     ui.Scheme
+	cmdHandler    CmdHandler
+	knownCommands map[string]bool
+	scheme        ui.Scheme
 }
 
 type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
 
-func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, scheme ui.Scheme) model {
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, knownCommands []string, scheme ui.Scheme) model {
 	ta := textarea.New()
 	ta.Placeholder = "ask koko anything... (alt+enter or ctrl+j for newline)"
 	ta.Focus()
@@ -77,19 +78,37 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 	ta.Prompt = ""
 	ta.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j", "shift+enter")
 
+	known := make(map[string]bool, len(knownCommands))
+	for _, name := range knownCommands {
+		known[name] = true
+	}
+
 	m := model{
-		input:      ta,
-		content:    &strings.Builder{},
-		agent:      a,
-		ctx:        ctx,
-		cancel:     cancel,
-		kokoDir:    kokoDir,
-		splashes:   splashes,
-		confirmCh:  confirmCh,
-		cmdHandler: cmdHandler,
-		scheme:     scheme,
+		input:         ta,
+		content:       &strings.Builder{},
+		agent:         a,
+		ctx:           ctx,
+		cancel:        cancel,
+		kokoDir:       kokoDir,
+		splashes:      splashes,
+		confirmCh:     confirmCh,
+		cmdHandler:    cmdHandler,
+		knownCommands: known,
+		scheme:        scheme,
 	}
 	return m
+}
+
+func (m model) recognizedCommand() (string, bool) {
+	in := strings.TrimSpace(m.input.Value())
+	if !strings.HasPrefix(in, ":") {
+		return "", false
+	}
+	name := strings.Fields(in)[0]
+	if m.knownCommands[name] {
+		return name, true
+	}
+	return "", false
 }
 
 func (m model) Init() tea.Cmd {
@@ -331,6 +350,8 @@ func (m model) View() string {
 	var inputLine string
 	if m.confirmMode {
 		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", m.scheme.Secondary, ui.Reset, m.confirmText, m.input.View())
+	} else if name, ok := m.recognizedCommand(); ok {
+		inputLine = fmt.Sprintf("%s%s▶%s %s   %s%s%s%s", ui.Bold, m.scheme.Success, ui.Reset, m.input.View(), ui.Dim, m.scheme.Success, name, ui.Reset)
 	} else {
 		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, m.input.View())
 	}
