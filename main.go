@@ -54,16 +54,16 @@ func main() {
 		cfgPath = *configFlag
 	}
 
-	cfg, err := config.Load(cfgPath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(err.Error()))
-		os.Exit(1)
+	src := reloadSources{
+		cfgPath:  cfgPath,
+		provider: *providerFlag,
+		model:    *modelFlag,
+		llmURL:   *llmUrlFlag,
+		sandbox:  *sandboxFlag,
 	}
 
-	cfg.ApplyFlags(*providerFlag, *modelFlag, *llmUrlFlag, *sandboxFlag)
-	cfg.ApplyEnv()
-
-	if err := cfg.Validate(); err != nil {
+	cfg, err := loadConfig(src)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(err.Error()))
 		os.Exit(1)
 	}
@@ -181,7 +181,7 @@ func main() {
 		splashes[i] = splash
 	}
 
-	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, scheme)
+	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, src, scheme)
 
 	if err := terminal.Run(a, kokoDir, splashes, cmdHandlers, scheme); err != nil {
 		fmt.Fprintln(os.Stderr, scheme.Error(err.Error()))
@@ -196,7 +196,7 @@ type command struct {
 	fn   func(input string, parts []string, a *agent.Agent) (handled bool, prompt string, output string)
 }
 
-func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, scheme ui.Scheme) terminal.CmdHandler {
+func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, src reloadSources, scheme ui.Scheme) terminal.CmdHandler {
 	var commands map[string]command
 	commands = map[string]command{
 		":koko": {desc: "print the koko mascot", fn: func(string, []string, *agent.Agent) (bool, string, string) {
@@ -316,6 +316,24 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 			}
 			return true, "", scheme.Info("saved", "session written to disk")
 		}},
+		":reload": {desc: "reload config from its sources", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
+			newCfg, err := loadConfig(src)
+			if err != nil {
+				return true, "", scheme.Error(fmt.Sprintf("reload failed (keeping current config): %v", err))
+			}
+			applied, restart := applyReloadedConfig(cfg, newCfg, llm.SetModel, a.SetThinkingVerbs, a.SetMaxSessionTokens)
+			if len(applied) == 0 && len(restart) == 0 {
+				return true, "", scheme.Info("reload", "config reloaded — no changes detected")
+			}
+			var b strings.Builder
+			if len(applied) > 0 {
+				b.WriteString(scheme.Info("applied", strings.Join(applied, ", ")) + "\n")
+			}
+			if len(restart) > 0 {
+				b.WriteString(scheme.Info("restart", "changed but needs restart: "+strings.Join(restart, ", ")) + "\n")
+			}
+			return true, "", strings.TrimRight(b.String(), "\n")
+		}},
 		":resume": {desc: "restore saved session", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			if err := a.LoadSession(dataDir); err != nil {
 				return true, "", scheme.Error(fmt.Sprintf("resume failed: %v", err))
@@ -379,6 +397,86 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		}
 		return true, "", scheme.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
+}
+
+type reloadSources struct {
+	cfgPath  string
+	provider string
+	model    string
+	llmURL   string
+	sandbox  string
+}
+
+func loadConfig(src reloadSources) (*config.Config, error) {
+	cfg, err := config.Load(src.cfgPath)
+	if err != nil {
+		return nil, err
+	}
+	cfg.ApplyFlags(src.provider, src.model, src.llmURL, src.sandbox)
+	cfg.ApplyEnv()
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func applyReloadedConfig(cur, next *config.Config, setModel func(string), setVerbs func([]string), setMaxTokens func(int)) (applied, restart []string) {
+	if !equalStrings(next.Style.ThinkingVerbs, cur.Style.ThinkingVerbs) {
+		setVerbs(next.Style.ThinkingVerbs)
+		cur.Style.ThinkingVerbs = next.Style.ThinkingVerbs
+		applied = append(applied, "thinking verbs")
+	}
+	if next.Llm.MaxSessionTokens != cur.Llm.MaxSessionTokens {
+		setMaxTokens(next.Llm.MaxSessionTokens)
+		cur.Llm.MaxSessionTokens = next.Llm.MaxSessionTokens
+		applied = append(applied, "max session tokens")
+	}
+	if next.Llm.Provider == cur.Llm.Provider {
+		if next.Llm.Model != cur.Llm.Model {
+			setModel(next.Llm.Model)
+			cur.Llm.Model = next.Llm.Model
+			applied = append(applied, "model")
+		}
+	} else {
+		restart = append(restart, "provider")
+	}
+	if next.Llm.Url != cur.Llm.Url {
+		restart = append(restart, "llm url")
+	}
+	if next.Sandbox.Root != cur.Sandbox.Root {
+		restart = append(restart, "sandbox root")
+	}
+	if !equalStrings(next.Sandbox.AdditionalDirs, cur.Sandbox.AdditionalDirs) {
+		restart = append(restart, "additional dirs")
+	}
+	if !equalStrings(next.Sandbox.DenyFiles, cur.Sandbox.DenyFiles) {
+		restart = append(restart, "deny files")
+	}
+	if next.Sandbox.MaxFileSize != cur.Sandbox.MaxFileSize {
+		restart = append(restart, "max file size")
+	}
+	if next.Sandbox.ScrubPII != cur.Sandbox.ScrubPII {
+		restart = append(restart, "scrub_pii")
+	}
+	if next.Sandbox.Exec.Profile != cur.Sandbox.Exec.Profile {
+		restart = append(restart, "exec profile")
+	}
+	if next.Ignore.Mode != cur.Ignore.Mode {
+		restart = append(restart, "ignore mode")
+	}
+	return applied, restart
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func isElevated() bool {
