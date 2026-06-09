@@ -351,7 +351,7 @@ func (m model) View() string {
 	if m.confirmMode {
 		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", m.scheme.Secondary, ui.Reset, m.confirmText, m.input.View())
 	} else if name, ok := m.recognizedCommand(); ok {
-		inputLine = fmt.Sprintf("%s%s▶%s %s   %s%s%s%s", ui.Bold, m.scheme.Success, ui.Reset, m.input.View(), ui.Dim, m.scheme.Success, name, ui.Reset)
+		inputLine = fmt.Sprintf("%s%s▶ %s%s%s", ui.Bold, m.scheme.Label, name, ui.Reset, strings.Replace(m.input.View(), name, "", 1))
 	} else {
 		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, m.input.View())
 	}
