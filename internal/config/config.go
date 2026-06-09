@@ -44,12 +44,13 @@ type LlmConfig struct {
 }
 
 type SandboxConfig struct {
-	Root           string     `toml:"root"`
-	AdditionalDirs []string   `toml:"additional_dirs"`
-	DenyFiles      []string   `toml:"deny_files"`
-	MaxFileSize    int64      `toml:"max_file_size"`
-	ScrubPII       bool       `toml:"scrub_pii"`
-	Exec           ExecConfig `toml:"exec"`
+	Root                    string     `toml:"root"`
+	AdditionalDirs          []string   `toml:"additional_dirs"`
+	DenyFiles               []string   `toml:"deny_files"`
+	MaxFileSize             int64      `toml:"max_file_size"`
+	ScrubPII                bool       `toml:"scrub_pii"`
+	SuppressElevatedWarning bool       `toml:"suppress_elevated_warning"`
+	Exec                    ExecConfig `toml:"exec"`
 }
 
 type ExecConfig struct {
@@ -64,7 +65,8 @@ type IgnoreConfig struct {
 }
 
 type StyleConfig struct {
-	ThinkingVerbs []string `toml:"thinking_verbs"`
+	ThinkingVerbs []string       `toml:"thinking_verbs"`
+	ColorScheme   map[string]int `toml:"color_scheme"`
 }
 
 type Config struct {

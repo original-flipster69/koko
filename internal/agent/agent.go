@@ -40,6 +40,7 @@ type Agent struct {
 	ignore           *ignore.Matcher
 	memory           *memory.Store
 	cmdPolicy        *policy.CmdPolicy
+	scheme           ui.Scheme
 	tools            []provider.ToolDef
 	output           io.Writer
 	confirm          confirmFunc
@@ -88,6 +89,18 @@ func (a *Agent) ThinkingVerb() string {
 	return a.thinkingVerbs[rand.Intn(len(a.thinkingVerbs))]
 }
 
+func (a *Agent) SetThinkingVerbs(verbs []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.thinkingVerbs = verbs
+}
+
+func (a *Agent) SetMaxSessionTokens(n int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.maxSessionTokens = n
+}
+
 func (a *Agent) TogglePlanMode() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -105,6 +118,7 @@ type Options struct {
 	Memory           *memory.Store
 	CmdPolicy        *policy.CmdPolicy
 	Ignore           *ignore.Matcher
+	Scheme           ui.Scheme
 	ProjectCtx       string
 	ThinkingVerbs    []string
 	MaxSessionTokens int
@@ -127,6 +141,7 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		ignore:           opts.Ignore,
 		memory:           opts.Memory,
 		cmdPolicy:        opts.CmdPolicy,
+		scheme:           opts.Scheme,
 		thinkingVerbs:    opts.ThinkingVerbs,
 		maxSessionTokens: opts.MaxSessionTokens,
 		streamTimeout:    opts.StreamTimeout,
@@ -214,11 +229,11 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 		a.trimHistory()
 		var spinner *ui.Spinner
 		if !a.suppressSpinner {
-			spinner = ui.NewLabeledSpinner(a.ThinkingVerb())
+			spinner = ui.NewLabeledSpinner(a.ThinkingVerb(), a.scheme)
 			spinner.Start()
 		}
 		firstDelta := true
-		md := ui.NewMarkdownStream()
+		md := ui.NewMarkdownStream(a.scheme)
 		activeTools := a.tools
 		if a.planMode {
 			filtered := make([]provider.ToolDef, 0, len(a.tools))
@@ -295,18 +310,18 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 			a.toolCallCount++
 			quiet := toolQuiet(tc.Name)
 			if !quiet {
-				fmt.Fprintf(a.output, "\n%s%s%s\n", ui.Blueberry, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(a.output, "\n%s%s%s\n", a.scheme.Primary, toolVerb(tc.Name), ui.Reset)
 				fmt.Fprintf(a.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
 			}
 			result := a.execTool(ctx, tc)
 			a.auditLog.Record(tc.Name, tc.Args, result)
 			isError := strings.HasPrefix(result, "error:")
 			if quiet && isError {
-				fmt.Fprintf(a.output, "\n%s%s%s\n", ui.Blueberry, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(a.output, "\n%s%s%s\n", a.scheme.Primary, toolVerb(tc.Name), ui.Reset)
 				fmt.Fprintf(a.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
 			}
 			if !quiet || isError {
-				fmt.Fprintln(a.output, formatToolResult(tc.Name, result))
+				fmt.Fprintln(a.output, a.formatToolResult(tc.Name, result))
 				if isError {
 					fmt.Fprintln(a.output)
 				}
@@ -338,25 +353,25 @@ func (a *Agent) Run(ctx context.Context, userInput string) error {
 	}
 
 	if !finishedNaturally {
-		fmt.Fprintf(a.output, "\n%s\n", ui.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
+		fmt.Fprintf(a.output, "\n%s\n", a.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
 	}
 
 	return nil
 }
 
-func formatToolResult(name string, result string) string {
+func (a *Agent) formatToolResult(name string, result string) string {
 	if strings.HasPrefix(result, "error:") {
-		return fmt.Sprintf("%s\n  %s%s%s", toolTag(name), ui.Red, result, ui.Reset)
+		return fmt.Sprintf("%s\n  %s%s%s", a.toolTag(name), a.scheme.Danger, result, ui.Reset)
 	}
-	return fmt.Sprintf("%s %s%s%s", toolTag(name), ui.Mauve, result, ui.Reset)
+	return fmt.Sprintf("%s %s%s%s", a.toolTag(name), a.scheme.Highlight, result, ui.Reset)
 }
 
-func toolTag(name string) string {
+func (a *Agent) toolTag(name string) string {
 	sym := "▪"
 	if s, ok := toolSymbols[name]; ok {
 		sym = s
 	}
-	return fmt.Sprintf("%s%s%s %s [Result]%s\n", ui.Bold, ui.LavenderIndigo, sym, name, ui.Reset)
+	return fmt.Sprintf("%s%s%s %s [Result]%s\n", ui.Bold, a.scheme.Secondary, sym, name, ui.Reset)
 }
 
 func wrapWithUlimit(cmd string, cpuSec, memMB, fileMB int) string {
@@ -535,7 +550,7 @@ func (a *Agent) writeFile(ctx context.Context, tc provider.ToolCall) string {
 	}
 	d := diff.Unified(oldContent, tc.Args["content"], rawPath)
 	if d != "" {
-		fmt.Fprint(a.output, ui.ColorDiff(d))
+		fmt.Fprint(a.output, a.scheme.ColorDiff(d))
 	}
 	return fmt.Sprintf("wrote %s", rawPath)
 }
@@ -562,7 +577,7 @@ func (a *Agent) replaceInFile(ctx context.Context, tc provider.ToolCall) string 
 	}
 	d := diff.Unified(oldContent, newContent, rawPath)
 	if d != "" {
-		fmt.Fprint(a.output, ui.ColorDiff(d))
+		fmt.Fprint(a.output, a.scheme.ColorDiff(d))
 	}
 	return fmt.Sprintf("updated %s", rawPath)
 }
@@ -737,7 +752,7 @@ func (a *Agent) exitPlanMode(ctx context.Context, tc provider.ToolCall) string {
 	if plan == "" {
 		return "error: plan argument required"
 	}
-	md := ui.NewMarkdownStream()
+	md := ui.NewMarkdownStream(a.scheme)
 	fmt.Fprintln(a.output)
 	fmt.Fprint(a.output, md.Write("## Proposed plan\n\n"+plan+"\n"))
 	fmt.Fprint(a.output, md.Flush())

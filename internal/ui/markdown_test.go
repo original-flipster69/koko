@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+func renderInline(s string) string { return NewMarkdownStream(DefaultScheme()).renderInline(s) }
+func renderLine(s string) string   { return NewMarkdownStream(DefaultScheme()).renderLine(s) }
+
 func stripANSI(s string) string {
 	var b strings.Builder
 	state := 0
@@ -161,7 +164,7 @@ func TestRenderLineBlockquote(t *testing.T) {
 }
 
 func TestStreamHorizontalRule(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	got := stripANSI(m.Write("---\n") + m.Flush())
 	if !strings.Contains(got, strings.Repeat("─", 40)) {
 		t.Errorf("expected horizontal rule, got %q", got)
@@ -169,7 +172,7 @@ func TestStreamHorizontalRule(t *testing.T) {
 }
 
 func TestStreamFencedCodeBlock(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	in := "```go\nfunc main() {}\n```\n"
 	got := stripANSI(m.Write(in) + m.Flush())
 	if !strings.Contains(got, "func main()") {
@@ -181,7 +184,7 @@ func TestStreamFencedCodeBlock(t *testing.T) {
 }
 
 func TestStreamSplitDeltas(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	out := ""
 	out += m.Write("Use `main")
 	out += m.Write(".go` here.\n")
@@ -232,7 +235,7 @@ func TestIsTableSeparator(t *testing.T) {
 }
 
 func TestStreamTable(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	in := "| Tool | Description |\n|------|-------------|\n| read | Read file |\n| write | Write file |\n\n"
 	got := stripANSI(m.Write(in) + m.Flush())
 	for _, want := range []string{"Tool", "Description", "read", "Read file", "write", "Write file", "┌", "├", "└"} {
@@ -246,7 +249,7 @@ func TestStreamTable(t *testing.T) {
 }
 
 func TestStreamTableCellWithBackticks(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	in := "| Tool | File |\n|------|------|\n| read | `main.go` |\n\n"
 	got := stripANSI(m.Write(in) + m.Flush())
 	if !strings.Contains(got, "main.go") {
@@ -258,7 +261,7 @@ func TestStreamTableCellWithBackticks(t *testing.T) {
 }
 
 func TestStreamPipeLineWithoutSeparatorTreatedAsPlain(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	in := "run: cat foo | grep bar\nnext line\n"
 	got := stripANSI(m.Write(in) + m.Flush())
 	if !strings.Contains(got, "cat foo | grep bar") {
@@ -270,7 +273,7 @@ func TestStreamPipeLineWithoutSeparatorTreatedAsPlain(t *testing.T) {
 }
 
 func TestStreamTableSplitAcrossDeltas(t *testing.T) {
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	out := ""
 	out += m.Write("| a | b |\n|---|")
 	out += m.Write("---|\n| 1 | 2 |\n\n")
@@ -315,7 +318,7 @@ func TestStreamTableWrapsLongCells(t *testing.T) {
 	SetTermWidth(80)
 	defer SetTermWidth(prev)
 
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	long := "github.com/original-flipster69/koko/internal/privacy"
 	in := "| Type | Path | Description |\n|------|------|-------------|\n| Internal | " + long + " | Privacy controls (e.g., data redaction, sanitization). |\n\n"
 	got := stripANSI(m.Write(in) + m.Flush())
@@ -336,14 +339,15 @@ func TestStreamTableWrapsLongCells(t *testing.T) {
 }
 
 func TestWrapTextPreservesStyleAcrossForceBreak(t *testing.T) {
-	in := PureOrange + "terminal" + Reset
+	code := fg(PureOrange)
+	in := code + "terminal" + Reset
 	got := wrapText(in, 7)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 lines, got %d: %v", len(got), got)
 	}
 	for i, line := range got {
-		if !strings.Contains(line, PureOrange) {
-			t.Errorf("line %d missing PureOrange opener: %q", i, line)
+		if !strings.Contains(line, code) {
+			t.Errorf("line %d missing color opener: %q", i, line)
 		}
 		if !strings.HasSuffix(line, Reset) {
 			t.Errorf("line %d missing trailing Reset: %q", i, line)
@@ -356,7 +360,7 @@ func TestStreamTableMarkersNotSplitByWrap(t *testing.T) {
 	SetTermWidth(60)
 	defer SetTermWidth(prev)
 
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	in := "| Pkg | Notes |\n|-----|-------|\n| `privacy` | Privacy controls (e.g., data redaction). |\n\n"
 	got := stripANSI(m.Write(in) + m.Flush())
 	if strings.Contains(got, "`privacy") || strings.Contains(got, "privacy`") {
@@ -372,7 +376,7 @@ func TestStreamTableUsesAvailableWidth(t *testing.T) {
 	SetTermWidth(200)
 	defer SetTermWidth(prev)
 
-	m := NewMarkdownStream()
+	m := NewMarkdownStream(DefaultScheme())
 	in := "| A | B | C |\n|---|---|---|\n| short | also short | medium length cell |\n\n"
 	got := stripANSI(m.Write(in) + m.Flush())
 	maxLine := 0
