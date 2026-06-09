@@ -36,10 +36,13 @@ const (
 	PureOrange     = 214
 )
 
+//FIXME potentially encapsulate the whole UI handling in a separate thing that then has the color scheme inside... but ok for now
+
 type Scheme struct {
 	Primary    string
 	Secondary  string
 	Highlight  string
+	Accent     string
 	Label      string
 	Value      string
 	Muted      string
@@ -59,6 +62,7 @@ func DefaultScheme() Scheme {
 		Primary:    fg(Blueberry),
 		Secondary:  fg(LavenderIndigo),
 		Highlight:  fg(Mauve),
+		Accent:     fg(DarkViolet),
 		Label:      fg(BrightLavender),
 		Value:      fg(White),
 		Muted:      fg(Gray),
@@ -77,7 +81,8 @@ func DefaultScheme() Scheme {
 func (s Scheme) With(overrides map[string]int) (Scheme, error) {
 	fgRoles := map[string]*string{
 		"primary": &s.Primary, "secondary": &s.Secondary, "highlight": &s.Highlight,
-		"label": &s.Label, "value": &s.Value, "muted": &s.Muted,
+		"accent": &s.Accent,
+		"label":  &s.Label, "value": &s.Value, "muted": &s.Muted,
 		"error": &s.Danger, "success": &s.Success, "code": &s.Code,
 		"diff_add_fg": &s.DiffAddFg, "diff_del_fg": &s.DiffDelFg, "diff_gutter": &s.DiffGutter,
 	}

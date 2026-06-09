@@ -41,15 +41,15 @@ var mascotFrame3 = []string{
 	`                    ████| |]`,
 }
 
-func Mascot() string {
-	return renderMascot(mascotFrame1)
+func (s Scheme) Mascot() string {
+	return s.renderMascot(mascotFrame1)
 }
 
-func MascotFrames() []string {
+func (s Scheme) MascotFrames() []string {
 	return []string{
-		renderMascot(mascotFrame1),
-		renderMascot(mascotFrame2),
-		renderMascot(mascotFrame3),
+		s.renderMascot(mascotFrame1),
+		s.renderMascot(mascotFrame2),
+		s.renderMascot(mascotFrame3),
 	}
 }
 
@@ -65,32 +65,32 @@ var mascotWidth = func() int {
 	return max
 }()
 
-func renderMascot(raw []string) string {
+func (s Scheme) renderMascot(raw []string) string {
 	var b strings.Builder
 	for _, line := range raw {
 		if pad := mascotWidth - len([]rune(line)); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(colorizeMascot(line))
+		b.WriteString(s.colorizeMascot(line))
 		b.WriteByte('\n')
 	}
 	return b.String()
 }
 
-func colorizeMascot(line string) string {
+func (s Scheme) colorizeMascot(line string) string {
 	var b strings.Builder
 	cur := ""
 	for _, c := range line {
 		var color string
 		switch c {
 		case '█', '╭', '∩', '╮', '❤':
-			color = fg(Mauve)
+			color = s.Highlight
 		case '▇':
-			color = fg(DarkViolet)
+			color = s.Accent
 		case ' ':
 			color = Reset
 		default:
-			color = fg(Blueberry)
+			color = s.Primary
 		}
 		if color != cur {
 			b.WriteString(color)
