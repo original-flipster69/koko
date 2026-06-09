@@ -53,9 +53,10 @@ type Usg struct {
 }
 
 type Response struct {
-	Content   string     `json:"content"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
-	Usage     Usg        `json:"usage"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	Usage      Usg        `json:"usage"`
+	StopReason string     `json:"stop_reason,omitempty"`
 }
 
 type StreamDelta struct {
@@ -69,6 +70,10 @@ type Provider interface {
 	Name() string
 	Model() string
 	SetModel(model string)
+}
+
+type TokenCounter interface {
+	CountTokens(ctx context.Context, msgs []Msg, tools []ToolDef) (int, error)
 }
 
 type ToolDef struct {
@@ -162,7 +167,7 @@ func New(cfg *config.LlmConfig) (Provider, error) {
 	case config.Claude:
 		return newClaude(cfg.ApiKey, cfg.Model, cfg.Url, cfg.MaxTokens)
 	case config.Mistral:
-		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url)
+		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url, cfg.Conversations)
 	case config.Ollama:
 		return newOllama(cfg.Model, cfg.Url)
 	default:

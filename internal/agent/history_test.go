@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -187,7 +188,7 @@ func TestTrimHistory_NoopUnderThreshold(t *testing.T) {
 		{Role: provider.Assistant, Content: "hello"},
 	}}
 	before := len(a.history)
-	a.trimHistory()
+	a.trimHistory(context.Background())
 	if len(a.history) != before {
 		t.Errorf("history mutated under threshold: %d → %d", before, len(a.history))
 	}
@@ -204,7 +205,7 @@ func TestTrimHistory_PreservesSystemAndEndsAtUser(t *testing.T) {
 		{Role: provider.User, Content: "third"},
 		{Role: provider.Assistant, Content: "done"},
 	}}
-	a.trimHistory()
+	a.trimHistory(context.Background())
 
 	if a.history[0].Role != provider.System || a.history[0].Content != "sys" {
 		t.Errorf("system prompt not preserved at index 0: %+v", a.history[0])

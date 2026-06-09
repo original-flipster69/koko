@@ -37,6 +37,10 @@ func newClaude(apiKey, model, baseURL string, maxTokens int) (*claude, error) {
 	}, nil
 }
 
+var ephemeral = map[string]string{"type": "ephemeral"}
+
+var _ TokenCounter = (*claude)(nil)
+
 func (a *claude) Name() string      { return "claude" }
 func (a *claude) Model() string     { return a.model }
 func (a *claude) SetModel(m string) { a.model = m }
@@ -82,9 +86,13 @@ func (a *claude) request(msgs []Msg, tools []ToolDef, stream bool) claudeReq {
 	reqBody := claudeReq{
 		Model:     a.model,
 		MaxTokens: a.maxTokens,
-		System:    system,
 		Msgs:      apiMessages,
 		Stream:    stream,
+	}
+	if system != "" {
+		reqBody.System = []map[string]interface{}{
+			{"type": "text", "text": system, "cache_control": ephemeral},
+		}
 	}
 	for _, t := range tools {
 		reqBody.Tools = append(reqBody.Tools, claudeTool{
@@ -93,14 +101,55 @@ func (a *claude) request(msgs []Msg, tools []ToolDef, stream bool) claudeReq {
 			InputSchema: t.Params,
 		})
 	}
+	markCacheBreakpoints(&reqBody)
 	return reqBody
 }
 
+func markCacheBreakpoints(reqBody *claudeReq) {
+	if n := len(reqBody.Tools); n > 0 {
+		reqBody.Tools[n-1].CacheControl = ephemeral
+	}
+	if n := len(reqBody.Msgs); n > 0 {
+		last := &reqBody.Msgs[n-1]
+		switch c := last.Content.(type) {
+		case string:
+			last.Content = []map[string]interface{}{
+				{"type": "text", "text": c, "cache_control": ephemeral},
+			}
+		case []map[string]interface{}:
+			if len(c) > 0 {
+				c[len(c)-1]["cache_control"] = ephemeral
+			}
+		}
+	}
+}
+
+func (a *claude) headers() map[string]string {
+	return map[string]string{
+		"x-api-key":         a.apiKey,
+		"anthropic-version": "2023-06-01",
+	}
+}
+
+func (a *claude) CountTokens(ctx context.Context, msgs []Msg, tools []ToolDef) (int, error) {
+	r := a.request(msgs, tools, false)
+	body := claudeCountReq{Model: r.Model, System: r.System, Msgs: r.Msgs, Tools: r.Tools}
+	resp, err := sendReq(ctx, a.client, a.baseURL+"/messages/count_tokens", body, a.headers())
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		InputTokens int `json:"input_tokens"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return 0, fmt.Errorf("parsing token count: %w", err)
+	}
+	return out.InputTokens, nil
+}
+
 func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
-	resp, err := sendReq(ctx, a.client, a.baseURL+"/msgs", a.request(msgs, tools, true), map[string]string{
-		"x-api-key":      a.apiKey,
-		"claude-version": "2023-06-01",
-	})
+	resp, err := sendReq(ctx, a.client, a.baseURL+"/messages", a.request(msgs, tools, true), a.headers())
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +180,12 @@ func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, on
 
 		switch event.Type {
 		case "message_start":
-			if event.Msg.Usage.Input > 0 {
-				result.Usage.InputTokens = event.Msg.Usage.Input
+			u := event.Msg.Usage
+			if in := u.Input + u.CacheCreation + u.CacheRead; in > 0 {
+				result.Usage.InputTokens = in
+			}
+			if u.CacheRead > 0 || u.CacheCreation > 0 {
+				slog.Debug("claude prompt cache", "read", u.CacheRead, "write", u.CacheCreation, "uncached", u.Input)
 			}
 		case "content_block_start":
 			if event.ContentBlock.Type == "tool_use" {
@@ -168,6 +221,9 @@ func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, on
 			if event.Usg.Output > 0 {
 				result.Usage.OutputTokens = event.Usg.Output
 			}
+			if event.Delta.StopReason != "" {
+				result.StopReason = event.Delta.StopReason
+			}
 		case "message_stop":
 			if onDelta != nil {
 				onDelta(StreamDelta{Done: true, Response: result})
@@ -188,6 +244,7 @@ type claudeStreamEvent struct {
 		Type        string `json:"type"`
 		Text        string `json:"text,omitempty"`
 		PartialJSON string `json:"partial_json,omitempty"`
+		StopReason  string `json:"stop_reason,omitempty"`
 	} `json:"delta,omitempty"`
 	Msg struct {
 		Usage claudeUsg `json:"usage"`
@@ -201,21 +258,31 @@ type claudeMsg struct {
 }
 
 type claudeTool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	InputSchema Schema `json:"input_schema"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	InputSchema  Schema            `json:"input_schema"`
+	CacheControl map[string]string `json:"cache_control,omitempty"`
 }
 
 type claudeReq struct {
 	Model     string       `json:"model"`
 	MaxTokens int          `json:"max_tokens"`
-	System    string       `json:"system,omitempty"`
+	System    interface{}  `json:"system,omitempty"`
 	Msgs      []claudeMsg  `json:"messages"`
 	Tools     []claudeTool `json:"tools,omitempty"`
 	Stream    bool         `json:"stream,omitempty"`
 }
 
+type claudeCountReq struct {
+	Model  string       `json:"model"`
+	System interface{}  `json:"system,omitempty"`
+	Msgs   []claudeMsg  `json:"messages"`
+	Tools  []claudeTool `json:"tools,omitempty"`
+}
+
 type claudeUsg struct {
-	Input  int `json:"input_tokens"`
-	Output int `json:"output"`
+	Input         int `json:"input_tokens"`
+	Output        int `json:"output_tokens"`
+	CacheCreation int `json:"cache_creation_input_tokens"`
+	CacheRead     int `json:"cache_read_input_tokens"`
 }

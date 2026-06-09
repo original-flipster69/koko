@@ -38,7 +38,7 @@ var goodbyeLines = []string{
 	"fold the tab. dim the light. go.",
 }
 
-func Goodbye() string {
+func Goodbye(s Scheme) string {
 	line := goodbyeLines[rand.Intn(len(goodbyeLines))]
-	return fmt.Sprintf("\n%s  ✦ %s %s\n", BrightLavender, line, Reset)
+	return fmt.Sprintf("\n%s  ✦ %s %s\n", s.Label, line, Reset)
 }
