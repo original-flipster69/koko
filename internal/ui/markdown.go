@@ -12,6 +12,7 @@ import (
 )
 
 type MarkdownStream struct {
+	scheme         Scheme
 	buf            strings.Builder
 	inFence        bool
 	fenceLang      string
@@ -22,8 +23,8 @@ type MarkdownStream struct {
 	tableRows      [][]string
 }
 
-func NewMarkdownStream() *MarkdownStream {
-	return &MarkdownStream{}
+func NewMarkdownStream(scheme Scheme) *MarkdownStream {
+	return &MarkdownStream{scheme: scheme}
 }
 
 func (m *MarkdownStream) Write(delta string) string {
@@ -49,7 +50,7 @@ func (m *MarkdownStream) Flush() string {
 	out += m.flushTable()
 	out += m.flushPendingTableHd()
 	if m.inFence && m.fenceBuf.Len() > 0 {
-		out += highlightCode(m.fenceLang, m.fenceBuf.String())
+		out += m.highlightCode(m.fenceLang, m.fenceBuf.String())
 		m.fenceBuf.Reset()
 	}
 	m.inFence = false
@@ -60,7 +61,7 @@ func (m *MarkdownStream) flushTable() string {
 	if !m.inTable {
 		return ""
 	}
-	out := renderTable(m.tableHeaders, m.tableRows)
+	out := m.renderTable(m.tableHeaders, m.tableRows)
 	m.inTable = false
 	m.tableHeaders = nil
 	m.tableRows = nil
@@ -73,7 +74,7 @@ func (m *MarkdownStream) flushPendingTableHd() string {
 	}
 	line := m.pendingTableHd
 	m.pendingTableHd = ""
-	return renderLine(line) + "\n"
+	return m.renderLine(line) + "\n"
 }
 
 func isFenceMarker(line string) bool {
@@ -150,7 +151,7 @@ func (m *MarkdownStream) renderBlock(block string) string {
 				m.fenceLang = fenceLanguage(trimmed)
 				m.fenceBuf.Reset()
 			} else {
-				out.WriteString(highlightCode(m.fenceLang, m.fenceBuf.String()))
+				out.WriteString(m.highlightCode(m.fenceLang, m.fenceBuf.String()))
 				m.fenceBuf.Reset()
 				m.inFence = false
 				m.fenceLang = ""
@@ -169,7 +170,7 @@ func (m *MarkdownStream) renderBlock(block string) string {
 		if isHorizontalRule(trimmed) {
 			out.WriteString(m.flushTable())
 			out.WriteString(m.flushPendingTableHd())
-			rule := Dim + Gray + strings.Repeat("─", 40) + Reset
+			rule := Dim + m.scheme.Muted + strings.Repeat("─", 40) + Reset
 			out.WriteString(rule)
 			if hasNL {
 				out.WriteString("\n")
@@ -192,7 +193,7 @@ func (m *MarkdownStream) renderBlock(block string) string {
 				m.pendingTableHd = ""
 				continue
 			}
-			out.WriteString(renderLine(m.pendingTableHd))
+			out.WriteString(m.renderLine(m.pendingTableHd))
 			out.WriteString("\n")
 			m.pendingTableHd = ""
 		}
@@ -202,7 +203,7 @@ func (m *MarkdownStream) renderBlock(block string) string {
 			continue
 		}
 
-		out.WriteString(renderLine(body))
+		out.WriteString(m.renderLine(body))
 		if hasNL {
 			out.WriteString("\n")
 		}
@@ -210,7 +211,7 @@ func (m *MarkdownStream) renderBlock(block string) string {
 	return out.String()
 }
 
-func highlightCode(lang, code string) string {
+func (m *MarkdownStream) highlightCode(lang, code string) string {
 	if strings.TrimSpace(code) == "" {
 		return ""
 	}
@@ -236,44 +237,44 @@ func highlightCode(lang, code string) string {
 
 	iterator, err := lexer.Tokenise(nil, code)
 	if err != nil {
-		return PureOrange + code + Reset
+		return m.scheme.Code + code + Reset
 	}
 
 	var buf strings.Builder
 	if err := formatter.Format(&buf, style, iterator); err != nil {
-		return PureOrange + code + Reset
+		return m.scheme.Code + code + Reset
 	}
 	return buf.String()
 }
 
-func renderLine(line string) string {
+func (m *MarkdownStream) renderLine(line string) string {
 	trimmed := strings.TrimLeft(line, " \t")
 	indent := line[:len(line)-len(trimmed)]
 
 	if h := headingLevel(trimmed); h > 0 {
 		text := strings.TrimSpace(trimmed[h:])
 		text = stripBoldMarkers(text)
-		color := Blueberry
+		color := m.scheme.Primary
 		if h >= 2 {
-			color = LavenderIndigo
+			color = m.scheme.Secondary
 		}
 		return fmt.Sprintf("%s%s%s%s%s", indent, Bold, color, text, Reset)
 	}
 
 	if after, ok := trimListMarker(trimmed); ok {
-		return fmt.Sprintf("%s%s•%s %s", indent, BrightLavender, Reset, renderInline(after))
+		return fmt.Sprintf("%s%s•%s %s", indent, m.scheme.Label, Reset, m.renderInline(after))
 	}
 
 	if after, ok := trimOrderedMarker(trimmed); ok {
-		return fmt.Sprintf("%s%s%s", indent, renderInline(after), Reset)
+		return fmt.Sprintf("%s%s%s", indent, m.renderInline(after), Reset)
 	}
 
 	if strings.HasPrefix(trimmed, "> ") {
 		inner := strings.TrimPrefix(trimmed, "> ")
-		return fmt.Sprintf("%s%s│%s %s", indent, Gray, Reset, renderInline(inner))
+		return fmt.Sprintf("%s%s│%s %s", indent, m.scheme.Muted, Reset, m.renderInline(inner))
 	}
 
-	return indent + renderInline(trimmed)
+	return indent + m.renderInline(trimmed)
 }
 
 func headingLevel(s string) int {
@@ -520,7 +521,7 @@ func wrapText(s string, width int) []string {
 	return lines
 }
 
-func renderTable(headers []string, rows [][]string) string {
+func (m *MarkdownStream) renderTable(headers []string, rows [][]string) string {
 	if len(headers) == 0 {
 		return ""
 	}
@@ -568,7 +569,7 @@ func renderTable(headers []string, rows [][]string) string {
 
 	border := func(left, mid, right string) string {
 		var b strings.Builder
-		b.WriteString(Gray + left)
+		b.WriteString(m.scheme.Muted + left)
 		for i, w := range colW {
 			b.WriteString(strings.Repeat("─", w+2))
 			if i < cols-1 {
@@ -586,9 +587,9 @@ func renderTable(headers []string, rows [][]string) string {
 			if i < len(row) {
 				raw = row[i]
 			}
-			rendered := renderInline(raw)
+			rendered := m.renderInline(raw)
 			if header {
-				rendered = Bold + Mauve + rendered + Reset
+				rendered = Bold + m.scheme.Highlight + rendered + Reset
 			}
 			wrapped[i] = wrapText(rendered, colW[i])
 		}
@@ -600,7 +601,7 @@ func renderTable(headers []string, rows [][]string) string {
 		}
 		var b strings.Builder
 		for line := 0; line < maxLines; line++ {
-			b.WriteString(Gray + "│" + Reset)
+			b.WriteString(m.scheme.Muted + "│" + Reset)
 			for i := 0; i < cols; i++ {
 				cell := ""
 				if line < len(wrapped[i]) {
@@ -614,7 +615,7 @@ func renderTable(headers []string, rows [][]string) string {
 				if pad > 0 {
 					b.WriteString(strings.Repeat(" ", pad))
 				}
-				b.WriteString(" " + Gray + "│" + Reset)
+				b.WriteString(" " + m.scheme.Muted + "│" + Reset)
 			}
 			b.WriteString("\n")
 		}
@@ -656,7 +657,7 @@ func normalizeCurlyApostrophe(s string) string {
 	return string(runes)
 }
 
-func renderInline(s string) string {
+func (m *MarkdownStream) renderInline(s string) string {
 	s = backtickLookalikes.Replace(s)
 	s = normalizeCurlyApostrophe(s)
 	var out strings.Builder
@@ -667,7 +668,7 @@ func renderInline(s string) string {
 		if c == '`' {
 			end := strings.IndexByte(s[i+1:], '`')
 			if end >= 0 {
-				out.WriteString(PureOrange)
+				out.WriteString(m.scheme.Code)
 				out.WriteString(s[i+1 : i+1+end])
 				out.WriteString(Reset)
 				i += end + 2
@@ -679,8 +680,8 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "**")
 			if end >= 0 {
 				out.WriteString(Bold)
-				out.WriteString(Mauve)
-				out.WriteString(renderInline(s[i+2 : i+2+end]))
+				out.WriteString(m.scheme.Highlight)
+				out.WriteString(m.renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
 				continue
@@ -691,7 +692,7 @@ func renderInline(s string) string {
 			end := strings.IndexByte(s[i+1:], '*')
 			if end > 0 && s[i+end] != ' ' {
 				out.WriteString(Italic)
-				out.WriteString(renderInline(s[i+1 : i+1+end]))
+				out.WriteString(m.renderInline(s[i+1 : i+1+end]))
 				out.WriteString(Reset)
 				i += end + 2
 				continue
@@ -702,8 +703,8 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "__")
 			if end >= 0 {
 				out.WriteString(Bold)
-				out.WriteString(Mauve)
-				out.WriteString(renderInline(s[i+2 : i+2+end]))
+				out.WriteString(m.scheme.Highlight)
+				out.WriteString(m.renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
 				continue
@@ -714,7 +715,7 @@ func renderInline(s string) string {
 			end := strings.IndexByte(s[i+1:], '_')
 			if end > 0 && s[i+end] != ' ' {
 				out.WriteString(Italic)
-				out.WriteString(renderInline(s[i+1 : i+1+end]))
+				out.WriteString(m.renderInline(s[i+1 : i+1+end]))
 				out.WriteString(Reset)
 				i += end + 2
 				continue
@@ -725,7 +726,7 @@ func renderInline(s string) string {
 			end := strings.Index(s[i+2:], "~~")
 			if end >= 0 {
 				out.WriteString(Strikethrough)
-				out.WriteString(renderInline(s[i+2 : i+2+end]))
+				out.WriteString(m.renderInline(s[i+2 : i+2+end]))
 				out.WriteString(Reset)
 				i += end + 4
 				continue
@@ -742,11 +743,11 @@ func renderInline(s string) string {
 						text := s[i+1 : i+1+closeBracket]
 						url := s[afterBracket+1 : afterBracket+1+closeParen]
 						out.WriteString(Underline)
-						out.WriteString(PureOrange)
+						out.WriteString(m.scheme.Code)
 						out.WriteString(text)
 						out.WriteString(Reset)
 						out.WriteString(Dim)
-						out.WriteString(Gray)
+						out.WriteString(m.scheme.Muted)
 						out.WriteString(" (")
 						out.WriteString(url)
 						out.WriteString(")")

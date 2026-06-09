@@ -38,6 +38,10 @@ The sandbox is the core security boundary. Every file operation is validated aga
   - `*.secret`, `*.password`
 - **File size limit** — reads/writes capped at a configurable maximum (default: 1 MB).
 
+### Elevated-Privilege Guard
+
+If koko is launched by a user with root privileges (effective UID 0), it prints a warning that running a non-deterministic agent with elevated privileges is strongly discouraged and requires explicit `y` confirmation before starting. Declining aborts the launch. The check is on by default; opt out by setting `suppress_elevated_warning = true` under `[sandbox]` in `~/.koko/config.toml`.
+
 ### Command Policy
 
 Shell commands run through `exec_command` are gated by a regex-based policy:
@@ -92,6 +96,8 @@ Two layers of automatic redaction:
 
 Redaction runs on the outbound message stream to the LLM (when `scrub_pii=true`, the default) and on session writes to disk. `write_file` and `replace_in_file` also run a secret scan on their new content.
 
+**Remote-provider warning** — when the active provider is anything other than Ollama (i.e. Claude or Mistral, which send data to a remote service), koko shows a privacy warning on startup noting that data may be retained by the provider and recommending Ollama for fully local inference. Ollama runs entirely locally and triggers no warning.
+
 ### Project Detection
 
 koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, etc.) and surfaces the result both in the splash banner and as part of the LLM system prompt for orientation.
@@ -110,9 +116,27 @@ Markdown files in `~/.koko/plays/` register as named playbooks. The play name is
 
 **Arguments** — text typed after the play name is passed in. If the play body contains a `{{args}}` placeholder, the argument is substituted in place; otherwise it is appended under a `User request:` heading. Example: `:review focus on auth` runs `review.md` with `focus on auth` as the argument.
 
+### Config Reload
+
+`:reload` re-reads configuration from its sources (config file, then environment, then the original launch flags — same precedence as startup) without leaving the session. Changes that can be applied live are applied immediately and reported under `applied`: the model (when the provider is unchanged), the thinking verbs, and the session token budget. Changes that require a fresh process — provider, API URL, sandbox root/dirs/limits, `scrub_pii`, exec profile, ignore mode — are detected and listed under `restart` rather than silently ignored. If the reloaded config is invalid, the current config is kept and the error is reported.
+
+### Caging the Agent
+
+`:cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]` generates a shell script that provisions a dedicated low-privilege user to run your coding CLI under, following the [caging-the-agent](https://originalflipster.com/playbooks/caging-the-agent/) playbook. It detects the OS and emits the matching variant (`dscl` on macOS, `useradd`/`groupadd` on Linux), creates a shared group and a `2770` workspace, and embeds a freshly generated random password. The script is written to your given path or `~/.koko/cage-<username>.sh` by default (mode `0700`). It's **never executed** until you run it `sudo sh <path>` yourself.
+
+Optional parameters (`key=value`, any order):
+
+- `dir=PATH` — where to write the script (default `~/.koko`; relative paths resolve against the sandbox root).
+- `group=NAME` — the shared group to create and add both users to (default `collabo`).
+- `os=darwin|linux` — override OS detection to generate a script for the other platform.
+
 ### Plan Mode
 
 Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.
+
+### Command Highlighting
+
+As you type, koko recognizes when the current line is a known command or installed play (e.g. `:help`, `:review`). When it matches, the input caret turns green and the recognized name is echoed beside the prompt — live feedback that the command will run before you press enter.
 
 ### Interactive REPL
 
@@ -130,7 +154,9 @@ Toggle with `:plan` to switch into a read-only investigation mode. Write tools a
 | `:config` | Display the active configuration |
 | `:save` | Save the current session to disk |
 | `:resume` | Restore a saved session |
+| `:reload` | Reload config from its sources without restarting |
 | `:plays` | List installed plays |
+| `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
 
@@ -200,6 +226,7 @@ additional_dirs = []
 deny_files = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "credentials.json", "*.secret", "*.password"]
 max_file_size = 1048576
 scrub_pii = true
+suppress_elevated_warning = false   # set true to skip the root/elevated-privilege startup check
 
 [sandbox.exec]
 profile = "default"
@@ -212,6 +239,16 @@ files = []
 
 [style]
 thinking_verbs = ["thinking", "pondering", "scheming"]
+
+# Optional color overrides, keyed by semantic role (not pigment). Each value is
+# an ANSI 256-color code (0-255); any role omitted keeps koko's default.
+[style.color_scheme]
+# Roles: primary (headings/prompt/spinner/diff-frame/mascot outline), secondary
+# (confirm/tool-tag/sub-headings), highlight (tool output + emphasis + mascot
+# highlights), accent (mascot body), label, value, muted, error, success, code,
+# diff_add_fg, diff_add_bg, diff_del_fg, diff_del_bg, diff_gutter, splash
+error = 160
+primary = 27
 ```
 
 API keys come from environment variables:
