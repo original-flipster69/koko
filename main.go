@@ -4,16 +4,19 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/audit"
+	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/memory"
@@ -68,6 +71,11 @@ func main() {
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(err.Error()))
+		os.Exit(1)
+	}
+
+	if !cfg.Sandbox.SuppressElevatedWarning && isElevated() && !confirmElevated(os.Stdin, os.Stdout) {
+		fmt.Println(scheme.Info("aborted", "not starting with elevated privileges"))
 		os.Exit(1)
 	}
 
@@ -163,12 +171,19 @@ func main() {
 	mascotFrames := ui.MascotFrames(scheme)
 	splashes := make([]string, len(mascotFrames))
 	for i, m := range mascotFrames {
-		splashes[i] = "\n" + scheme.Splashscreen(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
+		splash := "\n" + scheme.Splashscreen(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
+		if llm.Name() == "ollama" {
+			splash += ui.Dim + scheme.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		}
+		if warning := ui.PrivacyWarning(llm.Name()); warning != "" {
+			splash += warning + "\n\n"
+		}
+		splashes[i] = splash
 	}
 
 	cmdHandlers := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, scheme)
 
-	if err := terminal.Run(a, llm.Name(), kokoDir, splashes, cmdHandlers, scheme); err != nil {
+	if err := terminal.Run(a, kokoDir, splashes, cmdHandlers, scheme); err != nil {
 		fmt.Fprintln(os.Stderr, scheme.Error(err.Error()))
 		os.Exit(1)
 	}
@@ -230,6 +245,49 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		":compact": {desc: "compress history to free context", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			oldTokens, newTokens := a.Compact()
 			return true, "", scheme.Info("compact", fmt.Sprintf("~%d → ~%d tokens", oldTokens, newTokens))
+		}},
+		":cage": {desc: "generate a low-privilege user setup script", args: "<username> [dir=…] [group=…] [os=darwin|linux]", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
+			if len(parts) < 2 {
+				return true, "", scheme.Error("usage: :cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]")
+			}
+			opts := cage.Options{Username: parts[1], GOOS: runtime.GOOS}
+			outDir := dataDir
+			for _, tok := range parts[2:] {
+				k, v, ok := strings.Cut(tok, "=")
+				if !ok || v == "" {
+					return true, "", scheme.Error(fmt.Sprintf("invalid option %q (use key=value)", tok))
+				}
+				switch k {
+				case "dir":
+					outDir = v
+				case "group":
+					opts.Group = v
+				case "os":
+					opts.GOOS = v
+				default:
+					return true, "", scheme.Error(fmt.Sprintf("unknown option %q (allowed: dir, group, os)", k))
+				}
+			}
+			if !filepath.IsAbs(outDir) {
+				outDir = filepath.Join(sandboxRoot, outDir)
+			}
+			script, err := cage.Generate(opts)
+			if err != nil {
+				return true, "", scheme.Error(err.Error())
+			}
+			if err := os.MkdirAll(outDir, 0o700); err != nil {
+				return true, "", scheme.Error(fmt.Sprintf("cannot create output dir: %v", err))
+			}
+			dest := filepath.Join(outDir, script.Filename)
+			if err := os.WriteFile(dest, []byte(script.Body), 0o700); err != nil {
+				return true, "", scheme.Error(fmt.Sprintf("cannot write cage script: %v", err))
+			}
+			var b strings.Builder
+			b.WriteString(scheme.Info("cage", fmt.Sprintf("setup script for user %q (group %q, %s)", script.Username, script.Group, opts.GOOS)) + "\n")
+			b.WriteString(scheme.Info("path", dest) + "\n")
+			b.WriteString(scheme.Info("note", "a random password was generated inside — change it there before running") + "\n")
+			b.WriteString(scheme.Info("run", fmt.Sprintf("review it, then: sudo sh %s", dest)))
+			return true, "", b.String()
 		}},
 		":model": {desc: "show or switch model", args: "[name]", fn: func(_ string, parts []string, _ *agent.Agent) (bool, string, string) {
 			if len(parts) < 2 {
@@ -321,6 +379,19 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 		}
 		return true, "", scheme.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
+}
+
+func isElevated() bool {
+	return os.Geteuid() == 0
+}
+
+func confirmElevated(in io.Reader, out io.Writer) bool {
+	fmt.Fprintln(out, ui.DefaultScheme().Error("running with elevated privileges (root)"))
+	fmt.Fprintln(out, "  LLMs are non-deterministic; granting an agent root access is strongly discouraged.")
+	fmt.Fprintf(out, "  start koko anyway? [y/N] ")
+	answer, _ := bufio.NewReader(in).ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
 }
 
 func getKokoDir() string {

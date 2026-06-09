@@ -34,6 +34,10 @@ The sandbox is the core security boundary. Every file operation is validated aga
   - `*.secret`, `*.password`
 - **File size limit** — reads/writes capped at a configurable maximum (default: 1 MB).
 
+### Elevated-Privilege Guard
+
+If koko is launched by a user with root privileges (effective UID 0), it prints a warning that running a non-deterministic agent with elevated privileges is strongly discouraged and requires explicit `y` confirmation before starting. Declining aborts the launch. The check is on by default; opt out by setting `suppress_elevated_warning = true` under `[sandbox]` in `~/.koko/config.toml`.
+
 ### Command Policy
 
 Shell commands run through `exec_command` are gated by a regex-based policy:
@@ -88,6 +92,8 @@ Two layers of automatic redaction:
 
 Redaction runs on the outbound message stream to the LLM (when `scrub_pii=true`, the default) and on session writes to disk. `write_file` and `replace_in_file` also run a secret scan on their new content.
 
+**Remote-provider warning** — when the active provider is anything other than Ollama (i.e. Claude or Mistral, which send data to a remote service), koko shows a privacy warning on startup noting that data may be retained by the provider and recommending Ollama for fully local inference. Ollama runs entirely locally and triggers no warning.
+
 ### Project Detection
 
 koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, etc.) and surfaces the result both in the splash banner and as part of the LLM system prompt for orientation.
@@ -105,6 +111,16 @@ Persistent cross-session memories live at `~/.koko/memory/`. The agent can save 
 Markdown files in `~/.koko/plays/` register as named playbooks. The play name is the filename without `.md` — `review.md` is invoked as `:review`. `:plays` lists installed plays.
 
 **Arguments** — text typed after the play name is passed in. If the play body contains a `{{args}}` placeholder, the argument is substituted in place; otherwise it is appended under a `User request:` heading. Example: `:review focus on auth` runs `review.md` with `focus on auth` as the argument.
+
+### Caging the Agent
+
+`:cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]` generates a shell script that provisions a dedicated low-privilege user to run your coding CLI under, following the [caging-the-agent](https://originalflipster.com/playbooks/caging-the-agent/) playbook. It detects the OS and emits the matching variant (`dscl` on macOS, `useradd`/`groupadd` on Linux), creates a shared group and a `2770` workspace, and embeds a freshly generated random password. The script is written to your given path or `~/.koko/cage-<username>.sh` by default (mode `0700`). It's **never executed** until you run it `sudo sh <path>` yourself.
+
+Optional parameters (`key=value`, any order):
+
+- `dir=PATH` — where to write the script (default `~/.koko`; relative paths resolve against the sandbox root).
+- `group=NAME` — the shared group to create and add both users to (default `collabo`).
+- `os=darwin|linux` — override OS detection to generate a script for the other platform.
 
 ### Plan Mode
 
@@ -127,6 +143,7 @@ Toggle with `:plan` to switch into a read-only investigation mode. Write tools a
 | `:save` | Save the current session to disk |
 | `:resume` | Restore a saved session |
 | `:plays` | List installed plays |
+| `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
 
@@ -195,6 +212,7 @@ additional_dirs = []
 deny_files = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "credentials.json", "*.secret", "*.password"]
 max_file_size = 1048576
 scrub_pii = true
+suppress_elevated_warning = false   # set true to skip the root/elevated-privilege startup check
 
 [sandbox.exec]
 profile = "default"
