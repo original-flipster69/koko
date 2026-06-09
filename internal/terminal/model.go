@@ -42,14 +42,16 @@ type model struct {
 	input    textarea.Model
 	content  *strings.Builder
 
-	agent     *agent.Agent
-	ctx       context.Context
-	cancel    context.CancelFunc
-	runCancel context.CancelFunc
-	kokoDir   string
-	splashes  []string
-	splashIdx int
-	splashHit int
+	agent      *agent.Agent
+	ctx        context.Context
+	cancel     context.CancelFunc
+	runCancel  context.CancelFunc
+	kokoDir    string
+	splashes   []string
+	splashIdx  int
+	splashHit  int
+	termWidth  int
+	termHeight int
 
 	confirmCh    chan bool
 	confirmMode  bool
@@ -63,6 +65,7 @@ type model struct {
 	cmdHandler    CmdHandler
 	knownCommands map[string]bool
 	scheme        ui.Scheme
+	inputRows     int
 }
 
 type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
@@ -131,18 +134,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		chrome := 5
+		m.termWidth = msg.Width
+		m.termHeight = msg.Height
 		ui.SetTermWidth(msg.Width)
 		if !m.ready {
-			m.viewport = viewport.New(msg.Width, msg.Height-chrome)
-			m.syncViewport()
+			m.viewport = viewport.New(msg.Width, msg.Height-5)
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height - chrome
-			m.syncViewport()
 		}
 		m.input.SetWidth(msg.Width - 6)
+		m.resizeInput()
 		return m, nil
 
 	case tea.KeyMsg:
@@ -179,7 +181,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.input.Reset()
-			m.input.SetHeight(1)
+			m.resizeInput()
 
 			if input == "exit" || input == "quit" {
 				m.appendOutput("\n" + ui.Goodbye(m.scheme) + "\n")
@@ -273,17 +275,72 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
-		lines := strings.Count(m.input.Value(), "\n") + 1
-		if lines > 5 {
-			lines = 5
-		}
-		if lines < 1 {
-			lines = 1
-		}
-		m.input.SetHeight(lines)
+		m.resizeInput()
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+const maxInputLines = 8
+
+func (m *model) resizeInput() {
+	m.input.SetHeight(maxInputLines)
+	rows := contentRows(m.input.View())
+	if rows < 1 {
+		rows = 1
+	}
+	if rows > maxInputLines {
+		rows = maxInputLines
+	}
+	m.inputRows = rows
+	if m.termHeight > 0 {
+		h := m.termHeight - 4 - rows
+		if h < 1 {
+			h = 1
+		}
+		m.viewport.Height = h
+	}
+	m.syncViewport()
+}
+
+func cropLines(s string, n int) string {
+	if n < 1 {
+		n = 1
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) > n {
+		lines = lines[:n]
+	}
+	return strings.Join(lines, "\n")
+}
+
+func contentRows(view string) int {
+	n := 0
+	for i, line := range strings.Split(view, "\n") {
+		if strings.TrimSpace(stripANSI(line)) != "" {
+			n = i + 1
+		}
+	}
+	return n
+}
+
+func stripANSI(s string) string {
+	var b strings.Builder
+	inEsc := false
+	for _, r := range s {
+		if inEsc {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				inEsc = false
+			}
+			continue
+		}
+		if r == 0x1b {
+			inEsc = true
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func (m *model) appendOutput(s string) {
@@ -347,13 +404,15 @@ func (m model) View() string {
 		statusLine = fmt.Sprintf("  %s", m.spinnerView())
 	}
 
+	inputView := cropLines(m.input.View(), m.inputRows)
+
 	var inputLine string
 	if m.confirmMode {
-		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", m.scheme.Secondary, ui.Reset, m.confirmText, m.input.View())
+		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", m.scheme.Secondary, ui.Reset, m.confirmText, inputView)
 	} else if name, ok := m.recognizedCommand(); ok {
-		inputLine = fmt.Sprintf("%s%s▶ %s%s%s", ui.Bold, m.scheme.Label, name, ui.Reset, strings.Replace(m.input.View(), name, "", 1))
+		inputLine = fmt.Sprintf("%s%s▶ %s%s%s", ui.Bold, m.scheme.Label, name, ui.Reset, strings.Replace(inputView, name, "", 1))
 	} else {
-		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, m.input.View())
+		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, inputView)
 	}
 
 	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)
