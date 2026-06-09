@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/original-flipster69/koko/internal/agent"
+	"github.com/original-flipster69/koko/internal/ui"
 )
 
 func Run(
@@ -13,6 +14,7 @@ func Run(
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,
+	scheme ui.Scheme,
 ) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	confirmCh := make(chan bool, 1)
@@ -30,7 +32,7 @@ func Run(
 	})
 	a.SetSuppressSpinner(true)
 
-	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh)
+	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, scheme)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	w.program = p
