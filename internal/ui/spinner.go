@@ -10,12 +10,13 @@ type Spinner struct {
 	mu     sync.Mutex
 	active bool
 	label  string
+	scheme Scheme
 	stopCh chan struct{}
 	done   chan struct{}
 }
 
-func NewLabeledSpinner(label string) *Spinner {
-	return &Spinner{label: label}
+func NewLabeledSpinner(label string, scheme Scheme) *Spinner {
+	return &Spinner{label: label, scheme: scheme}
 }
 
 func (s *Spinner) Start() {
@@ -28,6 +29,7 @@ func (s *Spinner) Start() {
 	s.stopCh = make(chan struct{})
 	s.done = make(chan struct{})
 	label := s.label
+	scheme := s.scheme
 	s.mu.Unlock()
 
 	go func() {
@@ -64,8 +66,8 @@ func (s *Spinner) Start() {
 				}
 				dot := dots[cycle%len(dots)]
 				fmt.Printf("\r\033[K  %s%s%s%s\033[7G%s%s%s%s",
-					Bold, Primary, frame, Reset,
-					Muted, label, dot, Reset,
+					Bold, scheme.Primary, frame, Reset,
+					scheme.Muted, label, dot, Reset,
 				)
 				time.Sleep(beats[phase])
 				i++

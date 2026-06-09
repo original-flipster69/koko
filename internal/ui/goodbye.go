@@ -40,5 +40,5 @@ var goodbyeLines = []string{
 
 func Goodbye() string {
 	line := goodbyeLines[rand.Intn(len(goodbyeLines))]
-	return fmt.Sprintf("\n%s  ✦ %s %s\n", BrightLavender, line, Reset)
+	return fmt.Sprintf("\n%s  ✦ %s %s\n", fg(BrightLavender), line, Reset)
 }

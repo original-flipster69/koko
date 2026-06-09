@@ -62,11 +62,12 @@ type model struct {
 
 	cmdHandler    CmdHandler
 	knownCommands map[string]bool
+	scheme        ui.Scheme
 }
 
 type CmdHandler func(input string, a *agent.Agent) (handled bool, prompt string, output string)
 
-func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, knownCommands []string) model {
+func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, knownCommands []string, scheme ui.Scheme) model {
 	ta := textarea.New()
 	ta.Placeholder = "ask koko anything... (alt+enter or ctrl+j for newline)"
 	ta.Focus()
@@ -93,6 +94,7 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 		confirmCh:     confirmCh,
 		cmdHandler:    cmdHandler,
 		knownCommands: known,
+		scheme:        scheme,
 	}
 	return m
 }
@@ -151,7 +153,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.runCancel()
 				}
 				m.agentBusy = false
-				m.appendOutput(fmt.Sprintf("\n%s%sinterrupted%s\n", ui.Dim, ui.Muted, ui.Reset))
+				m.appendOutput(fmt.Sprintf("\n%s%sinterrupted%s\n", ui.Dim, m.scheme.Muted, ui.Reset))
 				return m, nil
 			}
 			m.quitting = true
@@ -253,9 +255,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case agentDoneMsg:
 		m.agentBusy = false
 		if msg.err != nil {
-			m.appendOutput("\n" + ui.Error(msg.err.Error()) + "\n")
+			m.appendOutput("\n" + m.scheme.Error(msg.err.Error()) + "\n")
 		} else {
-			m.appendOutput(ui.TokenStats(m.agent.TotalInput, m.agent.TotalOutput) + "\n")
+			m.appendOutput(m.scheme.TokenStats(m.agent.TotalInput, m.agent.TotalOutput) + "\n")
 		}
 		_ = m.agent.SaveSession(m.kokoDir)
 		return m, nil
@@ -316,7 +318,7 @@ func (m model) spinnerView() string {
 		frame = zodiac[cycle%len(zodiac)]
 	}
 	dot := dots[cycle%len(dots)]
-	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, ui.Primary, frame, ui.Reset, ui.Primary, m.spinnerLabel, dot, ui.Reset)
+	return fmt.Sprintf("%s%s%-2s%s %s%s%s%s", ui.Bold, m.scheme.Primary, frame, ui.Reset, m.scheme.Primary, m.spinnerLabel, dot, ui.Reset)
 }
 
 var inputBarStyle = lipgloss.NewStyle().
@@ -347,11 +349,11 @@ func (m model) View() string {
 
 	var inputLine string
 	if m.confirmMode {
-		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", ui.Secondary, ui.Reset, m.confirmText, m.input.View())
+		inputLine = fmt.Sprintf("  %srun:%s %s  [y/N] %s", m.scheme.Secondary, ui.Reset, m.confirmText, m.input.View())
 	} else if name, ok := m.recognizedCommand(); ok {
-		inputLine = fmt.Sprintf("%s%s▶%s %s   %s%s%s%s", ui.Bold, ui.Success, ui.Reset, m.input.View(), ui.Dim, ui.Success, name, ui.Reset)
+		inputLine = fmt.Sprintf("%s%s▶%s %s   %s%s%s%s", ui.Bold, m.scheme.Success, ui.Reset, m.input.View(), ui.Dim, m.scheme.Success, name, ui.Reset)
 	} else {
-		inputLine = fmt.Sprintf("%s▶%s %s", ui.Primary, ui.Reset, m.input.View())
+		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, m.input.View())
 	}
 
 	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)
