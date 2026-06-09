@@ -15,6 +15,7 @@ func Run(
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,
+	scheme ui.Scheme,
 ) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	confirmCh := make(chan bool, 1)
@@ -33,13 +34,13 @@ func Run(
 	a.SetSuppressSpinner(true)
 
 	if providerName == "ollama" {
-		suffix := ui.Dim + ui.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		suffix := ui.Dim + scheme.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
 		for i := range splashes {
 			splashes[i] += suffix
 		}
 	}
 
-	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh)
+	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, scheme)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	w.program = p

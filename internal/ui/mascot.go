@@ -84,13 +84,13 @@ func colorizeMascot(line string) string {
 		var color string
 		switch c {
 		case '█', '╭', '∩', '╮', '❤':
-			color = Mauve
+			color = fg(Mauve)
 		case '▇':
-			color = DarkViolet
+			color = fg(DarkViolet)
 		case ' ':
 			color = Reset
 		default:
-			color = Blueberry
+			color = fg(Blueberry)
 		}
 		if color != cur {
 			b.WriteString(color)

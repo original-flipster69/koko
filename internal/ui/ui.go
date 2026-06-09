@@ -21,126 +21,125 @@ func fg(code int) string { return fmt.Sprintf("\033[38;5;%dm", code) }
 func bg(code int) string { return fmt.Sprintf("\033[48;5;%dm", code) }
 
 const (
-	LavenderIndigo = "\033[38;5;135m"
-	Mauve          = "\033[38;5;183m"
-	Blueberry      = "\033[38;5;99m"
-	MediumPurple   = "\033[38;5;98m"
-	BrightLavender = "\033[38;5;141m"
-	DarkViolet     = "\033[38;5;55m"
-	PureViolet     = "\033[38;5;93m"
-	ElectricPurple = "\033[38;5;129m"
-	Gray           = "\033[38;5;243m"
-	White          = "\033[38;5;255m"
-	Red            = "\033[38;5;197m"
-	Green          = "\033[38;5;114m"
-	PureOrange     = "\033[38;5;214m"
+	LavenderIndigo = 135
+	Mauve          = 183
+	Blueberry      = 99
+	MediumPurple   = 98
+	BrightLavender = 141
+	DarkViolet     = 55
+	PureViolet     = 93
+	ElectricPurple = 129
+	Gray           = 243
+	White          = 255
+	Red            = 197
+	Green          = 114
+	PureOrange     = 214
 )
 
-var (
-	Primary   = Blueberry
-	Secondary = LavenderIndigo
-	Highlight = Mauve
-	Label     = BrightLavender
-	Value     = White
-	Muted     = Gray
-	Danger    = Red
-	Success   = Green
-	Code      = PureOrange
-
-	DiffAddFg  = "\033[38;5;156m"
-	DiffAddBg  = "\033[48;5;22m"
-	DiffDelFg  = "\033[38;5;210m"
-	DiffDelBg  = "\033[48;5;52m"
-	DiffGutter = "\033[38;5;240m"
-)
-
-var splashColorCode = 99
-
-var (
-	splashFrame   lipgloss.Style
-	splashTitle   lipgloss.Style
-	splashTagline = lipgloss.NewStyle().Italic(true)
-)
-
-func init() { rebuildSplashStyles() }
-
-func rebuildSplashStyles() {
-	col := lipgloss.Color(strconv.Itoa(splashColorCode))
-	splashFrame = lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
-		BorderForeground(col).
-		Padding(0, 1)
-	splashTitle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(col)
+type Scheme struct {
+	Primary    string
+	Secondary  string
+	Highlight  string
+	Label      string
+	Value      string
+	Muted      string
+	Danger     string
+	Success    string
+	Code       string
+	DiffAddFg  string
+	DiffAddBg  string
+	DiffDelFg  string
+	DiffDelBg  string
+	DiffGutter string
+	Splash     int
 }
 
-func ApplyColors(overrides map[string]int) error {
-	setters := map[string]func(int){
-		"primary":     func(c int) { Primary = fg(c) },
-		"secondary":   func(c int) { Secondary = fg(c) },
-		"highlight":   func(c int) { Highlight = fg(c) },
-		"label":       func(c int) { Label = fg(c) },
-		"value":       func(c int) { Value = fg(c) },
-		"muted":       func(c int) { Muted = fg(c) },
-		"error":       func(c int) { Danger = fg(c) },
-		"success":     func(c int) { Success = fg(c) },
-		"code":        func(c int) { Code = fg(c) },
-		"diff_add_fg": func(c int) { DiffAddFg = fg(c) },
-		"diff_add_bg": func(c int) { DiffAddBg = bg(c) },
-		"diff_del_fg": func(c int) { DiffDelFg = fg(c) },
-		"diff_del_bg": func(c int) { DiffDelBg = bg(c) },
-		"diff_gutter": func(c int) { DiffGutter = fg(c) },
-		"splash":      func(c int) { splashColorCode = c },
+func DefaultScheme() Scheme {
+	return Scheme{
+		Primary:    fg(Blueberry),
+		Secondary:  fg(LavenderIndigo),
+		Highlight:  fg(Mauve),
+		Label:      fg(BrightLavender),
+		Value:      fg(White),
+		Muted:      fg(Gray),
+		Danger:     fg(Red),
+		Success:    fg(Green),
+		Code:       fg(PureOrange),
+		DiffAddFg:  fg(156),
+		DiffAddBg:  bg(22),
+		DiffDelFg:  fg(210),
+		DiffDelBg:  bg(52),
+		DiffGutter: fg(240),
+		Splash:     Blueberry,
+	}
+}
+
+func (s Scheme) With(overrides map[string]int) (Scheme, error) {
+	fgRoles := map[string]*string{
+		"primary": &s.Primary, "secondary": &s.Secondary, "highlight": &s.Highlight,
+		"label": &s.Label, "value": &s.Value, "muted": &s.Muted,
+		"error": &s.Danger, "success": &s.Success, "code": &s.Code,
+		"diff_add_fg": &s.DiffAddFg, "diff_del_fg": &s.DiffDelFg, "diff_gutter": &s.DiffGutter,
+	}
+	bgRoles := map[string]*string{
+		"diff_add_bg": &s.DiffAddBg, "diff_del_bg": &s.DiffDelBg,
 	}
 	for key, code := range overrides {
-		set, ok := setters[key]
-		if !ok {
-			return fmt.Errorf("unknown style color %q", key)
-		}
 		if code < 0 || code > 255 {
-			return fmt.Errorf("style color %q out of range (want 0-255, got %d)", key, code)
+			return s, fmt.Errorf("style color %q out of range (want 0-255, got %d)", key, code)
 		}
-		set(code)
+		switch {
+		case key == "splash":
+			s.Splash = code
+		case fgRoles[key] != nil:
+			*fgRoles[key] = fg(code)
+		case bgRoles[key] != nil:
+			*bgRoles[key] = bg(code)
+		default:
+			return s, fmt.Errorf("unknown style color %q", key)
+		}
 	}
-	rebuildSplashStyles()
-	return nil
+	return s, nil
 }
 
-func Splash(mascot, provider, model, sandbox, version string, detected []string) string {
-	left := strings.TrimRight(mascot, "\n")
+func (s Scheme) Splashscreen(mascot, provider, model, sandbox, version string, detected []string) string {
+	col := lipgloss.Color(strconv.Itoa(s.Splash))
+	frame := lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(col).Padding(0, 1)
+	title := lipgloss.NewStyle().Bold(true).Foreground(col)
+	tagline := lipgloss.NewStyle().Italic(true)
 
+	left := strings.TrimRight(mascot, "\n")
 	rightLines := []string{
 		"",
-		splashTitle.Render(" k o k o "),
-		splashTagline.Render("  secure coding assistant"),
+		title.Render(" k o k o "),
+		tagline.Render("  secure coding assistant"),
 		"",
-		Info("version ", version),
-		Info("provider", provider),
-		Info("model   ", model),
-		Info("sandbox ", sandbox),
+		s.Info("version ", version),
+		s.Info("provider", provider),
+		s.Info("model   ", model),
+		s.Info("sandbox ", sandbox),
 	}
 	if len(detected) > 0 {
-		rightLines = append(rightLines, Info("stack", strings.Join(detected, ", ")))
+		rightLines = append(rightLines, s.Info("stack", strings.Join(detected, ", ")))
 	}
 
 	body := lipgloss.JoinHorizontal(lipgloss.Center, left, "    ", strings.Join(rightLines, "\n"))
-	return splashFrame.Render(body) + "\n"
+	return frame.Render(body) + "\n"
 }
 
-func Info(label string, value string) string {
-	return fmt.Sprintf("  %s%-9s%s %s%s%s", Bold+Label, label, Reset, Value, value, Reset)
+func (s Scheme) Info(label string, value string) string {
+	return fmt.Sprintf("  %s%-9s%s %s%s%s", Bold+s.Label, label, Reset, s.Value, value, Reset)
 }
 
-func Error(text string) string {
-	return fmt.Sprintf("%s%serror:%s %s", Bold, Danger, Reset, text)
+func (s Scheme) Error(text string) string {
+	return fmt.Sprintf("%s%serror:%s %s", Bold, s.Danger, Reset, text)
 }
 
-func TokenStats(input, output int) string {
-	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, Muted, input, output, Reset)
+func (s Scheme) TokenStats(input, output int) string {
+	return fmt.Sprintf("  %s%stokens: %d in / %d out%s", Dim, s.Muted, input, output, Reset)
 }
 
-func ColorDiff(diffText string) string {
+func (s Scheme) ColorDiff(diffText string) string {
 	if diffText == "" {
 		return ""
 	}
@@ -159,14 +158,14 @@ func ColorDiff(diffText string) string {
 				path = p
 			}
 			if !headerPrinted {
-				out.WriteString(fmt.Sprintf("  %s%s╭─ %s%s\n", Bold, Primary, path, Reset))
+				out.WriteString(fmt.Sprintf("  %s%s╭─ %s%s\n", Bold, s.Primary, path, Reset))
 				headerPrinted = true
 			}
 			continue
 		case strings.HasPrefix(line, "@@"):
 			var oc, nc int
 			fmt.Sscanf(line, "@@ -%d,%d +%d,%d @@", &oldLine, &oc, &newLine, &nc)
-			out.WriteString(fmt.Sprintf("  %s│ %s%s%s\n", Primary, Dim+Muted, line, Reset))
+			out.WriteString(fmt.Sprintf("  %s│ %s%s%s\n", s.Primary, Dim+s.Muted, line, Reset))
 			continue
 		case line == "":
 			continue
@@ -183,30 +182,30 @@ func ColorDiff(diffText string) string {
 		switch sign {
 		case "-":
 			gutter = fmt.Sprintf("%4d     ", oldLine)
-			bg, fg, prefix = DiffDelBg, DiffDelFg, " - "
+			bg, fg, prefix = s.DiffDelBg, s.DiffDelFg, " - "
 			oldLine++
 		case "+":
 			gutter = fmt.Sprintf("     %4d", newLine)
-			bg, fg, prefix = DiffAddBg, DiffAddFg, " + "
+			bg, fg, prefix = s.DiffAddBg, s.DiffAddFg, " + "
 			newLine++
 		default:
 			gutter = fmt.Sprintf("%4d %4d", oldLine, newLine)
-			bg, fg, prefix = "", Muted, "   "
+			bg, fg, prefix = "", s.Muted, "   "
 			oldLine++
 			newLine++
 		}
 
 		if bg != "" {
 			out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s%s\n",
-				Primary, DiffGutter, gutter, bg, fg, prefix, content, Reset))
+				s.Primary, s.DiffGutter, gutter, bg, fg, prefix, content, Reset))
 		} else {
 			out.WriteString(fmt.Sprintf("  %s│ %s%s %s%s%s%s\n",
-				Primary, DiffGutter, gutter, fg, prefix, content, Reset))
+				s.Primary, s.DiffGutter, gutter, fg, prefix, content, Reset))
 		}
 	}
 
 	if headerPrinted {
-		out.WriteString(fmt.Sprintf("  %s╰─%s\n", Primary, Reset))
+		out.WriteString(fmt.Sprintf("  %s╰─%s\n", s.Primary, Reset))
 	}
 	return out.String()
 }
