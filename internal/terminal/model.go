@@ -182,7 +182,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.input.SetHeight(1)
 
 			if input == "exit" || input == "quit" {
-				m.appendOutput("\n" + m.scheme.Goodbye() + "\n")
+				m.appendOutput("\n" + ui.Goodbye(m.scheme) + "\n")
 				m.quitting = true
 				m.cancel()
 				return m, tea.Quit

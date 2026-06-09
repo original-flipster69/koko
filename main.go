@@ -160,7 +160,7 @@ func main() {
 		ExecMaxFileMB:    fileMB,
 	})
 
-	mascotFrames := scheme.MascotFrames()
+	mascotFrames := ui.MascotFrames(scheme)
 	splashes := make([]string, len(mascotFrames))
 	for i, m := range mascotFrames {
 		splashes[i] = "\n" + scheme.Splashscreen(m, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, version, stack.Detected) + "\n\n"
@@ -175,7 +175,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, scheme.Error(err.Error()))
 		os.Exit(1)
 	}
-	fmt.Println(scheme.Goodbye())
+	fmt.Println(ui.Goodbye(scheme))
 }
 
 type command struct {
@@ -188,7 +188,7 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 	var commands map[string]command
 	commands = map[string]command{
 		":koko": {desc: "print the koko mascot", fn: func(string, []string, *agent.Agent) (bool, string, string) {
-			return true, "", "\n" + scheme.Mascot()
+			return true, "", "\n" + ui.Mascot(scheme)
 		}},
 		":clear": {desc: "reset conversation history", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			a.ClearHistory()

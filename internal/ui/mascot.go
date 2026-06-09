@@ -41,15 +41,15 @@ var mascotFrame3 = []string{
 	`                    ████| |]`,
 }
 
-func (s Scheme) Mascot() string {
-	return s.renderMascot(mascotFrame1)
+func Mascot(s Scheme) string {
+	return renderMascot(s, mascotFrame1)
 }
 
-func (s Scheme) MascotFrames() []string {
+func MascotFrames(s Scheme) []string {
 	return []string{
-		s.renderMascot(mascotFrame1),
-		s.renderMascot(mascotFrame2),
-		s.renderMascot(mascotFrame3),
+		renderMascot(s, mascotFrame1),
+		renderMascot(s, mascotFrame2),
+		renderMascot(s, mascotFrame3),
 	}
 }
 
@@ -65,7 +65,7 @@ var mascotWidth = func() int {
 	return max
 }()
 
-func (s Scheme) renderMascot(raw []string) string {
+func renderMascot(s Scheme, raw []string) string {
 	var b strings.Builder
 	for _, line := range raw {
 		if pad := mascotWidth - len([]rune(line)); pad > 0 {
