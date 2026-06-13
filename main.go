@@ -168,6 +168,11 @@ func main() {
 		ExecMaxFileMB:    fileMB,
 	})
 
+	projectConfigNote := ""
+	if p := config.ProjectConfigPath(cfg.Sandbox.Root); fileExists(p) {
+		projectConfigNote = ui.Dim + scheme.Muted + "  note: project config applied from " + p + ui.Reset + "\n\n"
+	}
+
 	mascotFrames := ui.MascotFrames(scheme)
 	splashes := make([]string, len(mascotFrames))
 	for i, m := range mascotFrames {
@@ -178,6 +183,7 @@ func main() {
 		if warning := ui.PrivacyWarning(llm.Name()); !cfg.Sandbox.SuppressPrivacyWarning && warning != "" {
 			splash += warning + "\n\n"
 		}
+		splash += projectConfigNote
 		splashes[i] = splash
 	}
 
@@ -421,6 +427,13 @@ func loadConfig(src reloadSources) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	root := src.sandbox
+	if root == "" {
+		root = cfg.Sandbox.Root
+	}
+	if _, err := cfg.ApplyProjectConfig(root); err != nil {
+		return nil, err
+	}
 	cfg.ApplyFlags(src.provider, src.model, src.llmURL, src.sandbox)
 	cfg.ApplyEnv()
 	if err := cfg.Validate(); err != nil {
@@ -501,6 +514,11 @@ func confirmElevated(in io.Reader, out io.Writer) bool {
 	answer, _ := bufio.NewReader(in).ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 	return answer == "y" || answer == "yes"
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func getKokoDir() string {

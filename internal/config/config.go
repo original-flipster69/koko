@@ -130,6 +130,50 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
+const ProjectConfigDir = ".koko"
+
+func ProjectConfigPath(sandboxRoot string) string {
+	return filepath.Join(sandboxRoot, ProjectConfigDir, "config.toml")
+}
+
+func (c *Config) ApplyProjectConfig(sandboxRoot string) ([]string, error) {
+	if sandboxRoot == "" {
+		return nil, nil
+	}
+	path := ProjectConfigPath(sandboxRoot)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading project config: %w", err)
+	}
+
+	var proj Config
+	md, err := toml.DecodeFile(path, &proj)
+	if err != nil {
+		return nil, fmt.Errorf("parsing project config: %w", err)
+	}
+
+	var applied []string
+	if md.IsDefined("llm", "model") {
+		c.Llm.Model = proj.Llm.Model
+		applied = append(applied, "llm.model")
+	}
+	if md.IsDefined("llm", "max_tokens") {
+		c.Llm.MaxTokens = proj.Llm.MaxTokens
+		applied = append(applied, "llm.max_tokens")
+	}
+	if md.IsDefined("style", "thinking_verbs") {
+		c.Style.ThinkingVerbs = proj.Style.ThinkingVerbs
+		applied = append(applied, "style.thinking_verbs")
+	}
+	if md.IsDefined("style", "color_scheme") {
+		c.Style.ColorScheme = proj.Style.ColorScheme
+		applied = append(applied, "style.color_scheme")
+	}
+	return applied, nil
+}
+
 func (c *Config) ApplyFlags(provider, model, llmUrl, sandbox string) {
 	if provider != "" {
 		c.Llm.Provider = Provider(provider)

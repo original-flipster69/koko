@@ -20,6 +20,8 @@ koko supports three LLM backends:
 
 Switch the active model at runtime with `:model <name>` or set defaults in `~/.koko/config.toml`.
 
+**Layered config.** `~/.koko/config.toml` is the base. A project-local `.koko/config.toml` in the sandbox root then overrides individual values on top of it — but, since that file may come from an untrusted repo, only a **safe subset** is honored: `llm.model`, `llm.max_tokens`, `style.thinking_verbs`, and `style.color_scheme`. Security-sensitive keys (sandbox root/dirs/deny patterns, `scrub_pii`, exec profile, provider, `llm.url`, API keys) are **ignored** from the project layer, so a cloned repo can't widen its own sandbox or redirect traffic. Precedence is defaults < home < project < environment < CLI flags. When a project config is applied, koko notes it on startup.
+
 **Always-on efficiency:** Claude requests carry `cache_control` breakpoints on the tools, system prompt, and growing conversation prefix, so the cached prefix costs ~10% of normal input tokens and skips recompute (5-minute auto-refreshing TTL). Mistral requests carry a per-session `prompt_cache_key`, letting Mistral reuse the shared prefix across turns at ~10% of the input-token price — same benefit, no server-side transcript storage. Ollama requests keep the model resident for 30 minutes so its KV prefix cache survives between turns. Output-token accounting is corrected for Claude, and a `truncated` hint is shown when a response stops at the max-token limit.
 
 ### Sandbox
