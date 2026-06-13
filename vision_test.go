@@ -27,6 +27,8 @@ func TestVisibleFiles(t *testing.T) {
 	mkfile("secret.key")       // denied (*.key)
 	mkfile("build/output.bin") // ignored dir
 	mkfile("notes.log")        // ignored pattern
+	mkfile(".git/config")      // skipped noise dir
+	mkfile("node_modules/lib/index.js")
 
 	deny := []string{".env", ".env.*", "*.key"}
 	sb, err := sandbox.New(root, []string{root}, deny, 1<<20)
@@ -43,11 +45,11 @@ func TestVisibleFiles(t *testing.T) {
 		t.Error("unexpected cap")
 	}
 	got := strings.Join(files, ",")
-	want := "main.go,src/app.go"
+	want := "main.go,node_modules/lib/index.js,src/app.go"
 	if got != want {
 		t.Errorf("visible files = %q, want %q", got, want)
 	}
-	for _, hidden := range []string{".env", "secret.key", "build/output.bin", "notes.log"} {
+	for _, hidden := range []string{".env", "secret.key", "build/output.bin", "notes.log", ".git/config"} {
 		for _, f := range files {
 			if f == hidden {
 				t.Errorf("%q should not be visible", hidden)

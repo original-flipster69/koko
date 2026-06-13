@@ -559,10 +559,13 @@ func visibleFiles(sb *sandbox.Sandbox, ig *ignore.Matcher) ([]string, bool, erro
 			}
 			return nil
 		}
-		if info.IsDir() {
+		if _, err := sb.ValidatePath(path); err != nil {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		if _, err := sb.ValidatePath(path); err != nil {
+		if info.IsDir() {
 			return nil
 		}
 		if len(out) >= visionMaxFiles {

@@ -31,6 +31,7 @@ The sandbox is the core security boundary. Every file operation is validated aga
 - **Directory allowlist** — the agent can only read, write, or list inside explicitly allowed directories. Default is the current working directory; additional dirs can be configured.
 - **Symlink-safe path resolution** — paths are canonicalized through symlinks before validation. Final-component opens use `O_NOFOLLOW` to prevent TOCTOU swaps.
 - **Typed validation token** — paths must pass `ValidatePath` (which returns a typed `ValidPath`) before reaching any I/O method. The compiler enforces "no raw paths in editor."
+- **`.git` always denied** — any path inside a `.git` directory is unconditionally blocked, regardless of config. Without this, a denied file's contents could still be reconstructed from committed git blobs in `.git/objects`, defeating the deny patterns.
 - **Denied file patterns** — sensitive files are blocked by glob regardless of directory. Defaults:
   - `.env`, `.env.*`
   - `*.pem`, `*.key`, `id_rsa*`
@@ -104,7 +105,7 @@ koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.t
 
 ### Vision Sanity Check
 
-`:vision` is a local, non-LLM command that walks the sandbox and lists every file the agent can actually see after applying the **deny** patterns and the **ignore** rules — the same filters the file tools use. It's a quick way to confirm sensitive files are excluded and to see exactly what's exposed before letting the agent loose.
+`:vision` is a local, non-LLM command that walks the sandbox and lists every file the agent can actually see after applying the **deny** patterns and the **ignore** rules — the same `ValidatePath` + ignore filters the file tools use, so the listing is exactly what the agent can reach. `.git` is absent because it is always denied at the sandbox layer (see above), not because `:vision` special-cases it. It's a quick way to confirm sensitive files are excluded and to see exactly what's exposed before letting the agent loose.
 
 ### Audit Logging
 
