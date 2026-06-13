@@ -41,7 +41,6 @@ type LlmConfig struct {
 	Url              string   `toml:"url"`
 	MaxTokens        int      `toml:"max_tokens"`
 	MaxSessionTokens int      `toml:"max_session_tokens"`
-	Conversations    bool     `toml:"conversations"`
 }
 
 type SandboxConfig struct {
@@ -90,7 +89,6 @@ func defaultConf() *Config {
 			Url:              "",
 			MaxTokens:        16384,
 			MaxSessionTokens: 1_000_000,
-			Conversations:    true,
 		},
 		Sandbox: SandboxConfig{
 			Root: cwd,

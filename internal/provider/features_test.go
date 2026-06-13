@@ -40,71 +40,25 @@ func TestClaudeCacheBreakpoints(t *testing.T) {
 	}
 }
 
-func TestHasMsgPrefix(t *testing.T) {
-	full := []Msg{{Role: User, Content: "a"}, {Role: Assistant, Content: "b"}, {Role: User, Content: "c"}}
-	if !hasMsgPrefix(full, full[:2]) {
-		t.Error("expected prefix match")
-	}
-	if hasMsgPrefix(full[:2], full) {
-		t.Error("longer prefix than full must not match")
-	}
-	if hasMsgPrefix(full, []Msg{{Role: User, Content: "x"}}) {
-		t.Error("differing content must not match")
-	}
-}
-
-func TestAssistantPlaceholder(t *testing.T) {
-	if got := assistantPlaceholder(&Response{Content: "hi"}); got != "hi" {
-		t.Errorf("text response: got %q", got)
-	}
-	got := assistantPlaceholder(&Response{ToolCalls: []ToolCall{{Name: "read_file"}, {Name: "list_dir"}}})
-	if got != "[calling tools: read_file, list_dir]" {
-		t.Errorf("tool placeholder: got %q", got)
-	}
-}
-
-func TestConvRespToResponse(t *testing.T) {
-	raw := `{
-		"conversation_id": "c1",
-		"outputs": [
-			{"type": "message.output", "role": "assistant", "content": "hello"},
-			{"type": "function.call", "name": "read_file", "arguments": "{\"path\": \"main.go\"}"}
-		],
-		"usage": {"prompt_tokens": 12, "completion_tokens": 7}
-	}`
-	var cr convResp
-	if err := json.Unmarshal([]byte(raw), &cr); err != nil {
-		t.Fatal(err)
-	}
-	resp := cr.toResponse()
-	if resp.Content != "hello" {
-		t.Errorf("content: got %q", resp.Content)
-	}
-	if resp.Usage.InputTokens != 12 || resp.Usage.OutputTokens != 7 {
-		t.Errorf("usage: got %+v", resp.Usage)
-	}
-	if len(resp.ToolCalls) != 1 || resp.ToolCalls[0].Name != "read_file" || resp.ToolCalls[0].Args["path"] != "main.go" {
-		t.Errorf("tool calls: got %+v", resp.ToolCalls)
-	}
-}
-
-func TestToConvInputs(t *testing.T) {
-	in := toConvInputs([]Msg{{Role: User, Content: "hi"}})
-	if len(in) != 1 || in[0].Type != "message.input" || in[0].Role != "user" || in[0].Content != "hi" {
-		t.Errorf("got %+v", in)
-	}
-}
-
-func TestMistralSetModelResetsConversation(t *testing.T) {
-	m, err := newMistral("key", "mistral-large-latest", "", true)
+func TestMistralPromptCacheKey(t *testing.T) {
+	m, err := newMistral("key", "mistral-large-latest", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.convID = "abc"
-	m.committed = []Msg{{Role: User, Content: "x"}}
-	m.SetModel("mistral-medium")
-	if m.convID != "" || m.committed != nil {
-		t.Error("switching model must reset the server-side conversation")
+	if m.cacheKey == "" {
+		t.Fatal("expected a non-empty prompt cache key")
+	}
+	req := mistralReq{Model: m.model, PromptCacheKey: m.cacheKey}
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"prompt_cache_key":"`+m.cacheKey+`"`) {
+		t.Errorf("serialized request missing prompt_cache_key: %s", data)
+	}
+	m2, _ := newMistral("key", "mistral-large-latest", "")
+	if m.cacheKey == m2.cacheKey {
+		t.Error("cache keys should be unique per session")
 	}
 }
 

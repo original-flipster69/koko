@@ -167,7 +167,7 @@ func New(cfg *config.LlmConfig) (Provider, error) {
 	case config.Anthropic:
 		return newClaude(cfg.ApiKey, cfg.Model, cfg.Url, cfg.MaxTokens)
 	case config.Mistral:
-		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url, cfg.Conversations)
+		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url)
 	case config.Ollama:
 		return newOllama(cfg.Model, cfg.Url)
 	default:

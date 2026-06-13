@@ -3,6 +3,8 @@ package provider
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -11,16 +13,14 @@ import (
 )
 
 type mistral struct {
-	apiKey        string
-	model         string
-	baseURL       string
-	conversations bool
-	convID        string
-	committed     []Msg
-	client        *http.Client
+	apiKey   string
+	model    string
+	baseURL  string
+	cacheKey string
+	client   *http.Client
 }
 
-func newMistral(apiKey, model, baseURL string, conversations bool) (*mistral, error) {
+func newMistral(apiKey, model, baseURL string) (*mistral, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("MISTRAL_API_KEY not set")
 	}
@@ -28,32 +28,25 @@ func newMistral(apiKey, model, baseURL string, conversations bool) (*mistral, er
 		baseURL = "https://api.mistral.ai/v1"
 	}
 	return &mistral{
-		apiKey:        apiKey,
-		model:         model,
-		baseURL:       baseURL,
-		conversations: conversations,
-		client:        &http.Client{},
+		apiKey:   apiKey,
+		model:    model,
+		baseURL:  baseURL,
+		cacheKey: newCacheKey(),
+		client:   &http.Client{},
 	}, nil
 }
 
-func (m *mistral) Name() string  { return "mistral" }
-func (m *mistral) Model() string { return m.model }
-func (m *mistral) SetModel(s string) {
-	m.model = s
-	m.resetConversation()
-}
-
-func (m *mistral) resetConversation() {
-	m.convID = ""
-	m.committed = nil
-}
-
-func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
-	if m.conversations {
-		return m.chatConversation(ctx, msgs, tools, onDelta)
+func newCacheKey() string {
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		return "koko-session"
 	}
-	return m.chatCompletions(ctx, msgs, tools, onDelta)
+	return "koko-" + hex.EncodeToString(buf)
 }
+
+func (m *mistral) Name() string      { return "mistral" }
+func (m *mistral) Model() string     { return m.model }
+func (m *mistral) SetModel(s string) { m.model = s }
 
 func toMistralMsgs(msgs []Msg) []mistralMsg {
 	var out []mistralMsg
@@ -82,11 +75,12 @@ func toMistralMsgs(msgs []Msg) []mistralMsg {
 	return out
 }
 
-func (m *mistral) chatCompletions(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
+func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
 	reqBody := mistralReq{
-		Model:  m.model,
-		Msgs:   toMistralMsgs(msgs),
-		Stream: true,
+		Model:          m.model,
+		Msgs:           toMistralMsgs(msgs),
+		Stream:         true,
+		PromptCacheKey: m.cacheKey,
 	}
 	for _, t := range tools {
 		reqBody.Tools = append(reqBody.Tools, mistralTool{
@@ -212,10 +206,11 @@ type mistralTool struct {
 }
 
 type mistralReq struct {
-	Model  string        `json:"model"`
-	Msgs   []mistralMsg  `json:"messages"`
-	Tools  []mistralTool `json:"tools,omitempty"`
-	Stream bool          `json:"stream,omitempty"`
+	Model          string        `json:"model"`
+	Msgs           []mistralMsg  `json:"messages"`
+	Tools          []mistralTool `json:"tools,omitempty"`
+	Stream         bool          `json:"stream,omitempty"`
+	PromptCacheKey string        `json:"prompt_cache_key,omitempty"`
 }
 
 type mistralStreamChunk struct {
