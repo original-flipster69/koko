@@ -175,7 +175,7 @@ func main() {
 		if llm.Name() == "ollama" {
 			splash += ui.Dim + scheme.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
 		}
-		if warning := ui.PrivacyWarning(llm.Name()); warning != "" {
+		if warning := ui.PrivacyWarning(llm.Name()); !cfg.Sandbox.SuppressPrivacyWarning && warning != "" {
 			splash += warning + "\n\n"
 		}
 		splashes[i] = splash
@@ -431,6 +431,8 @@ func loadConfig(src reloadSources) (*config.Config, error) {
 	}
 	return cfg, nil
 }
+
+//FIXME this buggy as hell... we need that untyped and checked this breaks with non updated list of values
 
 func applyReloadedConfig(cur, next *config.Config, setModel func(string), setVerbs func([]string), setMaxTokens func(int)) (applied, restart []string) {
 	if !equalStrings(next.Style.ThinkingVerbs, cur.Style.ThinkingVerbs) {

@@ -164,7 +164,7 @@ func coerceArgs(input map[string]interface{}) map[string]string {
 
 func New(cfg *config.LlmConfig) (Provider, error) {
 	switch cfg.Provider {
-	case config.Claude:
+	case config.Anthropic:
 		return newClaude(cfg.ApiKey, cfg.Model, cfg.Url, cfg.MaxTokens)
 	case config.Mistral:
 		return newMistral(cfg.ApiKey, cfg.Model, cfg.Url, cfg.Conversations)

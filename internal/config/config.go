@@ -13,9 +13,9 @@ import (
 type Provider string
 
 const (
-	Claude  Provider = "Claude"
-	Mistral Provider = "mistral"
-	Ollama  Provider = "ollama"
+	Anthropic Provider = "anthropic"
+	Mistral   Provider = "mistral"
+	Ollama    Provider = "ollama"
 )
 
 type ExecProfile string
@@ -51,6 +51,7 @@ type SandboxConfig struct {
 	MaxFileSize             int64      `toml:"max_file_size"`
 	ScrubPII                bool       `toml:"scrub_pii"`
 	SuppressElevatedWarning bool       `toml:"suppress_elevated_warning"`
+	SuppressPrivacyWarning  bool       `toml:"suppress_privacy_warning"`
 	Exec                    ExecConfig `toml:"exec"`
 }
 
@@ -168,11 +169,11 @@ func (c *Config) Validate() error {
 
 func (l *LlmConfig) Validate() error {
 	switch l.Provider {
-	case Claude, Mistral, Ollama:
+	case Anthropic, Mistral, Ollama:
 	default:
 		return fmt.Errorf("unknown llm.provider: %q (must be anthropic, mistral, or ollama)", l.Provider)
 	}
-	if (l.Provider == Claude || l.Provider == Mistral) && l.ApiKey == "" {
+	if (l.Provider == Anthropic || l.Provider == Mistral) && l.ApiKey == "" {
 		return fmt.Errorf("%s provider requires an API key (set %s)", l.Provider, apiKeyEnvName(l.Provider))
 	}
 	if l.Model == "" {
@@ -275,8 +276,8 @@ func (e *ExecConfig) Limits() (cpuSec, memMB, fileMB int) {
 
 func checkModelProvider(p Provider, model string) error {
 	switch {
-	case strings.HasPrefix(model, "Claude-") && p != Claude:
-		return fmt.Errorf("model %q looks Claude but provider is %q", model, p)
+	case strings.HasPrefix(model, "Anthropic-") && p != Anthropic:
+		return fmt.Errorf("model %q looks Anthropic but provider is %q", model, p)
 	case (strings.HasPrefix(model, "mistral-") ||
 		strings.HasPrefix(model, "codestral-") ||
 		strings.HasPrefix(model, "magistral-")) && p != Mistral:
@@ -287,7 +288,7 @@ func checkModelProvider(p Provider, model string) error {
 
 func apiKeyEnvName(p Provider) string {
 	switch p {
-	case Claude:
+	case Anthropic:
 		return "CLAUDE_API_KEY"
 	case Mistral:
 		return "MISTRAL_API_KEY"

@@ -10,7 +10,7 @@ import (
 func baseConfig() *config.Config {
 	return &config.Config{
 		Llm: config.LlmConfig{
-			Provider:         config.Claude,
+			Provider:         config.Anthropic,
 			Model:            "claude-sonnet-4-6",
 			MaxSessionTokens: 1000,
 		},
