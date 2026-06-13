@@ -187,7 +187,7 @@ func main() {
 		splashes[i] = splash
 	}
 
-	cmdHandlers, knownCommands := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, src, scheme)
+	cmdHandlers, knownCommands := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, sb, ignoreMatcher, src, scheme)
 	for _, p := range playRegistry.List() {
 		knownCommands = append(knownCommands, ":"+p.Name)
 	}
@@ -205,7 +205,7 @@ type command struct {
 	fn   func(input string, parts []string, a *agent.Agent) (handled bool, prompt string, output string)
 }
 
-func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, src reloadSources, scheme ui.Scheme) (terminal.CmdHandler, []string) {
+func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, sb *sandbox.Sandbox, ignoreMatcher *ignore.Matcher, src reloadSources, scheme ui.Scheme) (terminal.CmdHandler, []string) {
 	var commands map[string]command
 	commands = map[string]command{
 		":koko": {desc: "print the koko mascot", fn: func(string, []string, *agent.Agent) (bool, string, string) {
@@ -364,6 +364,24 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 			}
 			return true, "", b.String()
 		}},
+		":vision": {desc: "list files visible to the agent (after deny & ignore)", fn: func(_ string, _ []string, _ *agent.Agent) (bool, string, string) {
+			files, capped, err := visibleFiles(sb, ignoreMatcher)
+			if err != nil {
+				return true, "", scheme.Error(fmt.Sprintf("vision failed: %v", err))
+			}
+			if len(files) == 0 {
+				return true, "", scheme.Info("vision", "no files visible")
+			}
+			var b strings.Builder
+			for _, f := range files {
+				b.WriteString("  " + f + "\n")
+			}
+			summary := fmt.Sprintf("%d files visible", len(files))
+			if capped {
+				summary += fmt.Sprintf(" (showing first %d)", visionMaxFiles)
+			}
+			return true, "", scheme.Info("vision", summary) + "\n" + strings.TrimRight(b.String(), "\n")
+		}},
 		":plan": {desc: "toggle plan mode (read-only)", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			if a.TogglePlanMode() {
 				return true, "", scheme.Info("plan", "mode on — read-only; call :plan again to exit")
@@ -519,6 +537,46 @@ func confirmElevated(in io.Reader, out io.Writer) bool {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+const visionMaxFiles = 1000
+
+func visibleFiles(sb *sandbox.Sandbox, ig *ignore.Matcher) ([]string, bool, error) {
+	root := sb.Root()
+	var out []string
+	capped := false
+	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil || rel == "." {
+			return nil
+		}
+		if ig.IsIgnored(rel, info.IsDir()) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if _, err := sb.ValidatePath(path); err != nil {
+			return nil
+		}
+		if len(out) >= visionMaxFiles {
+			capped = true
+			return filepath.SkipAll
+		}
+		out = append(out, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, capped, err
+	}
+	sort.Strings(out)
+	return out, capped, nil
 }
 
 func getKokoDir() string {

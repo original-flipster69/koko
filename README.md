@@ -102,6 +102,10 @@ Redaction runs on the outbound message stream to the LLM (when `scrub_pii=true`,
 
 koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, etc.) and surfaces the result both in the splash banner and as part of the LLM system prompt for orientation.
 
+### Vision Sanity Check
+
+`:vision` is a local, non-LLM command that walks the sandbox and lists every file the agent can actually see after applying the **deny** patterns and the **ignore** rules — the same filters the file tools use. It's a quick way to confirm sensitive files are excluded and to see exactly what's exposed before letting the agent loose.
+
 ### Audit Logging
 
 Every tool invocation is recorded to `~/.koko/audit.jsonl` with timestamp, tool name, arguments, result, and a SHA-256 hash chained to the previous entry. The chain is verified at startup — broken or missing hashes fail loudly.
@@ -156,6 +160,7 @@ As you type, koko recognizes when the current line is a known command or install
 | `:resume` | Restore a saved session |
 | `:reload` | Reload config from its sources without restarting |
 | `:plays` | List installed plays |
+| `:vision` | List files the agent can see (after deny & ignore) |
 | `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
