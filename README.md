@@ -113,7 +113,7 @@ Every tool invocation is recorded to `~/.koko/audit.jsonl` with timestamp, tool 
 
 ### Memory
 
-Persistent cross-session memories live at `~/.koko/memory/`. The agent can save (`save_memory`) and delete (`delete_memory`) typed entries (user / feedback / project / reference) that surface as context in future sessions.
+Persistent cross-session memories live at `~/.koko/memories/`. The agent can save (`save_memory`) and delete (`delete_memory`) typed entries (user / feedback / project / reference) that surface as context in future sessions. You can also manage them directly with the `:memories` command — `:memories` lists them, `:memories <name>` reads one, `:memories add <name> <body>` stores a new `project` memory, and `:memories delete <name>` removes one.
 
 ### Plays
 
@@ -162,6 +162,7 @@ As you type, koko recognizes when the current line is a known command or install
 | `:reload` | Reload config from its sources without restarting |
 | `:plays` | List installed plays |
 | `:vision` | List files the agent can see (after deny & ignore) |
+| `:memories [<name> \| add <name> <body> \| delete <name>]` | List, read, add, or delete memories |
 | `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script |
 | `:plan` | Toggle plan mode |
 | `:<play>` | Run a named play (e.g., `:review`) |
@@ -274,5 +275,5 @@ koko stores runtime data in `~/.koko/`:
 | `audit.jsonl` | Hash-chained tool invocation log |
 | `koko.log` | Application log (JSON format) |
 | `session.json` | Saved conversation history (redacted) |
-| `memory/` | Persistent cross-session memories |
+| `memories/` | Persistent cross-session memories |
 | `plays/` | Markdown playbooks invokable as `:<name>` |

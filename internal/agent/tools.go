@@ -141,29 +141,29 @@ var tools = []tool{
 	},
 	{
 		Name:        "save_memory",
-		Description: "Save a persistent memory for future sessions. Types: user (preferences, role), feedback (corrections, validated approaches), project (ongoing work context), reference (pointers to external systems).",
+		Description: "Save a persistent memories for future sessions. Types: user (preferences, role), feedback (corrections, validated approaches), project (ongoing work context), reference (pointers to external systems).",
 		Verb:        "◆ remembering",
 		Handler:     (*Agent).saveMemory,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
-				"name":        provider.StringParam("Short unique name for the memory"),
+				"name":        provider.StringParam("Short unique name for the memories"),
 				"description": provider.StringParam("One-line summary used when deciding relevance later"),
 				"type":        provider.StringParam("One of: user, feedback, project, reference"),
-				"body":        provider.StringParam("The memory content"),
+				"body":        provider.StringParam("The memories content"),
 			},
 			Required: []string{"name", "type", "body"},
 		},
 	},
 	{
 		Name:        "delete_memory",
-		Description: "Remove a stored memory by name.",
+		Description: "Remove a stored memories by name.",
 		Verb:        "◆ forgetting",
 		Handler:     (*Agent).deleteMemory,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
-				"name": provider.StringParam("Name of the memory to delete"),
+				"name": provider.StringParam("Name of the memories to delete"),
 			},
 			Required: []string{"name"},
 		},

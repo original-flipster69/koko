@@ -19,7 +19,7 @@ import (
 	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
-	"github.com/original-flipster69/koko/internal/memory"
+	"github.com/original-flipster69/koko/internal/memories"
 	"github.com/original-flipster69/koko/internal/plays"
 	"github.com/original-flipster69/koko/internal/policy"
 	"github.com/original-flipster69/koko/internal/project"
@@ -111,9 +111,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, scheme.Error(fmt.Sprintf("cannot load plays: %v", err)))
 		playRegistry, _ = plays.Load("")
 	}
-	memoryStore, err := memory.Open(filepath.Join(kokoDir, "memory"))
+	memoryStore, err := memories.Open(filepath.Join(kokoDir, "memories"))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, scheme.Error(fmt.Sprintf("cannot open memory store: %v", err)))
+		fmt.Fprintln(os.Stderr, scheme.Error(fmt.Sprintf("cannot open memories store: %v", err)))
 		os.Exit(1)
 	}
 	extraContext := stack.Summary()
@@ -187,7 +187,7 @@ func main() {
 		splashes[i] = splash
 	}
 
-	cmdHandlers, knownCommands := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, sb, ignoreMatcher, src, scheme)
+	cmdHandlers, knownCommands := cmdHandler(cfg, llm, kokoDir, cfg.Sandbox.Root, playRegistry, sb, ignoreMatcher, memoryStore, src, scheme)
 	for _, p := range playRegistry.List() {
 		knownCommands = append(knownCommands, ":"+p.Name)
 	}
@@ -205,7 +205,7 @@ type command struct {
 	fn   func(input string, parts []string, a *agent.Agent) (handled bool, prompt string, output string)
 }
 
-func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, sb *sandbox.Sandbox, ignoreMatcher *ignore.Matcher, src reloadSources, scheme ui.Scheme) (terminal.CmdHandler, []string) {
+func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandboxRoot string, playRegistry *plays.Registry, sb *sandbox.Sandbox, ignoreMatcher *ignore.Matcher, memoryStore *memories.Store, src reloadSources, scheme ui.Scheme) (terminal.CmdHandler, []string) {
 	var commands map[string]command
 	commands = map[string]command{
 		":koko": {desc: "print the koko mascot", fn: func(string, []string, *agent.Agent) (bool, string, string) {
@@ -381,6 +381,9 @@ func cmdHandler(cfg *config.Config, llm provider.Provider, dataDir string, sandb
 				summary += fmt.Sprintf(" (showing first %d)", visionMaxFiles)
 			}
 			return true, "", scheme.Info("vision", summary) + "\n" + strings.TrimRight(b.String(), "\n")
+		}},
+		":memories": {desc: "manage memories", args: "[<name> | add <name> <body> | delete <name>]", fn: func(input string, parts []string, _ *agent.Agent) (bool, string, string) {
+			return true, "", memoryCommand(memoryStore, scheme, input, parts)
 		}},
 		":plan": {desc: "toggle plan mode (read-only)", fn: func(_ string, _ []string, a *agent.Agent) (bool, string, string) {
 			if a.TogglePlanMode() {
@@ -580,6 +583,65 @@ func visibleFiles(sb *sandbox.Sandbox, ig *ignore.Matcher) ([]string, bool, erro
 	}
 	sort.Strings(out)
 	return out, capped, nil
+}
+
+func memoryCommand(store *memories.Store, scheme ui.Scheme, input string, parts []string) string {
+	if len(parts) < 2 {
+		list, err := store.List()
+		if err != nil {
+			return scheme.Error(fmt.Sprintf("cannot list memories: %v", err))
+		}
+		if len(list) == 0 {
+			return scheme.Info("memories", "none stored")
+		}
+		var b strings.Builder
+		for _, mem := range list {
+			desc := mem.Description
+			if desc == "" {
+				desc = "(no description)"
+			}
+			b.WriteString(scheme.Info(mem.Name, fmt.Sprintf("[%s] %s", mem.Type, desc)) + "\n")
+		}
+		return strings.TrimRight(b.String(), "\n")
+	}
+
+	switch parts[1] {
+	case "add":
+		if len(parts) < 4 {
+			return scheme.Error("usage: :memories add <name> <body>")
+		}
+		name := parts[2]
+		body := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(strings.TrimPrefix(input, parts[0])), "add"))
+		body = strings.TrimSpace(strings.TrimPrefix(body, name))
+		if body == "" {
+			return scheme.Error("usage: :memories add <name> <body>")
+		}
+		if _, err := store.Save(memories.Memory{Name: name, Type: memories.TypeProject, Body: body}); err != nil {
+			return scheme.Error(fmt.Sprintf("cannot save memories: %v", err))
+		}
+		return scheme.Info("saved", fmt.Sprintf("memories %q", name))
+	case "delete":
+		if len(parts) < 3 {
+			return scheme.Error("usage: :memories delete <name>")
+		}
+		if err := store.Delete(parts[2]); err != nil {
+			return scheme.Error(err.Error())
+		}
+		return scheme.Info("deleted", fmt.Sprintf("memories %q", parts[2]))
+	default:
+		name := parts[1]
+		mem, ok, err := store.Get(name)
+		if err != nil {
+			return scheme.Error(fmt.Sprintf("cannot read memories: %v", err))
+		}
+		if !ok {
+			return scheme.Error(fmt.Sprintf("no memories named %q", name))
+		}
+		var b strings.Builder
+		b.WriteString(scheme.Info(mem.Name, fmt.Sprintf("[%s] %s", mem.Type, mem.Description)) + "\n\n")
+		b.WriteString(mem.Body)
+		return b.String()
+	}
 }
 
 func getKokoDir() string {

@@ -21,7 +21,7 @@ import (
 	"github.com/original-flipster69/koko/internal/diff"
 	"github.com/original-flipster69/koko/internal/editor"
 	"github.com/original-flipster69/koko/internal/ignore"
-	"github.com/original-flipster69/koko/internal/memory"
+	"github.com/original-flipster69/koko/internal/memories"
 	"github.com/original-flipster69/koko/internal/policy"
 	"github.com/original-flipster69/koko/internal/privacy"
 	"github.com/original-flipster69/koko/internal/provider"
@@ -39,7 +39,7 @@ type Agent struct {
 	editor           *editor.Editor
 	sandbox          *sandbox.Sandbox
 	ignore           *ignore.Matcher
-	memory           *memory.Store
+	memory           *memories.Store
 	cmdPolicy        *policy.CmdPolicy
 	scheme           ui.Scheme
 	tools            []provider.ToolDef
@@ -116,7 +116,7 @@ func (a *Agent) PlanMode() bool {
 }
 
 type Options struct {
-	Memory           *memory.Store
+	Memory           *memories.Store
 	CmdPolicy        *policy.CmdPolicy
 	Ignore           *ignore.Matcher
 	Scheme           ui.Scheme
@@ -707,26 +707,26 @@ func (a *Agent) execCmd(ctx context.Context, tc provider.ToolCall) string {
 
 func (a *Agent) saveMemory(ctx context.Context, tc provider.ToolCall) string {
 	if a.memory == nil {
-		return "error: memory not configured"
+		return "error: memories not configured"
 	}
 	if err := a.requireArgs(tc, "name", "type", "body"); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	path, err := a.memory.Save(memory.Memory{
+	path, err := a.memory.Save(memories.Memory{
 		Name:        tc.Args["name"],
 		Description: tc.Args["description"],
-		Type:        memory.Type(tc.Args["type"]),
+		Type:        memories.Type(tc.Args["type"]),
 		Body:        tc.Args["body"],
 	})
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	return fmt.Sprintf("saved memory %q to %s", tc.Args["name"], filepath.Base(path))
+	return fmt.Sprintf("saved memories %q to %s", tc.Args["name"], filepath.Base(path))
 }
 
 func (a *Agent) deleteMemory(ctx context.Context, tc provider.ToolCall) string {
 	if a.memory == nil {
-		return "error: memory not configured"
+		return "error: memories not configured"
 	}
 	if err := a.requireArgs(tc, "name"); err != nil {
 		return fmt.Sprintf("error: %v", err)
@@ -734,12 +734,12 @@ func (a *Agent) deleteMemory(ctx context.Context, tc provider.ToolCall) string {
 	if err := a.memory.Delete(tc.Args["name"]); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
-	return fmt.Sprintf("deleted memory %q", tc.Args["name"])
+	return fmt.Sprintf("deleted memories %q", tc.Args["name"])
 }
 
 func (a *Agent) listMemories(ctx context.Context, tc provider.ToolCall) string {
 	if a.memory == nil {
-		return "error: memory not configured"
+		return "error: memories not configured"
 	}
 	list, err := a.memory.List()
 	if err != nil {

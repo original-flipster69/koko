@@ -1,4 +1,4 @@
-package memory
+package memories
 
 import (
 	"fmt"
@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 )
+
+const indexFile = "MEMORIES.md"
 
 type Type string
 
@@ -33,7 +35,7 @@ type Store struct {
 
 func Open(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		return nil, fmt.Errorf("creating memory dir: %w", err)
+		return nil, fmt.Errorf("creating memories dir: %w", err)
 	}
 	return &Store{dir: dir}, nil
 }
@@ -50,13 +52,13 @@ func (s *Store) List() ([]Memory, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		if e.Name() == "MEMORY.md" {
+		if e.Name() == indexFile {
 			continue
 		}
 		path := filepath.Join(s.dir, e.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
-			slog.Warn("memory: skipping unreadable entry", "path", path, "err", err)
+			slog.Warn("memories: skipping unreadable entry", "path", path, "err", err)
 			continue
 		}
 		m := parse(string(data))
@@ -90,14 +92,14 @@ func slug(name string) string {
 	s = strings.ReplaceAll(s, " ", "_")
 	s = slugRe.ReplaceAllString(s, "")
 	if s == "" {
-		s = "memory"
+		s = "memories"
 	}
 	return s
 }
 
 func (s *Store) Save(m Memory) (string, error) {
 	if m.Name == "" {
-		return "", fmt.Errorf("memory name required")
+		return "", fmt.Errorf("memories name required")
 	}
 	if m.Type == "" {
 		m.Type = TypeProject
@@ -127,7 +129,7 @@ func (s *Store) Delete(name string) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no memory named %q", name)
+		return fmt.Errorf("no memories named %q", name)
 	}
 	if err := os.Remove(m.Path); err != nil {
 		return err
@@ -149,11 +151,11 @@ func (s *Store) rebuildIndex() error {
 		rel := filepath.Base(m.Path)
 		b.WriteString(fmt.Sprintf("- [%s](%s) — %s\n", m.Name, rel, desc))
 	}
-	return os.WriteFile(filepath.Join(s.dir, "MEMORY.md"), []byte(b.String()), 0640)
+	return os.WriteFile(filepath.Join(s.dir, indexFile), []byte(b.String()), 0640)
 }
 
 func (s *Store) Index() string {
-	data, err := os.ReadFile(filepath.Join(s.dir, "MEMORY.md"))
+	data, err := os.ReadFile(filepath.Join(s.dir, indexFile))
 	if err != nil {
 		return ""
 	}

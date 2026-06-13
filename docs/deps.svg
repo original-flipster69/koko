@@ -101,7 +101,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/memory -->
+<!-- github.com/original&#45;flipster69/koko/internal/memories -->
 <g id="node8" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/memory</title>
 <g id="a_node8"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/memory" xlink:title="github.com/original&#45;flipster69/koko/internal/memory" target="_graphviz">
@@ -111,7 +111,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/memory -->
+<!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/memories -->
 <g id="edge5" class="edge">
 <title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/memory</title>
 <g id="a_edge5"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/memory">
@@ -309,7 +309,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/memory -->
+<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/memories -->
 <g id="edge17" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/memory</title>
 <g id="a_edge17"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/memory">
