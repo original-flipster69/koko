@@ -14,7 +14,7 @@ type koko struct{}
 func (k koko) name() string { return "koko" }
 func (k koko) desc() string { return "Print the koko mascot" }
 func (k koko) args() string { return "" }
-func (k koko) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (k koko) do(_ string, _ []string, _ *agent.Agent, scheme ui.Scheme) (bool, string, string) {
 	return true, "", "\n" + ui.Mascot(scheme)
 }
 
@@ -23,7 +23,7 @@ type clear struct{}
 func (c clear) name() string { return "clear" }
 func (c clear) desc() string { return "Reset conversation history" }
 func (c clear) args() string { return "" }
-func (c clear) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (c clear) do(_ string, _ []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
 	a.ClearHistory()
 	return true, "", scheme.Info("cleared", "conversation history reset")
 }
@@ -33,7 +33,7 @@ type history struct{}
 func (h history) name() string { return "history" }
 func (h history) desc() string { return "Show message count" }
 func (h history) args() string { return "" }
-func (h history) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (h history) do(_ string, _ []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
 	return true, "", scheme.Info("messages", fmt.Sprintf("%d", a.HistoryLen()))
 }
 
@@ -42,7 +42,7 @@ type undo struct{}
 func (u undo) name() string { return "undo" }
 func (u undo) desc() string { return "Revert last file change" }
 func (u undo) args() string { return "" }
-func (u undo) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (u undo) do(_ string, _ []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
 	path, err := a.Undo()
 	switch {
 	case err != nil:
@@ -59,7 +59,7 @@ type tokens struct{}
 func (t tokens) name() string { return "tokens" }
 func (t tokens) desc() string { return "Show token usage stats" }
 func (t tokens) args() string { return "" }
-func (t tokens) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (t tokens) do(_ string, _ []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
 	var b strings.Builder
 	b.WriteString(scheme.Info("input   ", fmt.Sprintf("%d tokens", a.TotalInput)) + "\n")
 	b.WriteString(scheme.Info("output  ", fmt.Sprintf("%d tokens", a.TotalOutput)) + "\n")

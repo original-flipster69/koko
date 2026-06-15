@@ -75,16 +75,17 @@ func (r resume) do(input string, parts []string, a *agent.Agent, scheme ui.Schem
 }
 
 type reload struct {
-	cfg *config.Config
-	llm provider.Provider
-	src reloadSources
+	cfg     *config.Config
+	llm     provider.Provider
+	cfgPath string
+	opts    Flags
 }
 
 func (r reload) name() string { return "reload" }
 func (r reload) desc() string { return "Reload config from its sources" }
 func (r reload) args() string { return "" }
 func (r reload) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
-	newCfg, err := loadConfig(r.src)
+	newCfg, err := loadConfig(r.cfgPath, r.opts)
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("reload failed (keeping current config): %v", err))
 	}

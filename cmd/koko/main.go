@@ -24,7 +24,7 @@ func main() {
 		return
 	}
 
-	if err := cli.Main(cli.Options{
+	if err := cli.Main(cli.Flags{
 		Provider: *provider,
 		Model:    *model,
 		LlmURL:   *llmUrl,

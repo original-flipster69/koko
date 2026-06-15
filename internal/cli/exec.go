@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os/exec"
 	"strings"
 
@@ -21,22 +20,6 @@ func (r run) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) 
 	}
 	cmdStr := strings.TrimPrefix(input, ":run ")
 	return true, "", runShell(r.sb, cmdStr, scheme)
-}
-
-type execCmd struct{ sb *sandbox.Sandbox }
-
-func (e execCmd) name() string { return "exec" }
-func (e execCmd) desc() string { return "Execute a command with approval" }
-func (e execCmd) args() string { return "<cmd>" }
-func (e execCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
-	if len(parts) < 2 {
-		return true, "", scheme.Error("usage: :exec <command>")
-	}
-	cmdStr := strings.TrimPrefix(input, ":exec ")
-	if !a.Confirm(fmt.Sprintf("Execute command: %s", cmdStr)) {
-		return true, "", scheme.Info("exec", "cancelled")
-	}
-	return true, "", runShell(e.sb, cmdStr, scheme)
 }
 
 func runShell(sb *sandbox.Sandbox, cmdStr string, scheme ui.Scheme) string {

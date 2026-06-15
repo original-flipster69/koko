@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/audit"
@@ -28,35 +29,21 @@ const (
 	auditFile = "audit.jsonl"
 	logFile   = "koko.log"
 	memoDir   = "memories"
+
+	llmStreamTimeout = 5 * time.Minute
 )
 
-type Options struct {
+type Flags struct {
 	Provider string
 	Model    string
 	LlmURL   string
 	Sandbox  string
 }
 
-type reloadSources struct {
-	cfgPath  string
-	provider string
-	model    string
-	llmURL   string
-	sandbox  string
-}
-
-func Main(opts Options) error {
+func Main(opts Flags) error {
 	kokoRoot := kokoDir()
 
-	src := reloadSources{
-		cfgPath:  config.Path(kokoRoot),
-		provider: opts.Provider,
-		model:    opts.Model,
-		llmURL:   opts.LlmURL,
-		sandbox:  opts.Sandbox,
-	}
-
-	cfg, err := loadConfig(src)
+	cfg, err := loadConfig(config.Path(kokoRoot), opts)
 	if err != nil {
 		return err
 	}
@@ -71,10 +58,10 @@ func Main(opts Options) error {
 		return err
 	}
 
-	return Run(llm, sb, cfg, kokoRoot, src)
+	return Run(llm, sb, cfg, kokoRoot, config.Path(kokoRoot), opts)
 }
 
-func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoot string, src reloadSources) error {
+func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoot string, cfgPath string, opts Flags) error {
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
 		return fmt.Errorf("failed to initialize UI scheme: %v", err)
@@ -154,13 +141,12 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 
 	cmds := make(map[string]command)
 	register(cmds,
-		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{},
-		read{sb}, write{sb}, replace{sb}, deleteCmd{sb}, list{sb}, vision{sb, ignoreMatcher},
-		run{sb}, execCmd{sb},
+		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{}, vision{sb, ignoreMatcher},
+		run{sb},
 		memoriesCmd{memoStore},
 		playsCmd{playsReg},
 		model{llm}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
-		reload{cfg, llm, src}, cageCmd{kokoRoot, sb.Root()},
+		reload{cfg, llm, cfgPath, opts}, cageCmd{kokoRoot, sb.Root()},
 	)
 	register(cmds, help{cmds})
 
@@ -172,7 +158,7 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 		knownCommands = append(knownCommands, ":"+p.Name)
 	}
 
-	slashHandler := func(input string, a *agent.Agent) (bool, string, string) {
+	colonHandler := func(input string, a *agent.Agent) (bool, string, string) {
 		parts := strings.Fields(input)
 		if len(parts) == 0 {
 			return true, "", ""
@@ -190,7 +176,7 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 		return true, "", scheme.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
 
-	return terminal.Run(a, kokoRoot, ui.MascotFrames(scheme), slashHandler, knownCommands, scheme)
+	return terminal.Run(a, kokoRoot, ui.MascotFrames(scheme), colonHandler, knownCommands, scheme)
 }
 
 func kokoDir() string {
@@ -200,19 +186,19 @@ func kokoDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".koko")
 }
 
-func loadConfig(src reloadSources) (*config.Config, error) {
-	cfg, err := config.Load(src.cfgPath)
+func loadConfig(path string, opts Flags) (*config.Config, error) {
+	cfg, err := config.Load(path)
 	if err != nil {
 		return nil, err
 	}
-	root := src.sandbox
+	root := opts.Sandbox
 	if root == "" {
 		root = cfg.Sandbox.Root
 	}
 	if _, err := cfg.ApplyProjectConfig(root); err != nil {
 		return nil, err
 	}
-	cfg.ApplyFlags(src.provider, src.model, src.llmURL, src.sandbox)
+	cfg.ApplyFlags(opts.Provider, opts.Model, opts.LlmURL, opts.Sandbox)
 	cfg.ApplyEnv()
 	if err := cfg.Validate(); err != nil {
 		return nil, err

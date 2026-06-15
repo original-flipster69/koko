@@ -7,11 +7,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
-)
-
-const (
-	llmStreamTimeout = 5 * time.Minute
 )
 
 func isElevated() bool {

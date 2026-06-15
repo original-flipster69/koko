@@ -85,16 +85,6 @@ func (a *Agent) SetSuppressSpinner(on bool) {
 	a.suppressSpinner = on
 }
 
-func (a *Agent) Confirm(action string) bool {
-	a.mu.Lock()
-	fn := a.confirm
-	a.mu.Unlock()
-	if fn == nil {
-		return false
-	}
-	return fn(action)
-}
-
 func (a *Agent) Editor() *editor.Editor { return a.editor }
 
 func (a *Agent) ThinkingVerb() string {
