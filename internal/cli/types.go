@@ -15,13 +15,16 @@ type cmdDef interface {
 }
 
 type cmdOpts struct {
-	input  string
-	a      *agent.Agent
-	scheme ui.Scheme
+	input string
+	a     *agent.Agent
 }
 
 func (c cmdOpts) parts() []string {
 	return strings.Fields(c.input)
+}
+
+func (c cmdOpts) scheme() ui.Scheme {
+	return c.a.Scheme()
 }
 
 type command struct {

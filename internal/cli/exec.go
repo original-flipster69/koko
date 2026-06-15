@@ -15,10 +15,10 @@ func (r run) desc() string { return "Run a shell command directly" }
 func (r run) args() string { return "<cmd>" }
 func (r run) do(opts cmdOpts) (bool, string, string) {
 	if len(opts.parts()) < 2 {
-		return true, "", opts.scheme.Error("usage: :run <command>")
+		return true, "", opts.scheme().Error("usage: :run <command>")
 	}
 	cmdStr := strings.TrimPrefix(opts.input, ":run ")
-	return true, "", runShell(r.sb, cmdStr, opts.scheme)
+	return true, "", runShell(r.sb, cmdStr, opts.scheme())
 }
 
 func runShell(sb *sandbox.Sandbox, cmdStr string, scheme ui.Scheme) string {

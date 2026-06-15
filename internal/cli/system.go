@@ -21,10 +21,10 @@ func (m model) args() string { return "[name]" }
 func (m model) do(opts cmdOpts) (bool, string, string) {
 	parts := opts.parts()
 	if len(parts) < 2 {
-		return true, "", opts.scheme.Info("model", opts.a.Model())
+		return true, "", opts.scheme().Info("model", opts.a.Model())
 	}
 	opts.a.SetModel(parts[1])
-	return true, "", opts.scheme.Info("model", fmt.Sprintf("switched to %s", parts[1]))
+	return true, "", opts.scheme().Info("model", fmt.Sprintf("switched to %s", parts[1]))
 }
 
 type configCmd struct {
@@ -36,7 +36,7 @@ func (c configCmd) name() string { return "config" }
 func (c configCmd) desc() string { return "Show active configuration" }
 func (c configCmd) args() string { return "" }
 func (c configCmd) do(opts cmdOpts) (bool, string, string) {
-	scheme := opts.scheme
+	scheme := opts.scheme()
 	var b strings.Builder
 	b.WriteString(scheme.Info("provider", string(c.cfg.Llm.Provider)) + "\n")
 	b.WriteString(scheme.Info("model", c.cfg.Llm.Model) + "\n")
@@ -58,9 +58,9 @@ func (s save) desc() string { return "Save session to disk" }
 func (s save) args() string { return "" }
 func (s save) do(opts cmdOpts) (bool, string, string) {
 	if err := opts.a.SaveSession(s.kokoDir); err != nil {
-		return true, "", opts.scheme.Error(fmt.Sprintf("save failed: %v", err))
+		return true, "", opts.scheme().Error(fmt.Sprintf("save failed: %v", err))
 	}
-	return true, "", opts.scheme.Info("saved", "session written to disk")
+	return true, "", opts.scheme().Info("saved", "session written to disk")
 }
 
 type resume struct{ kokoDir string }
@@ -70,9 +70,9 @@ func (r resume) desc() string { return "Restore saved session" }
 func (r resume) args() string { return "" }
 func (r resume) do(opts cmdOpts) (bool, string, string) {
 	if err := opts.a.LoadSession(r.kokoDir); err != nil {
-		return true, "", opts.scheme.Error(fmt.Sprintf("resume failed: %v", err))
+		return true, "", opts.scheme().Error(fmt.Sprintf("resume failed: %v", err))
 	}
-	return true, "", opts.scheme.Info("resumed", fmt.Sprintf("loaded %d messages", opts.a.HistoryLen()))
+	return true, "", opts.scheme().Info("resumed", fmt.Sprintf("loaded %d messages", opts.a.HistoryLen()))
 }
 
 type reload struct {
@@ -85,7 +85,7 @@ func (r reload) name() string { return "reload" }
 func (r reload) desc() string { return "Reload config from its sources" }
 func (r reload) args() string { return "" }
 func (r reload) do(opts cmdOpts) (bool, string, string) {
-	scheme := opts.scheme
+	scheme := opts.scheme()
 	newCfg, err := loadConfig(r.cfgPath, r.opts)
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("reload failed (keeping current config): %v", err))
@@ -118,7 +118,7 @@ func (c cageCmd) name() string { return "cage" }
 func (c cageCmd) desc() string { return "Generate a low-privilege user setup script" }
 func (c cageCmd) args() string { return "<username> [dir=…] [group=…] [os=darwin|linux]" }
 func (c cageCmd) do(opts cmdOpts) (bool, string, string) {
-	scheme := opts.scheme
+	scheme := opts.scheme()
 	parts := opts.parts()
 	if len(parts) < 2 {
 		return true, "", scheme.Error("usage: :cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]")
