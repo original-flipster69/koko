@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/original-flipster69/koko/internal/agent"
@@ -22,32 +23,40 @@ import (
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
-// Options holds the raw command-line inputs used to bootstrap the CLI.
+const (
+	playsDir  = "plays"
+	auditFile = "audit.jsonl"
+	logFile   = "koko.log"
+	memoDir   = "memories"
+)
+
 type Options struct {
-	Provider   string
-	Model      string
-	LlmURL     string
-	Sandbox    string
-	ConfigPath string
+	Provider string
+	Model    string
+	LlmURL   string
+	Sandbox  string
 }
 
-// Main is the package entrypoint. It loads configuration, constructs the
-// provider, sandbox and play registry, then starts the CLI. Keeping all wiring
-// here means cmd/koko/main.go never has to touch unexported helpers.
-func Main(opts Options) error {
-	kokoDir := KokoDir()
-	cfgPath := config.Path(kokoDir)
-	if opts.ConfigPath != "" {
-		cfgPath = opts.ConfigPath
-	}
+type reloadSources struct {
+	cfgPath  string
+	provider string
+	model    string
+	llmURL   string
+	sandbox  string
+}
 
-	cfg, err := loadConfig(ReloadSources{
-		cfgPath:  cfgPath,
+func Main(opts Options) error {
+	kokoRoot := kokoDir()
+
+	src := reloadSources{
+		cfgPath:  config.Path(kokoRoot),
 		provider: opts.Provider,
 		model:    opts.Model,
 		llmURL:   opts.LlmURL,
 		sandbox:  opts.Sandbox,
-	})
+	}
+
+	cfg, err := loadConfig(src)
 	if err != nil {
 		return err
 	}
@@ -62,46 +71,38 @@ func Main(opts Options) error {
 		return err
 	}
 
-	playsDir := filepath.Join(kokoDir, "plays")
-	playRegistry, err := plays.Load(playsDir)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(fmt.Sprintf("cannot load plays: %v", err)))
-		playRegistry, _ = plays.Load("")
-	}
-
-	return Run(llm, sb, cfg, playRegistry)
+	return Run(llm, sb, cfg, kokoRoot, src)
 }
 
-// Run initializes the CLI and starts the terminal.
-func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, playRegistry *plays.Registry) error {
-	// Initialize UI scheme
+func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoot string, src reloadSources) error {
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
 		return fmt.Errorf("failed to initialize UI scheme: %v", err)
 	}
 
-	// Initialize audit log
-	kokoDir := KokoDir()
-	auditLog, err := audit.NewLog(filepath.Join(kokoDir, "audit.jsonl"))
+	playDir := filepath.Join(kokoRoot, playsDir)
+	playsReg, err := plays.Load(playDir)
+	if err != nil {
+		return fmt.Errorf("failed to load plays: %v", err)
+	}
+
+	auditLog, err := audit.NewLog(filepath.Join(kokoRoot, auditFile))
 	if err != nil {
 		return fmt.Errorf("failed to open audit log: %v", err)
 	}
 	defer auditLog.Close()
 
-	// Initialize log file
-	logFile, err := os.OpenFile(filepath.Join(kokoDir, "koko.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	log, err := os.OpenFile(filepath.Join(kokoRoot, logFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err == nil {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: slog.LevelInfo})))
-		defer logFile.Close()
+		slog.SetDefault(slog.New(slog.NewJSONHandler(log, &slog.HandlerOptions{Level: slog.LevelInfo})))
+		defer log.Close()
 	}
 
-	// Initialize memory store
-	memoryStore, err := memories.Open(filepath.Join(kokoDir, "memories"))
+	memoStore, err := memories.Open(filepath.Join(kokoRoot, memoDir))
 	if err != nil {
 		return fmt.Errorf("failed to open memories store: %v", err)
 	}
 
-	// Initialize ignore matcher
 	var ignoreMatcher *ignore.Matcher
 	if cfg.Ignore.Mode == config.Custom {
 		ignoreMatcher = ignore.NewFromPatterns(cfg.Ignore.Files)
@@ -109,22 +110,24 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, playReg
 		ignoreMatcher = ignore.LoadGitignore(cfg.Sandbox.Root)
 	}
 
-	// Initialize command policy
 	cmdPolicy, err := policy.NewCommandPolicy(cfg.Sandbox.Exec.Allow, cfg.Sandbox.Exec.Deny)
 	if err != nil {
 		return fmt.Errorf("failed to initialize command policy: %v", err)
 	}
 
-	// Build project context summary
-	extraContext := project.Scan(cfg.Sandbox.Root).Summary()
-
-	// Build outbound message filters
-	var outboundFilters []agent.OutboundFilter
-	if cfg.Sandbox.ScrubPII {
-		outboundFilters = append(outboundFilters, agent.ScrubPIIFilter)
+	projectCtx := project.Scan(cfg.Sandbox.Root).Summary()
+	if idx := memoStore.Index(); idx != "" {
+		if projectCtx != "" {
+			projectCtx += "\n\n"
+		}
+		projectCtx += "Stored memories (use list_memories to read bodies, save_memory/delete_memory to modify):\n" + idx
 	}
 
-	// Initialize agent
+	var outFilters []agent.OutboundFilter
+	if cfg.Sandbox.ScrubPII {
+		outFilters = append(outFilters, agent.ScrubPIIFilter)
+	}
+
 	confirm := func(action string) bool {
 		fmt.Printf("  %s%srun:%s %s%s%s  [y/N] ", ui.Bold, scheme.Secondary, ui.Reset, scheme.Label, action, ui.Reset)
 		reader := bufio.NewReader(os.Stdin)
@@ -135,59 +138,143 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, playReg
 
 	cpuSec, memMB, fileMB := cfg.Sandbox.Exec.Limits()
 	a := agent.New(llm, sb, os.Stdout, confirm, auditLog, agent.Options{
-		Memory:           memoryStore,
+		Memory:           memoStore,
 		CmdPolicy:        cmdPolicy,
 		Ignore:           ignoreMatcher,
 		Scheme:           scheme,
-		ProjectCtx:       extraContext,
+		ProjectCtx:       projectCtx,
 		ThinkingVerbs:    cfg.Style.ThinkingVerbs,
 		MaxSessionTokens: cfg.Llm.MaxSessionTokens,
 		StreamTimeout:    llmStreamTimeout,
-		OutboundFilters:  outboundFilters,
+		OutboundFilters:  outFilters,
 		ExecCPUSeconds:   cpuSec,
 		ExecMemoryMB:     memMB,
 		ExecMaxFileMB:    fileMB,
 	})
 
-	// Register all commands
-	commands := make(map[string]Command)
-	for k, v := range registerCoreCommands(a, scheme) {
-		commands[k] = v
-	}
-	for k, v := range registerFileCommands(sb, scheme) {
-		commands[k] = v
-	}
-	for k, v := range registerMemoryCommands(a, scheme) {
-		commands[k] = v
-	}
-	for k, v := range registerExecCommands(sb, scheme) {
-		commands[k] = v
-	}
-	for k, v := range registerPlayCommands(playRegistry, scheme) {
-		commands[k] = v
-	}
+	cmds := make(map[string]command)
+	register(cmds,
+		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{},
+		read{sb}, write{sb}, replace{sb}, deleteCmd{sb}, list{sb}, vision{sb, ignoreMatcher},
+		run{sb}, execCmd{sb},
+		memoriesCmd{memoStore},
+		playsCmd{playsReg},
+		model{llm}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
+		reload{cfg, llm, src}, cageCmd{kokoRoot, sb.Root()},
+	)
+	register(cmds, help{cmds})
 
-	// Build the list of known command names (for tab-completion / hints).
-	knownCommands := make([]string, 0, len(commands))
-	for name := range commands {
+	knownCommands := make([]string, 0, len(cmds))
+	for name := range cmds {
 		knownCommands = append(knownCommands, name)
 	}
+	for _, p := range playsReg.List() {
+		knownCommands = append(knownCommands, ":"+p.Name)
+	}
 
-	// Adapt the command map into the terminal's CmdHandler signature.
-	// The terminal passes the raw input line; we split it into parts and
-	// dispatch to the matching command's Fn.
 	slashHandler := func(input string, a *agent.Agent) (bool, string, string) {
 		parts := strings.Fields(input)
 		if len(parts) == 0 {
-			return false, "", ""
+			return true, "", ""
 		}
-		cmd, ok := commands[parts[0]]
-		if !ok {
-			return false, "", ""
+		name := parts[0]
+		if c, ok := cmds[name]; ok {
+			return c.fn(input, parts, a, scheme)
 		}
-		return cmd.Fn(input, parts, a)
+		playName := strings.TrimPrefix(name, ":")
+		if p, ok := playsReg.Get(playName); ok {
+			extra := strings.TrimSpace(strings.TrimPrefix(input, name))
+			prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Render(extra))
+			return false, prompt, ""
+		}
+		return true, "", scheme.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
 
-	// Start the terminal
-	return terminal.Run(a, kokoDir, ui.MascotFrames(scheme), slashHandler, knownCommands, scheme)
+	return terminal.Run(a, kokoRoot, ui.MascotFrames(scheme), slashHandler, knownCommands, scheme)
+}
+
+func kokoDir() string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(os.Getenv("APPDATA"), "koko")
+	}
+	return filepath.Join(os.Getenv("HOME"), ".koko")
+}
+
+func loadConfig(src reloadSources) (*config.Config, error) {
+	cfg, err := config.Load(src.cfgPath)
+	if err != nil {
+		return nil, err
+	}
+	root := src.sandbox
+	if root == "" {
+		root = cfg.Sandbox.Root
+	}
+	if _, err := cfg.ApplyProjectConfig(root); err != nil {
+		return nil, err
+	}
+	cfg.ApplyFlags(src.provider, src.model, src.llmURL, src.sandbox)
+	cfg.ApplyEnv()
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func applyReloadedConfig(cur, next *config.Config, setModel func(string), setVerbs func([]string), setMaxTokens func(int)) (applied, restart []string) {
+	if !equalStrings(next.Style.ThinkingVerbs, cur.Style.ThinkingVerbs) {
+		setVerbs(next.Style.ThinkingVerbs)
+		cur.Style.ThinkingVerbs = next.Style.ThinkingVerbs
+		applied = append(applied, "thinking verbs")
+	}
+	if next.Llm.MaxSessionTokens != cur.Llm.MaxSessionTokens {
+		setMaxTokens(next.Llm.MaxSessionTokens)
+		cur.Llm.MaxSessionTokens = next.Llm.MaxSessionTokens
+		applied = append(applied, "max session tokens")
+	}
+	if next.Llm.Provider == cur.Llm.Provider {
+		if next.Llm.Model != cur.Llm.Model {
+			setModel(next.Llm.Model)
+			cur.Llm.Model = next.Llm.Model
+			applied = append(applied, "model")
+		}
+	} else {
+		restart = append(restart, "provider")
+	}
+	if next.Llm.Url != cur.Llm.Url {
+		restart = append(restart, "llm url")
+	}
+	if next.Sandbox.Root != cur.Sandbox.Root {
+		restart = append(restart, "sandbox root")
+	}
+	if !equalStrings(next.Sandbox.AdditionalDirs, cur.Sandbox.AdditionalDirs) {
+		restart = append(restart, "additional dirs")
+	}
+	if !equalStrings(next.Sandbox.DenyFiles, cur.Sandbox.DenyFiles) {
+		restart = append(restart, "deny files")
+	}
+	if next.Sandbox.MaxFileSize != cur.Sandbox.MaxFileSize {
+		restart = append(restart, "max file size")
+	}
+	if next.Sandbox.ScrubPII != cur.Sandbox.ScrubPII {
+		restart = append(restart, "scrub_pii")
+	}
+	if next.Sandbox.Exec.Profile != cur.Sandbox.Exec.Profile {
+		restart = append(restart, "exec profile")
+	}
+	if next.Ignore.Mode != cur.Ignore.Mode {
+		restart = append(restart, "ignore mode")
+	}
+	return applied, restart
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

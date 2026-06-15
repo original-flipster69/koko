@@ -121,7 +121,7 @@ func sendReq(ctx context.Context, client *http.Client, url string, body any, hea
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(bodyBytes)), nil
 	}
-	resp, err := withRetry(ctx, client, req, 5)
+	resp, err := withRetry(ctx, client, req, 7)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}

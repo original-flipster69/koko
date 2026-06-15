@@ -29,6 +29,8 @@ import (
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
+//FIXME rename... golem, minion, puppet, gofer
+
 type confirmFunc func(action string) bool
 
 type OutboundFilter func([]provider.Msg) []provider.Msg
@@ -82,6 +84,18 @@ func (a *Agent) SetSuppressSpinner(on bool) {
 	defer a.mu.Unlock()
 	a.suppressSpinner = on
 }
+
+func (a *Agent) Confirm(action string) bool {
+	a.mu.Lock()
+	fn := a.confirm
+	a.mu.Unlock()
+	if fn == nil {
+		return false
+	}
+	return fn(action)
+}
+
+func (a *Agent) Editor() *editor.Editor { return a.editor }
 
 func (a *Agent) ThinkingVerb() string {
 	if len(a.thinkingVerbs) == 0 {

@@ -1,4 +1,4 @@
-package sandbox
+package cli
 
 import (
 	"strings"

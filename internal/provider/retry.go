@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	baseBackoff = 2 * time.Second
-	maxBackoff  = 30 * time.Second
+	baseBackoff = 3 * time.Second
+	maxBackoff  = 60 * time.Second
 )
 
 func withRetry(ctx context.Context, client *http.Client, req *http.Request, maxAttempts int) (*http.Response, error) {

@@ -10,47 +10,42 @@ import (
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
-// registerExecCommands registers exec operations like :run, :exec, etc.
-func registerExecCommands(sb *sandbox.Sandbox, scheme ui.Scheme) map[string]Command {
-	return map[string]Command{
-		":run": {
-			Desc: "Run a shell command directly",
-			Args: "<cmd>",
-			Fn: func(input string, parts []string, _ *agent.Agent) (bool, string, string) {
-				if len(parts) < 2 {
-					return true, "", scheme.Error("usage: :run <command>")
-				}
-				cmdStr := strings.TrimPrefix(input, ":run ")
-				runCmd := exec.Command("sh", "-c", cmdStr)
-				runCmd.Dir = sb.Root()
-				output, err := runCmd.CombinedOutput()
-				text := strings.TrimRight(string(output), "\n")
-				if err != nil {
-					return true, "", scheme.Error(text)
-				}
-				return true, "", text
-			},
-		},
-		":exec": {
-			Desc: "Execute a command with approval",
-			Args: "<cmd>",
-			Fn: func(input string, parts []string, a *agent.Agent) (bool, string, string) {
-				if len(parts) < 2 {
-					return true, "", scheme.Error("usage: :exec <command>")
-				}
-				cmdStr := strings.TrimPrefix(input, ":exec ")
-				if !a.Confirm(fmt.Sprintf("Execute command: %s", cmdStr)) {
-					return true, "", scheme.Info("exec", "cancelled")
-				}
-				runCmd := exec.Command("sh", "-c", cmdStr)
-				runCmd.Dir = sb.Root()
-				output, err := runCmd.CombinedOutput()
-				text := strings.TrimRight(string(output), "\n")
-				if err != nil {
-					return true, "", scheme.Error(text)
-				}
-				return true, "", text
-			},
-		},
+type run struct{ sb *sandbox.Sandbox }
+
+func (r run) name() string { return "run" }
+func (r run) desc() string { return "Run a shell command directly" }
+func (r run) args() string { return "<cmd>" }
+func (r run) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+	if len(parts) < 2 {
+		return true, "", scheme.Error("usage: :run <command>")
 	}
+	cmdStr := strings.TrimPrefix(input, ":run ")
+	return true, "", runShell(r.sb, cmdStr, scheme)
+}
+
+type execCmd struct{ sb *sandbox.Sandbox }
+
+func (e execCmd) name() string { return "exec" }
+func (e execCmd) desc() string { return "Execute a command with approval" }
+func (e execCmd) args() string { return "<cmd>" }
+func (e execCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+	if len(parts) < 2 {
+		return true, "", scheme.Error("usage: :exec <command>")
+	}
+	cmdStr := strings.TrimPrefix(input, ":exec ")
+	if !a.Confirm(fmt.Sprintf("Execute command: %s", cmdStr)) {
+		return true, "", scheme.Info("exec", "cancelled")
+	}
+	return true, "", runShell(e.sb, cmdStr, scheme)
+}
+
+func runShell(sb *sandbox.Sandbox, cmdStr string, scheme ui.Scheme) string {
+	runCmd := exec.Command("sh", "-c", cmdStr)
+	runCmd.Dir = sb.Root()
+	output, err := runCmd.CombinedOutput()
+	text := strings.TrimRight(string(output), "\n")
+	if err != nil {
+		return scheme.Error(text)
+	}
+	return text
 }
