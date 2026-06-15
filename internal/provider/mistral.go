@@ -17,6 +17,7 @@ type mistral struct {
 	model    string
 	baseURL  string
 	cacheKey string
+	effort   Effort
 	client   *http.Client
 }
 
@@ -44,9 +45,26 @@ func newCacheKey() string {
 	return "koko-" + hex.EncodeToString(buf)
 }
 
-func (m *mistral) Name() string      { return "mistral" }
-func (m *mistral) Model() string     { return m.model }
-func (m *mistral) SetModel(s string) { m.model = s }
+func (m *mistral) Name() string       { return "mistral" }
+func (m *mistral) Model() string      { return m.model }
+func (m *mistral) SetModel(s string)  { m.model = s }
+func (m *mistral) Effort() Effort     { return m.effort }
+func (m *mistral) SetEffort(e Effort) { m.effort = e }
+
+// mistralReasoningEffort maps the abstract effort level onto Mistral's
+// reasoning_effort, which only accepts "high" or "none". low collapses to
+// "none"; medium and high both map to "high". Returns "" to omit the field.
+// Note: native-reasoning models (magistral) reject this with HTTP 422.
+func mistralReasoningEffort(e Effort) string {
+	switch e {
+	case EffortLow:
+		return "none"
+	case EffortMedium, EffortHigh:
+		return "high"
+	default:
+		return ""
+	}
+}
 
 func toMistralMsgs(msgs []Msg) []mistralMsg {
 	var out []mistralMsg
@@ -77,10 +95,11 @@ func toMistralMsgs(msgs []Msg) []mistralMsg {
 
 func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
 	reqBody := mistralReq{
-		Model:          m.model,
-		Msgs:           toMistralMsgs(msgs),
-		Stream:         true,
-		PromptCacheKey: m.cacheKey,
+		Model:           m.model,
+		Msgs:            toMistralMsgs(msgs),
+		Stream:          true,
+		PromptCacheKey:  m.cacheKey,
+		ReasoningEffort: mistralReasoningEffort(m.effort),
 	}
 	for _, t := range tools {
 		reqBody.Tools = append(reqBody.Tools, mistralTool{
@@ -206,11 +225,12 @@ type mistralTool struct {
 }
 
 type mistralReq struct {
-	Model          string        `json:"model"`
-	Msgs           []mistralMsg  `json:"messages"`
-	Tools          []mistralTool `json:"tools,omitempty"`
-	Stream         bool          `json:"stream,omitempty"`
-	PromptCacheKey string        `json:"prompt_cache_key,omitempty"`
+	Model           string        `json:"model"`
+	Msgs            []mistralMsg  `json:"messages"`
+	Tools           []mistralTool `json:"tools,omitempty"`
+	Stream          bool          `json:"stream,omitempty"`
+	PromptCacheKey  string        `json:"prompt_cache_key,omitempty"`
+	ReasoningEffort string        `json:"reasoning_effort,omitempty"`
 }
 
 type mistralStreamChunk struct {

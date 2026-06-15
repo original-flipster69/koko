@@ -135,6 +135,18 @@ func (a *Agent) SetModel(model string) {
 	a.provider.SetModel(model)
 }
 
+func (a *Agent) Effort() provider.Effort {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.provider.Effort()
+}
+
+func (a *Agent) SetEffort(e provider.Effort) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.provider.SetEffort(e)
+}
+
 func (a *Agent) SetIgnore(m *ignore.Matcher) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

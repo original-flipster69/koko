@@ -65,11 +65,44 @@ type StreamDelta struct {
 	Response *Response
 }
 
+type Effort string
+
+const (
+	EffortDefault Effort = ""
+	EffortLow     Effort = "low"
+	EffortMedium  Effort = "medium"
+	EffortHigh    Effort = "high"
+)
+
+func ParseEffort(s string) (Effort, bool) {
+	switch s {
+	case "default":
+		return EffortDefault, true
+	case string(EffortLow):
+		return EffortLow, true
+	case string(EffortMedium):
+		return EffortMedium, true
+	case string(EffortHigh):
+		return EffortHigh, true
+	default:
+		return EffortDefault, false
+	}
+}
+
+func (e Effort) String() string {
+	if e == EffortDefault {
+		return "default"
+	}
+	return string(e)
+}
+
 type Provider interface {
 	ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error)
 	Name() string
 	Model() string
 	SetModel(model string)
+	Effort() Effort
+	SetEffort(e Effort)
 }
 
 type TokenCounter interface {

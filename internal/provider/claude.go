@@ -15,6 +15,7 @@ type claude struct {
 	model     string
 	baseURL   string
 	maxTokens int
+	effort    Effort
 	client    *http.Client
 }
 
@@ -41,9 +42,11 @@ var ephemeral = map[string]string{"type": "ephemeral"}
 
 var _ TokenCounter = (*claude)(nil)
 
-func (a *claude) Name() string      { return "claude" }
-func (a *claude) Model() string     { return a.model }
-func (a *claude) SetModel(m string) { a.model = m }
+func (a *claude) Name() string       { return "claude" }
+func (a *claude) Model() string      { return a.model }
+func (a *claude) SetModel(m string)  { a.model = m }
+func (a *claude) Effort() Effort     { return a.effort }
+func (a *claude) SetEffort(e Effort) { a.effort = e }
 
 func (a *claude) request(msgs []Msg, tools []ToolDef, stream bool) claudeReq {
 	var system string
@@ -100,6 +103,10 @@ func (a *claude) request(msgs []Msg, tools []ToolDef, stream bool) claudeReq {
 			Description: t.Description,
 			InputSchema: t.Params,
 		})
+	}
+	if a.effort != EffortDefault {
+		reqBody.Thinking = &claudeThinking{Type: "adaptive"}
+		reqBody.Effort = string(a.effort)
 	}
 	markCacheBreakpoints(&reqBody)
 	return reqBody
@@ -265,12 +272,18 @@ type claudeTool struct {
 }
 
 type claudeReq struct {
-	Model     string       `json:"model"`
-	MaxTokens int          `json:"max_tokens"`
-	System    interface{}  `json:"system,omitempty"`
-	Msgs      []claudeMsg  `json:"messages"`
-	Tools     []claudeTool `json:"tools,omitempty"`
-	Stream    bool         `json:"stream,omitempty"`
+	Model     string          `json:"model"`
+	MaxTokens int             `json:"max_tokens"`
+	System    interface{}     `json:"system,omitempty"`
+	Msgs      []claudeMsg     `json:"messages"`
+	Tools     []claudeTool    `json:"tools,omitempty"`
+	Stream    bool            `json:"stream,omitempty"`
+	Thinking  *claudeThinking `json:"thinking,omitempty"`
+	Effort    string          `json:"effort,omitempty"`
+}
+
+type claudeThinking struct {
+	Type string `json:"type"`
 }
 
 type claudeCountReq struct {

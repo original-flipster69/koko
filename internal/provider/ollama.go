@@ -16,6 +16,7 @@ const ollamaKeepAlive = "30m"
 type ollama struct {
 	model   string
 	baseURL string
+	effort  Effort
 	client  *http.Client
 }
 
@@ -33,9 +34,11 @@ func newOllama(model, baseURL string) (*ollama, error) {
 	}, nil
 }
 
-func (o *ollama) Name() string      { return "ollama" }
-func (o *ollama) Model() string     { return o.model }
-func (o *ollama) SetModel(m string) { o.model = m }
+func (o *ollama) Name() string       { return "ollama" }
+func (o *ollama) Model() string      { return o.model }
+func (o *ollama) SetModel(m string)  { o.model = m }
+func (o *ollama) Effort() Effort     { return o.effort }
+func (o *ollama) SetEffort(e Effort) { o.effort = e }
 
 func toOllamaMsgs(messages []Msg) []ollamaMsg {
 	var out []ollamaMsg
@@ -55,6 +58,7 @@ func (o *ollama) ChatStream(ctx context.Context, messages []Msg, tools []ToolDef
 		Messages:  toOllamaMsgs(messages),
 		Stream:    true,
 		KeepAlive: ollamaKeepAlive,
+		Think:     string(o.effort),
 	}
 	if len(tools) > 0 {
 		reqBody.Tools = toOllama(tools)
@@ -200,6 +204,7 @@ type ollamaReq struct {
 	Stream    bool         `json:"stream"`
 	Tools     []ollamaTool `json:"tools,omitempty"`
 	KeepAlive string       `json:"keep_alive,omitempty"`
+	Think     string       `json:"think,omitempty"`
 }
 
 type ollamaResp struct {

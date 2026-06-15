@@ -62,6 +62,67 @@ func TestMistralPromptCacheKey(t *testing.T) {
 	}
 }
 
+func TestParseEffort(t *testing.T) {
+	cases := map[string]struct {
+		want Effort
+		ok   bool
+	}{
+		"default": {EffortDefault, true},
+		"low":     {EffortLow, true},
+		"medium":  {EffortMedium, true},
+		"high":    {EffortHigh, true},
+		"HIGH":    {EffortDefault, false},
+		"":        {EffortDefault, false},
+		"bogus":   {EffortDefault, false},
+	}
+	for in, c := range cases {
+		got, ok := ParseEffort(in)
+		if got != c.want || ok != c.ok {
+			t.Errorf("ParseEffort(%q) = (%v, %v), want (%v, %v)", in, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestClaudeEffortAdaptive(t *testing.T) {
+	a, _ := newClaude("key", "claude-opus-4-8", "", 0)
+	req := a.request([]Msg{{Role: User, Content: "hi"}}, nil, false)
+	if req.Thinking != nil || req.Effort != "" {
+		t.Errorf("default effort must omit thinking/effort, got thinking=%v effort=%q", req.Thinking, req.Effort)
+	}
+	a.SetEffort(EffortHigh)
+	req = a.request([]Msg{{Role: User, Content: "hi"}}, nil, false)
+	if req.Thinking == nil || req.Thinking.Type != "adaptive" || req.Effort != "high" {
+		t.Errorf("high effort should set adaptive thinking + effort=high, got %+v effort=%q", req.Thinking, req.Effort)
+	}
+}
+
+func TestMistralEffortMapping(t *testing.T) {
+	cases := map[Effort]string{
+		EffortDefault: "",
+		EffortLow:     "none",
+		EffortMedium:  "high",
+		EffortHigh:    "high",
+	}
+	for level, want := range cases {
+		if got := mistralReasoningEffort(level); got != want {
+			t.Errorf("mistralReasoningEffort(%v) = %q, want %q", level, got, want)
+		}
+	}
+}
+
+func TestOllamaEffortOmittedByDefault(t *testing.T) {
+	o, _ := newOllama("llama3", "")
+	data, _ := json.Marshal(ollamaReq{Model: o.model, Think: string(o.effort)})
+	if strings.Contains(string(data), "think") {
+		t.Errorf("default effort must omit think, got %s", data)
+	}
+	o.SetEffort(EffortMedium)
+	data, _ = json.Marshal(ollamaReq{Model: o.model, Think: string(o.effort)})
+	if !strings.Contains(string(data), `"think":"medium"`) {
+		t.Errorf("medium effort should serialize think=medium, got %s", data)
+	}
+}
+
 func TestClaudeUsageTagsParse(t *testing.T) {
 	raw := `{"input_tokens": 10, "output_tokens": 20, "cache_creation_input_tokens": 5, "cache_read_input_tokens": 100}`
 	var u claudeUsg

@@ -153,7 +153,7 @@ func Run(opts Flags) error {
 		run{sb},
 		memoriesCmd{memoStore},
 		playsCmd{playsReg},
-		model{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
+		model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
 		reload{cfgPath, opts, apply}, cageCmd{kokoRoot, sb.Root()},
 	)
 	register(cmds, help{cmds})

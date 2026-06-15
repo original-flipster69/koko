@@ -10,6 +10,7 @@ import (
 
 	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
+	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
@@ -27,6 +28,24 @@ func (m model) do(opts cmdOpts) (bool, string, string) {
 	return true, "", opts.scheme().Info("model", fmt.Sprintf("switched to %s", parts[1]))
 }
 
+type effort struct{}
+
+func (e effort) name() string { return "effort" }
+func (e effort) desc() string { return "Show or set reasoning effort" }
+func (e effort) args() string { return "[default|low|medium|high]" }
+func (e effort) do(opts cmdOpts) (bool, string, string) {
+	parts := opts.parts()
+	if len(parts) < 2 {
+		return true, "", opts.scheme().Info("effort", opts.a.Effort().String())
+	}
+	level, ok := provider.ParseEffort(parts[1])
+	if !ok {
+		return true, "", opts.scheme().Error("usage: :effort [default|low|medium|high]")
+	}
+	opts.a.SetEffort(level)
+	return true, "", opts.scheme().Info("effort", fmt.Sprintf("set to %s", level))
+}
+
 type configCmd struct {
 	cfg     *config.Config
 	kokoDir string
@@ -40,6 +59,7 @@ func (c configCmd) do(opts cmdOpts) (bool, string, string) {
 	var b strings.Builder
 	b.WriteString(scheme.Info("provider", string(c.cfg.Llm.Provider)) + "\n")
 	b.WriteString(scheme.Info("model", c.cfg.Llm.Model) + "\n")
+	b.WriteString(scheme.Info("effort", opts.a.Effort().String()) + "\n")
 	b.WriteString(scheme.Info("sandbox", c.cfg.Sandbox.Root) + "\n")
 	b.WriteString(scheme.Info("max_tok", fmt.Sprintf("%d", c.cfg.Llm.MaxTokens)) + "\n")
 	b.WriteString(scheme.Info("session", fmt.Sprintf("%d max tokens", c.cfg.Llm.MaxSessionTokens)) + "\n")

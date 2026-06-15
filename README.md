@@ -156,6 +156,7 @@ As you type, koko recognizes when the current line is a known command or install
 | `:run <cmd>` | Run a shell command directly (bypasses agent) |
 | `:compact` | Summarize history to reclaim context |
 | `:model [name]` | Show or switch the active model |
+| `:effort [default\|low\|medium\|high]` | Show or set reasoning effort (mapped per provider) |
 | `:config` | Display the active configuration |
 | `:save` | Save the current session to disk |
 | `:resume` | Restore a saved session |
