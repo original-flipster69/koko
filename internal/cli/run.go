@@ -212,77 +212,10 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-type configDiff struct {
-	provider, model, verbs, maxTokens, scrubPII, execLimits, cmdPolicy, ignore, colorScheme bool
-	sandboxRoot, sandboxDirs, denyFiles, maxFileSize                                        bool
-}
-
-func diffConfig(cur, next *config.Config) configDiff {
-	providerChanged := next.Llm.Provider != cur.Llm.Provider ||
-		next.Llm.Url != cur.Llm.Url ||
-		next.Llm.ApiKey != cur.Llm.ApiKey
-	return configDiff{
-		provider:    providerChanged,
-		model:       !providerChanged && next.Llm.Model != cur.Llm.Model,
-		verbs:       !equalStrings(next.Style.ThinkingVerbs, cur.Style.ThinkingVerbs),
-		maxTokens:   next.Llm.MaxSessionTokens != cur.Llm.MaxSessionTokens,
-		scrubPII:    next.Sandbox.ScrubPII != cur.Sandbox.ScrubPII,
-		execLimits:  next.Sandbox.Exec.Profile != cur.Sandbox.Exec.Profile,
-		cmdPolicy:   !equalStrings(next.Sandbox.Exec.Allow, cur.Sandbox.Exec.Allow) || !equalStrings(next.Sandbox.Exec.Deny, cur.Sandbox.Exec.Deny),
-		ignore:      next.Ignore.Mode != cur.Ignore.Mode || !equalStrings(next.Ignore.Files, cur.Ignore.Files),
-		colorScheme: !equalIntMap(next.Style.ColorScheme, cur.Style.ColorScheme),
-		sandboxRoot: next.Sandbox.Root != cur.Sandbox.Root,
-		sandboxDirs: !equalStrings(next.Sandbox.AdditionalDirs, cur.Sandbox.AdditionalDirs),
-		denyFiles:   !equalStrings(next.Sandbox.DenyFiles, cur.Sandbox.DenyFiles),
-		maxFileSize: next.Sandbox.MaxFileSize != cur.Sandbox.MaxFileSize,
-	}
-}
-
-func (d configDiff) liveLabels() []string {
-	var l []string
-	for _, e := range []struct {
-		on    bool
-		label string
-	}{
-		{d.provider, "provider"},
-		{d.model, "model"},
-		{d.verbs, "thinking verbs"},
-		{d.maxTokens, "max session tokens"},
-		{d.scrubPII, "scrub_pii"},
-		{d.execLimits, "exec profile"},
-		{d.cmdPolicy, "command policy"},
-		{d.ignore, "ignore"},
-		{d.colorScheme, "color scheme"},
-	} {
-		if e.on {
-			l = append(l, e.label)
-		}
-	}
-	return l
-}
-
-func (d configDiff) restartLabels() []string {
-	var l []string
-	for _, e := range []struct {
-		on    bool
-		label string
-	}{
-		{d.sandboxRoot, "sandbox root"},
-		{d.sandboxDirs, "additional dirs"},
-		{d.denyFiles, "deny files"},
-		{d.maxFileSize, "max file size"},
-	} {
-		if e.on {
-			l = append(l, e.label)
-		}
-	}
-	return l
-}
-
 func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applied, restart []string) {
-	d := diffConfig(cur, &next)
+	d := cur.Diff(&next)
 
-	if d.provider {
+	if d.Provider {
 		if p, err := provider.New(&next.Llm); err == nil {
 			a.SetProvider(p)
 			cur.Llm.Provider = next.Llm.Provider
@@ -291,22 +224,22 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 			cur.Llm.Model = next.Llm.Model
 			applied = append(applied, "provider")
 		}
-	} else if d.model {
+	} else if d.Model {
 		a.SetModel(next.Llm.Model)
 		cur.Llm.Model = next.Llm.Model
 		applied = append(applied, "model")
 	}
-	if d.verbs {
+	if d.Verbs {
 		a.SetThinkingVerbs(next.Style.ThinkingVerbs)
 		cur.Style.ThinkingVerbs = next.Style.ThinkingVerbs
 		applied = append(applied, "thinking verbs")
 	}
-	if d.maxTokens {
+	if d.MaxTokens {
 		a.SetMaxSessionTokens(next.Llm.MaxSessionTokens)
 		cur.Llm.MaxSessionTokens = next.Llm.MaxSessionTokens
 		applied = append(applied, "max session tokens")
 	}
-	if d.scrubPII {
+	if d.ScrubPII {
 		var filters []agent.OutboundFilter
 		if next.Sandbox.ScrubPII {
 			filters = append(filters, agent.ScrubPIIFilter)
@@ -315,13 +248,16 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 		cur.Sandbox.ScrubPII = next.Sandbox.ScrubPII
 		applied = append(applied, "scrub_pii")
 	}
-	if d.execLimits {
+	if d.SuppressPrivacyWarning {
+		applied = append(applied, "suppress privacy warning")
+	}
+	if d.ExecLimits {
 		cpuSec, memMB, fileMB := next.Sandbox.Exec.Limits()
 		a.SetExecLimits(cpuSec, memMB, fileMB)
 		cur.Sandbox.Exec.Profile = next.Sandbox.Exec.Profile
 		applied = append(applied, "exec profile")
 	}
-	if d.cmdPolicy {
+	if d.CmdPolicy {
 		if p, err := policy.NewCommandPolicy(next.Sandbox.Exec.Allow, next.Sandbox.Exec.Deny); err == nil {
 			a.SetCmdPolicy(p)
 			cur.Sandbox.Exec.Allow = next.Sandbox.Exec.Allow
@@ -329,7 +265,7 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 			applied = append(applied, "command policy")
 		}
 	}
-	if d.ignore {
+	if d.Ignore {
 		var m *ignore.Matcher
 		if next.Ignore.Mode == config.Custom {
 			m = ignore.NewFromPatterns(next.Ignore.Files)
@@ -340,7 +276,7 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 		cur.Ignore = next.Ignore
 		applied = append(applied, "ignore")
 	}
-	if d.colorScheme {
+	if d.ColorScheme {
 		if s, err := ui.DefaultScheme().With(next.Style.ColorScheme); err == nil {
 			a.SetScheme(s)
 			cur.Style.ColorScheme = next.Style.ColorScheme
@@ -348,31 +284,7 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 		}
 	}
 
-	return applied, append(restart, d.restartLabels()...)
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func equalIntMap(a, b map[string]int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if bv, ok := b[k]; !ok || bv != v {
-			return false
-		}
-	}
-	return true
+	return applied, append(restart, d.RestartLabels()...)
 }
 
 func register(cmds map[string]command, list ...cmdDef) {

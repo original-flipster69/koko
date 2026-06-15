@@ -344,3 +344,73 @@ func apiKeyEnvName(p Provider) string {
 func Path(kokoDir string) string {
 	return filepath.Join(kokoDir, ConfFile)
 }
+
+type Diff struct {
+	Provider, Model, Verbs, MaxTokens, ScrubPII, ExecLimits, CmdPolicy, Ignore, ColorScheme bool
+	sandboxRoot, sandboxDirs, denyFiles, maxFileSize, SuppressPrivacyWarning                bool
+}
+
+// FIXME at some point clearly show old vs new value instead just 'changed'
+func (c *Config) Diff(next *Config) Diff {
+	providerChanged := next.Llm.Provider != c.Llm.Provider ||
+		next.Llm.Url != c.Llm.Url ||
+		next.Llm.ApiKey != c.Llm.ApiKey
+	return Diff{
+		Provider:               providerChanged,
+		Model:                  !providerChanged && next.Llm.Model != c.Llm.Model,
+		Verbs:                  !equalStrings(next.Style.ThinkingVerbs, c.Style.ThinkingVerbs),
+		MaxTokens:              next.Llm.MaxSessionTokens != c.Llm.MaxSessionTokens,
+		ScrubPII:               next.Sandbox.ScrubPII != c.Sandbox.ScrubPII,
+		ExecLimits:             next.Sandbox.Exec.Profile != c.Sandbox.Exec.Profile,
+		CmdPolicy:              !equalStrings(next.Sandbox.Exec.Allow, c.Sandbox.Exec.Allow) || !equalStrings(next.Sandbox.Exec.Deny, c.Sandbox.Exec.Deny),
+		Ignore:                 next.Ignore.Mode != c.Ignore.Mode || !equalStrings(next.Ignore.Files, c.Ignore.Files),
+		ColorScheme:            !equalIntMap(next.Style.ColorScheme, c.Style.ColorScheme),
+		sandboxRoot:            next.Sandbox.Root != c.Sandbox.Root,
+		sandboxDirs:            !equalStrings(next.Sandbox.AdditionalDirs, c.Sandbox.AdditionalDirs),
+		denyFiles:              !equalStrings(next.Sandbox.DenyFiles, c.Sandbox.DenyFiles),
+		maxFileSize:            next.Sandbox.MaxFileSize != c.Sandbox.MaxFileSize,
+		SuppressPrivacyWarning: next.Sandbox.SuppressPrivacyWarning != c.Sandbox.SuppressPrivacyWarning,
+	}
+}
+
+func (d Diff) RestartLabels() []string {
+	var l []string
+	for _, e := range []struct {
+		on    bool
+		label string
+	}{
+		{d.sandboxRoot, "sandbox root"},
+		{d.sandboxDirs, "additional dirs"},
+		{d.denyFiles, "deny files"},
+		{d.maxFileSize, "max file size"},
+	} {
+		if e.on {
+			l = append(l, e.label)
+		}
+	}
+	return l
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalIntMap(a, b map[string]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
+			return false
+		}
+	}
+	return true
+}
