@@ -86,13 +86,20 @@ func TestParseEffort(t *testing.T) {
 func TestClaudeEffortAdaptive(t *testing.T) {
 	a, _ := newClaude("key", "claude-opus-4-8", "", 0)
 	req := a.request([]Msg{{Role: User, Content: "hi"}}, nil, false)
-	if req.Thinking != nil || req.Effort != "" {
-		t.Errorf("default effort must omit thinking/effort, got thinking=%v effort=%q", req.Thinking, req.Effort)
+	if req.Thinking != nil || req.OutputConfig != nil {
+		t.Errorf("default effort must omit thinking/output_config, got thinking=%v output_config=%v", req.Thinking, req.OutputConfig)
 	}
 	a.SetEffort(EffortHigh)
 	req = a.request([]Msg{{Role: User, Content: "hi"}}, nil, false)
-	if req.Thinking == nil || req.Thinking.Type != "adaptive" || req.Effort != "high" {
-		t.Errorf("high effort should set adaptive thinking + effort=high, got %+v effort=%q", req.Thinking, req.Effort)
+	if req.Thinking == nil || req.Thinking.Type != "adaptive" {
+		t.Errorf("high effort should enable adaptive thinking, got %+v", req.Thinking)
+	}
+	if req.OutputConfig == nil || req.OutputConfig.Effort != "high" {
+		t.Errorf("high effort should set output_config.effort=high, got %+v", req.OutputConfig)
+	}
+	data, _ := json.Marshal(req)
+	if !strings.Contains(string(data), `"output_config":{"effort":"high"}`) {
+		t.Errorf("serialized request should nest effort under output_config, got %s", data)
 	}
 }
 

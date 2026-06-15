@@ -106,7 +106,7 @@ func (a *claude) request(msgs []Msg, tools []ToolDef, stream bool) claudeReq {
 	}
 	if a.effort != EffortDefault {
 		reqBody.Thinking = &claudeThinking{Type: "adaptive"}
-		reqBody.Effort = string(a.effort)
+		reqBody.OutputConfig = &claudeOutputConfig{Effort: string(a.effort)}
 	}
 	markCacheBreakpoints(&reqBody)
 	return reqBody
@@ -272,18 +272,22 @@ type claudeTool struct {
 }
 
 type claudeReq struct {
-	Model     string          `json:"model"`
-	MaxTokens int             `json:"max_tokens"`
-	System    interface{}     `json:"system,omitempty"`
-	Msgs      []claudeMsg     `json:"messages"`
-	Tools     []claudeTool    `json:"tools,omitempty"`
-	Stream    bool            `json:"stream,omitempty"`
-	Thinking  *claudeThinking `json:"thinking,omitempty"`
-	Effort    string          `json:"effort,omitempty"`
+	Model        string              `json:"model"`
+	MaxTokens    int                 `json:"max_tokens"`
+	System       interface{}         `json:"system,omitempty"`
+	Msgs         []claudeMsg         `json:"messages"`
+	Tools        []claudeTool        `json:"tools,omitempty"`
+	Stream       bool                `json:"stream,omitempty"`
+	Thinking     *claudeThinking     `json:"thinking,omitempty"`
+	OutputConfig *claudeOutputConfig `json:"output_config,omitempty"`
 }
 
 type claudeThinking struct {
 	Type string `json:"type"`
+}
+
+type claudeOutputConfig struct {
+	Effort string `json:"effort,omitempty"`
 }
 
 type claudeCountReq struct {
