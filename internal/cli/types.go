@@ -29,9 +29,3 @@ type command struct {
 	args string
 	fn   func(opts cmdOpts) (handled bool, prompt string, output string)
 }
-
-func register(cmds map[string]command, list ...cmdDef) {
-	for _, c := range list {
-		cmds[":"+c.name()] = command{desc: c.desc(), args: c.args(), fn: c.do}
-	}
-}

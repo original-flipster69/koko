@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -65,6 +66,10 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
 		return fmt.Errorf("failed to initialize UI scheme: %v", err)
+	}
+
+	if !cfg.Sandbox.SuppressElevatedWarning && isElevated() && !confirmElevated(os.Stdin, os.Stdout) {
+		return fmt.Errorf("aborted: not starting with elevated privileges")
 	}
 
 	playDir := filepath.Join(kokoRoot, playsDir)
@@ -179,6 +184,12 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 	return terminal.Run(a, kokoRoot, ui.MascotFrames(scheme), colonHandler, knownCommands, scheme)
 }
 
+func register(cmds map[string]command, list ...cmdDef) {
+	for _, c := range list {
+		cmds[":"+c.name()] = command{desc: c.desc(), args: c.args(), fn: c.do}
+	}
+}
+
 func kokoDir() string {
 	if runtime.GOOS == "windows" {
 		return filepath.Join(os.Getenv("APPDATA"), "koko")
@@ -263,4 +274,19 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func isElevated() bool {
+	if runtime.GOOS == "windows" {
+		return os.Geteuid() == 0
+	}
+	return os.Getuid() == 0
+}
+
+func confirmElevated(r io.Reader, w io.Writer) bool {
+	fmt.Fprintf(w, "Running with elevated privileges. Continue? [y/N] ")
+	reader := bufio.NewReader(r)
+	answer, _ := reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
 }
