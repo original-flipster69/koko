@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/plays"
-	"github.com/original-flipster69/koko/internal/ui"
 )
 
 type playsCmd struct{ registry *plays.Registry }
@@ -14,7 +12,8 @@ type playsCmd struct{ registry *plays.Registry }
 func (p playsCmd) name() string { return "plays" }
 func (p playsCmd) desc() string { return "List installed plays" }
 func (p playsCmd) args() string { return "" }
-func (p playsCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (p playsCmd) do(opts cmdOpts) (bool, string, string) {
+	scheme := opts.scheme
 	list := p.registry.List()
 	if len(list) == 0 {
 		return true, "", scheme.Info("plays", fmt.Sprintf("none installed — add *.md files in %s", p.registry.Dir()))

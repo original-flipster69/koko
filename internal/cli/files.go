@@ -7,10 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/sandbox"
-	"github.com/original-flipster69/koko/internal/ui"
 )
 
 const visionMaxFiles = 1000
@@ -23,7 +21,8 @@ type vision struct {
 func (v vision) name() string { return "vision" }
 func (v vision) desc() string { return "List files visible to the agent (after deny & ignore)" }
 func (v vision) args() string { return "" }
-func (v vision) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (v vision) do(opts cmdOpts) (bool, string, string) {
+	scheme := opts.scheme
 	files, capped, err := visibleFiles(v.sb, v.ignore)
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("vision failed: %v", err))

@@ -7,11 +7,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/provider"
-	"github.com/original-flipster69/koko/internal/ui"
 )
 
 type model struct{ llm provider.Provider }
@@ -19,12 +17,13 @@ type model struct{ llm provider.Provider }
 func (m model) name() string { return "model" }
 func (m model) desc() string { return "Show or switch model" }
 func (m model) args() string { return "[name]" }
-func (m model) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (m model) do(opts cmdOpts) (bool, string, string) {
+	parts := opts.parts()
 	if len(parts) < 2 {
-		return true, "", scheme.Info("model", m.llm.Model())
+		return true, "", opts.scheme.Info("model", m.llm.Model())
 	}
 	m.llm.SetModel(parts[1])
-	return true, "", scheme.Info("model", fmt.Sprintf("switched to %s", parts[1]))
+	return true, "", opts.scheme.Info("model", fmt.Sprintf("switched to %s", parts[1]))
 }
 
 type configCmd struct {
@@ -35,7 +34,8 @@ type configCmd struct {
 func (c configCmd) name() string { return "config" }
 func (c configCmd) desc() string { return "Show active configuration" }
 func (c configCmd) args() string { return "" }
-func (c configCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (c configCmd) do(opts cmdOpts) (bool, string, string) {
+	scheme := opts.scheme
 	var b strings.Builder
 	b.WriteString(scheme.Info("provider", string(c.cfg.Llm.Provider)) + "\n")
 	b.WriteString(scheme.Info("model", c.cfg.Llm.Model) + "\n")
@@ -55,11 +55,11 @@ type save struct{ kokoDir string }
 func (s save) name() string { return "save" }
 func (s save) desc() string { return "Save session to disk" }
 func (s save) args() string { return "" }
-func (s save) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
-	if err := a.SaveSession(s.kokoDir); err != nil {
-		return true, "", scheme.Error(fmt.Sprintf("save failed: %v", err))
+func (s save) do(opts cmdOpts) (bool, string, string) {
+	if err := opts.a.SaveSession(s.kokoDir); err != nil {
+		return true, "", opts.scheme.Error(fmt.Sprintf("save failed: %v", err))
 	}
-	return true, "", scheme.Info("saved", "session written to disk")
+	return true, "", opts.scheme.Info("saved", "session written to disk")
 }
 
 type resume struct{ kokoDir string }
@@ -67,11 +67,11 @@ type resume struct{ kokoDir string }
 func (r resume) name() string { return "resume" }
 func (r resume) desc() string { return "Restore saved session" }
 func (r resume) args() string { return "" }
-func (r resume) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
-	if err := a.LoadSession(r.kokoDir); err != nil {
-		return true, "", scheme.Error(fmt.Sprintf("resume failed: %v", err))
+func (r resume) do(opts cmdOpts) (bool, string, string) {
+	if err := opts.a.LoadSession(r.kokoDir); err != nil {
+		return true, "", opts.scheme.Error(fmt.Sprintf("resume failed: %v", err))
 	}
-	return true, "", scheme.Info("resumed", fmt.Sprintf("loaded %d messages", a.HistoryLen()))
+	return true, "", opts.scheme.Info("resumed", fmt.Sprintf("loaded %d messages", opts.a.HistoryLen()))
 }
 
 type reload struct {
@@ -84,12 +84,13 @@ type reload struct {
 func (r reload) name() string { return "reload" }
 func (r reload) desc() string { return "Reload config from its sources" }
 func (r reload) args() string { return "" }
-func (r reload) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (r reload) do(opts cmdOpts) (bool, string, string) {
+	scheme := opts.scheme
 	newCfg, err := loadConfig(r.cfgPath, r.opts)
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("reload failed (keeping current config): %v", err))
 	}
-	applied, restart := applyReloadedConfig(r.cfg, newCfg, r.llm.SetModel, a.SetThinkingVerbs, a.SetMaxSessionTokens)
+	applied, restart := applyReloadedConfig(r.cfg, newCfg, r.llm.SetModel, opts.a.SetThinkingVerbs, opts.a.SetMaxSessionTokens)
 	if len(applied) == 0 && len(restart) == 0 {
 		return true, "", scheme.Info("reload", "config reloaded — no changes detected")
 	}
@@ -111,11 +112,13 @@ type cageCmd struct {
 func (c cageCmd) name() string { return "cage" }
 func (c cageCmd) desc() string { return "Generate a low-privilege user setup script" }
 func (c cageCmd) args() string { return "<username> [dir=…] [group=…] [os=darwin|linux]" }
-func (c cageCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Scheme) (bool, string, string) {
+func (c cageCmd) do(opts cmdOpts) (bool, string, string) {
+	scheme := opts.scheme
+	parts := opts.parts()
 	if len(parts) < 2 {
 		return true, "", scheme.Error("usage: :cage <username> [dir=PATH] [group=NAME] [os=darwin|linux]")
 	}
-	opts := cage.Options{Username: parts[1], GOOS: runtime.GOOS}
+	co := cage.Options{Username: parts[1], GOOS: runtime.GOOS}
 	outDir := c.kokoDir
 	for _, tok := range parts[2:] {
 		k, v, ok := strings.Cut(tok, "=")
@@ -126,9 +129,9 @@ func (c cageCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Sche
 		case "dir":
 			outDir = v
 		case "group":
-			opts.Group = v
+			co.Group = v
 		case "os":
-			opts.GOOS = v
+			co.GOOS = v
 		default:
 			return true, "", scheme.Error(fmt.Sprintf("unknown option %q (allowed: dir, group, os)", k))
 		}
@@ -136,7 +139,7 @@ func (c cageCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Sche
 	if !filepath.IsAbs(outDir) {
 		outDir = filepath.Join(c.sandboxRoot, outDir)
 	}
-	script, err := cage.Generate(opts)
+	script, err := cage.Generate(co)
 	if err != nil {
 		return true, "", scheme.Error(err.Error())
 	}
@@ -148,7 +151,7 @@ func (c cageCmd) do(input string, parts []string, a *agent.Agent, scheme ui.Sche
 		return true, "", scheme.Error(fmt.Sprintf("cannot write cage script: %v", err))
 	}
 	var b strings.Builder
-	b.WriteString(scheme.Info("cage", fmt.Sprintf("setup script for user %q (group %q, %s)", script.Username, script.Group, opts.GOOS)) + "\n")
+	b.WriteString(scheme.Info("cage", fmt.Sprintf("setup script for user %q (group %q, %s)", script.Username, script.Group, co.GOOS)) + "\n")
 	b.WriteString(scheme.Info("path", dest) + "\n")
 	b.WriteString(scheme.Info("note", "a random password was generated inside — change it there before running") + "\n")
 	b.WriteString(scheme.Info("run", fmt.Sprintf("review it, then: sudo sh %s", dest)))

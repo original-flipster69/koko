@@ -165,7 +165,7 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 		}
 		name := parts[0]
 		if c, ok := cmds[name]; ok {
-			return c.fn(input, parts, a, scheme)
+			return c.fn(cmdOpts{input: input, a: a, scheme: scheme})
 		}
 		playName := strings.TrimPrefix(name, ":")
 		if p, ok := playsReg.Get(playName); ok {
