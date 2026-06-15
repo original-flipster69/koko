@@ -13,17 +13,14 @@ import (
 
 const visionMaxFiles = 1000
 
-type vision struct {
-	sb     *sandbox.Sandbox
-	ignore *ignore.Matcher
-}
+type vision struct{}
 
 func (v vision) name() string { return "vision" }
 func (v vision) desc() string { return "List files visible to the agent (after deny & ignore)" }
 func (v vision) args() string { return "" }
 func (v vision) do(opts cmdOpts) (bool, string, string) {
 	scheme := opts.scheme
-	files, capped, err := visibleFiles(v.sb, v.ignore)
+	files, capped, err := visibleFiles(opts.a.Sandbox(), opts.a.Ignore())
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("vision failed: %v", err))
 	}

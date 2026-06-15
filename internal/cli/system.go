@@ -5,14 +5,15 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/original-flipster69/koko/internal/cage"
 	"github.com/original-flipster69/koko/internal/config"
-	"github.com/original-flipster69/koko/internal/provider"
+	"github.com/original-flipster69/koko/internal/ui"
 )
 
-type model struct{ llm provider.Provider }
+type model struct{}
 
 func (m model) name() string { return "model" }
 func (m model) desc() string { return "Show or switch model" }
@@ -20,9 +21,9 @@ func (m model) args() string { return "[name]" }
 func (m model) do(opts cmdOpts) (bool, string, string) {
 	parts := opts.parts()
 	if len(parts) < 2 {
-		return true, "", opts.scheme.Info("model", m.llm.Model())
+		return true, "", opts.scheme.Info("model", opts.a.Model())
 	}
-	m.llm.SetModel(parts[1])
+	opts.a.SetModel(parts[1])
 	return true, "", opts.scheme.Info("model", fmt.Sprintf("switched to %s", parts[1]))
 }
 
@@ -75,10 +76,9 @@ func (r resume) do(opts cmdOpts) (bool, string, string) {
 }
 
 type reload struct {
-	cfg     *config.Config
-	llm     provider.Provider
 	cfgPath string
 	opts    Flags
+	apply   func(next config.Config) (applied, restart []string)
 }
 
 func (r reload) name() string { return "reload" }
@@ -90,6 +90,23 @@ func (r reload) do(opts cmdOpts) (bool, string, string) {
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("reload failed (keeping current config): %v", err))
 	}
+	applied, restart := r.apply(*newCfg)
+	if len(applied) == 0 && len(restart) == 0 {
+		return true, "", scheme.Info("reload", "config reloaded — no changes detected")
+	}
+	var b strings.Builder
+	if len(applied) > 0 {
+		b.WriteString(scheme.Info("applied", strings.Join(applied, ", ")) + "\n")
+	}
+	if len(restart) > 0 {
+		b.WriteString(scheme.Info("restart", "changed but needs restart: "+strings.Join(restart, ", ")) + "\n")
+	}
+	if slices.Contains(applied, "provider") && !newCfg.Sandbox.SuppressPrivacyWarning {
+		if warning := ui.PrivacyWarning(opts.a.ProviderName()); warning != "" {
+			b.WriteString(warning + "\n")
+		}
+	}
+	return true, "", strings.TrimRight(b.String(), "\n")
 }
 
 type cageCmd struct {

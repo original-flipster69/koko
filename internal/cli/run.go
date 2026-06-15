@@ -39,9 +39,10 @@ type Flags struct {
 	Model    string
 	LlmURL   string
 	Sandbox  string
+	Version  string
 }
 
-func Main(opts Flags) error {
+func Run(opts Flags) error {
 	kokoRoot := kokoDir()
 
 	cfg, err := loadConfig(config.Path(kokoRoot), opts)
@@ -59,10 +60,6 @@ func Main(opts Flags) error {
 		return err
 	}
 
-	return Run(llm, sb, cfg, kokoRoot, opts)
-}
-
-func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoot string, opts Flags) error {
 	cfgPath := config.Path(kokoRoot)
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
@@ -108,7 +105,8 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 		return fmt.Errorf("failed to initialize command policy: %v", err)
 	}
 
-	projectCtx := project.Scan(cfg.Sandbox.Root).Summary()
+	stack := project.Scan(cfg.Sandbox.Root)
+	projectCtx := stack.Summary()
 	if idx := memoStore.Index(); idx != "" {
 		if projectCtx != "" {
 			projectCtx += "\n\n"
@@ -145,14 +143,18 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 		ExecMaxFileMB:    fileMB,
 	})
 
+	apply := func(next config.Config) (applied, restart []string) {
+		return applyConfig(cfg, next, a)
+	}
+
 	cmds := make(map[string]command)
 	register(cmds,
-		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{}, vision{sb, ignoreMatcher},
+		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{}, vision{},
 		run{sb},
 		memoriesCmd{memoStore},
 		playsCmd{playsReg},
-		model{llm}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
-		reload{cfg, llm, cfgPath, opts}, cageCmd{kokoRoot, sb.Root()},
+		model{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
+		reload{cfgPath, opts, apply}, cageCmd{kokoRoot, sb.Root()},
 	)
 	register(cmds, help{cmds})
 
@@ -169,9 +171,10 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 		if len(parts) == 0 {
 			return true, "", ""
 		}
+		cur := a.Scheme()
 		name := parts[0]
 		if c, ok := cmds[name]; ok {
-			return c.fn(cmdOpts{input: input, a: a, scheme: scheme})
+			return c.fn(cmdOpts{input: input, a: a, scheme: cur})
 		}
 		playName := strings.TrimPrefix(name, ":")
 		if p, ok := playsReg.Get(playName); ok {
@@ -179,10 +182,197 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 			prompt := fmt.Sprintf("Run the '%s' play:\n\n%s", p.Name, p.Render(extra))
 			return false, prompt, ""
 		}
-		return true, "", scheme.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
+		return true, "", cur.Error(fmt.Sprintf("unknown command: %s (try :help)", name))
 	}
 
-	return terminal.Run(a, kokoRoot, ui.MascotFrames(scheme), colonHandler, knownCommands, scheme)
+	projectConfigNote := ""
+	if p := config.ProjectConfigPath(cfg.Sandbox.Root); fileExists(p) {
+		projectConfigNote = ui.Dim + scheme.Muted + "  note: project config applied from " + p + ui.Reset + "\n\n"
+	}
+
+	mascotFrames := ui.MascotFrames(scheme)
+	splashes := make([]string, len(mascotFrames))
+	for i, mascot := range mascotFrames {
+		splash := "\n" + scheme.Splashscreen(mascot, llm.Name(), cfg.Llm.Model, cfg.Sandbox.Root, opts.Version, stack.Detected) + "\n\n"
+		if llm.Name() == "ollama" {
+			splash += ui.Dim + scheme.Muted + "  note: tool support depends on model (llama3.1+, mistral, command-r)" + ui.Reset + "\n\n"
+		}
+		if warning := ui.PrivacyWarning(llm.Name()); !cfg.Sandbox.SuppressPrivacyWarning && warning != "" {
+			splash += warning + "\n\n"
+		}
+		splash += projectConfigNote
+		splashes[i] = splash
+	}
+
+	return terminal.Run(a, kokoRoot, splashes, colonHandler, knownCommands, scheme)
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+type configDiff struct {
+	provider, model, verbs, maxTokens, scrubPII, execLimits, cmdPolicy, ignore, colorScheme bool
+	sandboxRoot, sandboxDirs, denyFiles, maxFileSize                                        bool
+}
+
+func diffConfig(cur, next *config.Config) configDiff {
+	providerChanged := next.Llm.Provider != cur.Llm.Provider ||
+		next.Llm.Url != cur.Llm.Url ||
+		next.Llm.ApiKey != cur.Llm.ApiKey
+	return configDiff{
+		provider:    providerChanged,
+		model:       !providerChanged && next.Llm.Model != cur.Llm.Model,
+		verbs:       !equalStrings(next.Style.ThinkingVerbs, cur.Style.ThinkingVerbs),
+		maxTokens:   next.Llm.MaxSessionTokens != cur.Llm.MaxSessionTokens,
+		scrubPII:    next.Sandbox.ScrubPII != cur.Sandbox.ScrubPII,
+		execLimits:  next.Sandbox.Exec.Profile != cur.Sandbox.Exec.Profile,
+		cmdPolicy:   !equalStrings(next.Sandbox.Exec.Allow, cur.Sandbox.Exec.Allow) || !equalStrings(next.Sandbox.Exec.Deny, cur.Sandbox.Exec.Deny),
+		ignore:      next.Ignore.Mode != cur.Ignore.Mode || !equalStrings(next.Ignore.Files, cur.Ignore.Files),
+		colorScheme: !equalIntMap(next.Style.ColorScheme, cur.Style.ColorScheme),
+		sandboxRoot: next.Sandbox.Root != cur.Sandbox.Root,
+		sandboxDirs: !equalStrings(next.Sandbox.AdditionalDirs, cur.Sandbox.AdditionalDirs),
+		denyFiles:   !equalStrings(next.Sandbox.DenyFiles, cur.Sandbox.DenyFiles),
+		maxFileSize: next.Sandbox.MaxFileSize != cur.Sandbox.MaxFileSize,
+	}
+}
+
+func (d configDiff) liveLabels() []string {
+	var l []string
+	for _, e := range []struct {
+		on    bool
+		label string
+	}{
+		{d.provider, "provider"},
+		{d.model, "model"},
+		{d.verbs, "thinking verbs"},
+		{d.maxTokens, "max session tokens"},
+		{d.scrubPII, "scrub_pii"},
+		{d.execLimits, "exec profile"},
+		{d.cmdPolicy, "command policy"},
+		{d.ignore, "ignore"},
+		{d.colorScheme, "color scheme"},
+	} {
+		if e.on {
+			l = append(l, e.label)
+		}
+	}
+	return l
+}
+
+func (d configDiff) restartLabels() []string {
+	var l []string
+	for _, e := range []struct {
+		on    bool
+		label string
+	}{
+		{d.sandboxRoot, "sandbox root"},
+		{d.sandboxDirs, "additional dirs"},
+		{d.denyFiles, "deny files"},
+		{d.maxFileSize, "max file size"},
+	} {
+		if e.on {
+			l = append(l, e.label)
+		}
+	}
+	return l
+}
+
+func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applied, restart []string) {
+	d := diffConfig(cur, &next)
+
+	if d.provider {
+		if p, err := provider.New(&next.Llm); err == nil {
+			a.SetProvider(p)
+			cur.Llm.Provider = next.Llm.Provider
+			cur.Llm.Url = next.Llm.Url
+			cur.Llm.ApiKey = next.Llm.ApiKey
+			cur.Llm.Model = next.Llm.Model
+			applied = append(applied, "provider")
+		}
+	} else if d.model {
+		a.SetModel(next.Llm.Model)
+		cur.Llm.Model = next.Llm.Model
+		applied = append(applied, "model")
+	}
+	if d.verbs {
+		a.SetThinkingVerbs(next.Style.ThinkingVerbs)
+		cur.Style.ThinkingVerbs = next.Style.ThinkingVerbs
+		applied = append(applied, "thinking verbs")
+	}
+	if d.maxTokens {
+		a.SetMaxSessionTokens(next.Llm.MaxSessionTokens)
+		cur.Llm.MaxSessionTokens = next.Llm.MaxSessionTokens
+		applied = append(applied, "max session tokens")
+	}
+	if d.scrubPII {
+		var filters []agent.OutboundFilter
+		if next.Sandbox.ScrubPII {
+			filters = append(filters, agent.ScrubPIIFilter)
+		}
+		a.SetOutboundFilters(filters)
+		cur.Sandbox.ScrubPII = next.Sandbox.ScrubPII
+		applied = append(applied, "scrub_pii")
+	}
+	if d.execLimits {
+		cpuSec, memMB, fileMB := next.Sandbox.Exec.Limits()
+		a.SetExecLimits(cpuSec, memMB, fileMB)
+		cur.Sandbox.Exec.Profile = next.Sandbox.Exec.Profile
+		applied = append(applied, "exec profile")
+	}
+	if d.cmdPolicy {
+		if p, err := policy.NewCommandPolicy(next.Sandbox.Exec.Allow, next.Sandbox.Exec.Deny); err == nil {
+			a.SetCmdPolicy(p)
+			cur.Sandbox.Exec.Allow = next.Sandbox.Exec.Allow
+			cur.Sandbox.Exec.Deny = next.Sandbox.Exec.Deny
+			applied = append(applied, "command policy")
+		}
+	}
+	if d.ignore {
+		var m *ignore.Matcher
+		if next.Ignore.Mode == config.Custom {
+			m = ignore.NewFromPatterns(next.Ignore.Files)
+		} else {
+			m = ignore.LoadGitignore(next.Sandbox.Root)
+		}
+		a.SetIgnore(m)
+		cur.Ignore = next.Ignore
+		applied = append(applied, "ignore")
+	}
+	if d.colorScheme {
+		if s, err := ui.DefaultScheme().With(next.Style.ColorScheme); err == nil {
+			a.SetScheme(s)
+			cur.Style.ColorScheme = next.Style.ColorScheme
+			applied = append(applied, "color scheme")
+		}
+	}
+
+	return applied, append(restart, d.restartLabels()...)
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalIntMap(a, b map[string]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
+			return false
+		}
+	}
+	return true
 }
 
 func register(cmds map[string]command, list ...cmdDef) {

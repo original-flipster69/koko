@@ -19,99 +19,93 @@ func baseConfig() *config.Config {
 	}
 }
 
-type capture struct {
-	model    string
-	verbs    []string
-	maxTok   int
-	modelHit bool
+func labelSet(d configDiff) (live, restart string) {
+	return strings.Join(d.liveLabels(), ", "), strings.Join(d.restartLabels(), ", ")
 }
 
-func (c *capture) setModel(m string)   { c.model = m; c.modelHit = true }
-func (c *capture) setVerbs(v []string) { c.verbs = v }
-func (c *capture) setMaxTokens(n int)  { c.maxTok = n }
-
-func TestReloadNoChanges(t *testing.T) {
+func TestDiffNoChanges(t *testing.T) {
 	cur := baseConfig()
 	next := baseConfig()
-	c := &capture{}
-	applied, restart := applyReloadedConfig(cur, next, c.setModel, c.setVerbs, c.setMaxTokens)
-	if len(applied) != 0 || len(restart) != 0 {
-		t.Errorf("expected no changes, got applied=%v restart=%v", applied, restart)
-	}
-	if c.modelHit {
-		t.Error("setModel should not be called when model is unchanged")
+	d := diffConfig(cur, next)
+	if len(d.liveLabels()) != 0 || len(d.restartLabels()) != 0 {
+		live, restart := labelSet(d)
+		t.Errorf("expected no changes, got live=[%s] restart=[%s]", live, restart)
 	}
 }
 
-func TestReloadAppliesLiveChanges(t *testing.T) {
+func TestDiffLiveFields(t *testing.T) {
 	cur := baseConfig()
 	next := baseConfig()
 	next.Llm.Model = "claude-opus-4-8"
 	next.Llm.MaxSessionTokens = 2000
 	next.Style.ThinkingVerbs = []string{"pondering", "scheming"}
+	next.Sandbox.ScrubPII = false
+	next.Sandbox.Exec.Profile = config.Strict
 
-	c := &capture{}
-	applied, restart := applyReloadedConfig(cur, next, c.setModel, c.setVerbs, c.setMaxTokens)
-
-	if len(restart) != 0 {
-		t.Errorf("unexpected restart items: %v", restart)
+	d := diffConfig(cur, next)
+	live, restart := labelSet(d)
+	if restart != "" {
+		t.Errorf("unexpected restart items: %s", restart)
 	}
-	want := "model, max session tokens, thinking verbs"
-	got := strings.Join(applied, ", ")
-	for _, item := range []string{"model", "max session tokens", "thinking verbs"} {
-		if !strings.Contains(got, item) {
-			t.Errorf("applied %q missing %q (want all of: %s)", got, item, want)
+	for _, want := range []string{"model", "max session tokens", "thinking verbs", "scrub_pii", "exec profile"} {
+		if !strings.Contains(live, want) {
+			t.Errorf("live %q missing %q", live, want)
 		}
-	}
-	if c.model != "claude-opus-4-8" {
-		t.Errorf("setModel got %q", c.model)
-	}
-	if c.maxTok != 2000 {
-		t.Errorf("setMaxTokens got %d", c.maxTok)
-	}
-	if cur.Llm.Model != "claude-opus-4-8" {
-		t.Error("live config Model not updated for :config consistency")
 	}
 }
 
-func TestReloadProviderChangeNeedsRestart(t *testing.T) {
+func TestDiffProviderRebuildHidesModel(t *testing.T) {
 	cur := baseConfig()
 	next := baseConfig()
 	next.Llm.Provider = config.Mistral
 	next.Llm.Model = "mistral-large-latest"
 
-	c := &capture{}
-	applied, restart := applyReloadedConfig(cur, next, c.setModel, c.setVerbs, c.setMaxTokens)
-
-	if c.modelHit {
-		t.Error("model must not be swapped when the provider changed (needs restart)")
+	d := diffConfig(cur, next)
+	if !d.provider {
+		t.Error("provider change should be a live provider rebuild")
 	}
-	if len(applied) != 0 {
-		t.Errorf("nothing should be live-applied, got %v", applied)
+	if d.model {
+		t.Error("model must not be a separate live field when the provider changed")
 	}
-	if strings.Join(restart, ",") != "provider" {
-		t.Errorf("restart should be [provider], got %v", restart)
+	live, restart := labelSet(d)
+	if !strings.Contains(live, "provider") {
+		t.Errorf("live %q missing provider", live)
+	}
+	if restart != "" {
+		t.Errorf("provider swap should not require restart, got %s", restart)
 	}
 }
 
-func TestReloadRestartRequiredFields(t *testing.T) {
+func TestDiffColorSchemeIsLive(t *testing.T) {
+	cur := baseConfig()
+	next := baseConfig()
+	next.Style.ColorScheme = map[string]int{"primary": 42}
+
+	d := diffConfig(cur, next)
+	if !d.colorScheme {
+		t.Error("color scheme change should be live")
+	}
+	if live, _ := labelSet(d); !strings.Contains(live, "color scheme") {
+		t.Errorf("live %q missing color scheme", live)
+	}
+}
+
+func TestDiffSandboxNeedsRestart(t *testing.T) {
 	cur := baseConfig()
 	next := baseConfig()
 	next.Sandbox.Root = "/other"
-	next.Sandbox.ScrubPII = false
-	next.Sandbox.Exec.Profile = config.Strict
+	next.Sandbox.AdditionalDirs = []string{"/extra"}
+	next.Sandbox.DenyFiles = []string{"*.foo"}
+	next.Sandbox.MaxFileSize = 4242
 
-	c := &capture{}
-	_, restart := applyReloadedConfig(cur, next, c.setModel, c.setVerbs, c.setMaxTokens)
-	for _, item := range []string{"sandbox root", "scrub_pii", "exec profile"} {
-		found := false
-		for _, r := range restart {
-			if r == item {
-				found = true
-			}
-		}
-		if !found {
-			t.Errorf("restart list missing %q: %v", item, restart)
+	d := diffConfig(cur, next)
+	if len(d.liveLabels()) != 0 {
+		t.Errorf("sandbox boundary changes must not be live-applied, got %v", d.liveLabels())
+	}
+	_, restart := labelSet(d)
+	for _, want := range []string{"sandbox root", "additional dirs", "deny files", "max file size"} {
+		if !strings.Contains(restart, want) {
+			t.Errorf("restart %q missing %q", restart, want)
 		}
 	}
 }

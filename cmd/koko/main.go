@@ -24,11 +24,12 @@ func main() {
 		return
 	}
 
-	if err := cli.Main(cli.Flags{
+	if err := cli.Run(cli.Flags{
 		Provider: *provider,
 		Model:    *model,
 		LlmURL:   *llmUrl,
 		Sandbox:  *sandbox,
+		Version:  version,
 	}); err != nil {
 		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(err.Error()))
 		os.Exit(1)

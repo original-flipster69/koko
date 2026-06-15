@@ -106,6 +106,85 @@ func (a *Agent) SetMaxSessionTokens(n int) {
 	a.maxSessionTokens = n
 }
 
+func (a *Agent) SetProvider(p provider.Provider) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.provider = p
+	if c, ok := p.(provider.TokenCounter); ok {
+		a.counter = c
+	} else {
+		a.counter = nil
+	}
+}
+
+func (a *Agent) Model() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.provider.Model()
+}
+
+func (a *Agent) ProviderName() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.provider.Name()
+}
+
+func (a *Agent) SetModel(model string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.provider.SetModel(model)
+}
+
+func (a *Agent) SetIgnore(m *ignore.Matcher) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.ignore = m
+}
+
+func (a *Agent) Ignore() *ignore.Matcher {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ignore
+}
+
+func (a *Agent) Sandbox() *sandbox.Sandbox {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.sandbox
+}
+
+func (a *Agent) SetCmdPolicy(p *policy.CmdPolicy) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cmdPolicy = p
+}
+
+func (a *Agent) SetOutboundFilters(f []OutboundFilter) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.outboundFilters = f
+}
+
+func (a *Agent) SetExecLimits(cpuSec, memMB, fileMB int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.execCPUSecs = cpuSec
+	a.execMemoryMB = memMB
+	a.execMaxFileMB = fileMB
+}
+
+func (a *Agent) SetScheme(s ui.Scheme) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.scheme = s
+}
+
+func (a *Agent) Scheme() ui.Scheme {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.scheme
+}
+
 func (a *Agent) TogglePlanMode() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()

@@ -200,6 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if strings.HasPrefix(input, ":") && m.cmdHandler != nil {
 				handled, prompt, output := m.cmdHandler(input, m.agent)
+				m.scheme = m.agent.Scheme()
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}
