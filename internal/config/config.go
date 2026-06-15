@@ -130,10 +130,13 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
-const ProjectConfigDir = ".koko"
+const (
+	ProjectConfigDir = ".koko"
+	ConfFile         = "config.toml"
+)
 
 func ProjectConfigPath(sandboxRoot string) string {
-	return filepath.Join(sandboxRoot, ProjectConfigDir, "config.toml")
+	return filepath.Join(sandboxRoot, ProjectConfigDir, ConfFile)
 }
 
 func (c *Config) ApplyProjectConfig(sandboxRoot string) ([]string, error) {
@@ -339,5 +342,5 @@ func apiKeyEnvName(p Provider) string {
 }
 
 func Path(kokoDir string) string {
-	return filepath.Join(kokoDir, "config.toml")
+	return filepath.Join(kokoDir, ConfFile)
 }

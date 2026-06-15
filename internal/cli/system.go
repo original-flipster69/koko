@@ -90,18 +90,6 @@ func (r reload) do(opts cmdOpts) (bool, string, string) {
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("reload failed (keeping current config): %v", err))
 	}
-	applied, restart := applyReloadedConfig(r.cfg, newCfg, r.llm.SetModel, opts.a.SetThinkingVerbs, opts.a.SetMaxSessionTokens)
-	if len(applied) == 0 && len(restart) == 0 {
-		return true, "", scheme.Info("reload", "config reloaded — no changes detected")
-	}
-	var b strings.Builder
-	if len(applied) > 0 {
-		b.WriteString(scheme.Info("applied", strings.Join(applied, ", ")) + "\n")
-	}
-	if len(restart) > 0 {
-		b.WriteString(scheme.Info("restart", "changed but needs restart: "+strings.Join(restart, ", ")) + "\n")
-	}
-	return true, "", strings.TrimRight(b.String(), "\n")
 }
 
 type cageCmd struct {

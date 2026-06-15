@@ -59,10 +59,11 @@ func Main(opts Flags) error {
 		return err
 	}
 
-	return Run(llm, sb, cfg, kokoRoot, config.Path(kokoRoot), opts)
+	return Run(llm, sb, cfg, kokoRoot, opts)
 }
 
-func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoot string, cfgPath string, opts Flags) error {
+func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoot string, opts Flags) error {
+	cfgPath := config.Path(kokoRoot)
 	scheme, err := ui.DefaultScheme().With(cfg.Style.ColorScheme)
 	if err != nil {
 		return fmt.Errorf("failed to initialize UI scheme: %v", err)
@@ -186,7 +187,7 @@ func Run(llm provider.Provider, sb *sandbox.Sandbox, cfg *config.Config, kokoRoo
 
 func register(cmds map[string]command, list ...cmdDef) {
 	for _, c := range list {
-		cmds[":"+c.name()] = command{desc: c.desc(), args: c.args(), fn: c.do}
+		cmds[":"+c.name()] = command{c.desc(), c.args(), c.do}
 	}
 }
 
@@ -215,65 +216,6 @@ func loadConfig(path string, opts Flags) (*config.Config, error) {
 		return nil, err
 	}
 	return cfg, nil
-}
-
-func applyReloadedConfig(cur, next *config.Config, setModel func(string), setVerbs func([]string), setMaxTokens func(int)) (applied, restart []string) {
-	if !equalStrings(next.Style.ThinkingVerbs, cur.Style.ThinkingVerbs) {
-		setVerbs(next.Style.ThinkingVerbs)
-		cur.Style.ThinkingVerbs = next.Style.ThinkingVerbs
-		applied = append(applied, "thinking verbs")
-	}
-	if next.Llm.MaxSessionTokens != cur.Llm.MaxSessionTokens {
-		setMaxTokens(next.Llm.MaxSessionTokens)
-		cur.Llm.MaxSessionTokens = next.Llm.MaxSessionTokens
-		applied = append(applied, "max session tokens")
-	}
-	if next.Llm.Provider == cur.Llm.Provider {
-		if next.Llm.Model != cur.Llm.Model {
-			setModel(next.Llm.Model)
-			cur.Llm.Model = next.Llm.Model
-			applied = append(applied, "model")
-		}
-	} else {
-		restart = append(restart, "provider")
-	}
-	if next.Llm.Url != cur.Llm.Url {
-		restart = append(restart, "llm url")
-	}
-	if next.Sandbox.Root != cur.Sandbox.Root {
-		restart = append(restart, "sandbox root")
-	}
-	if !equalStrings(next.Sandbox.AdditionalDirs, cur.Sandbox.AdditionalDirs) {
-		restart = append(restart, "additional dirs")
-	}
-	if !equalStrings(next.Sandbox.DenyFiles, cur.Sandbox.DenyFiles) {
-		restart = append(restart, "deny files")
-	}
-	if next.Sandbox.MaxFileSize != cur.Sandbox.MaxFileSize {
-		restart = append(restart, "max file size")
-	}
-	if next.Sandbox.ScrubPII != cur.Sandbox.ScrubPII {
-		restart = append(restart, "scrub_pii")
-	}
-	if next.Sandbox.Exec.Profile != cur.Sandbox.Exec.Profile {
-		restart = append(restart, "exec profile")
-	}
-	if next.Ignore.Mode != cur.Ignore.Mode {
-		restart = append(restart, "ignore mode")
-	}
-	return applied, restart
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func isElevated() bool {
