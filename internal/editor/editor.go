@@ -2,6 +2,7 @@ package editor
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -392,6 +393,55 @@ func (e *Editor) List(path sandbox.ValidPath) (string, []os.DirEntry, error) {
 		return "", nil, fmt.Errorf("reading directory: %w", err)
 	}
 	return resolved, entries, nil
+}
+
+// Walk traverses the sandbox tree depth-first, validating every directory
+// through the sandbox before reading it and skipping any entry that fails
+// validation (denied, outside the sandbox, or unresolvable). For each
+// validated entry it calls visit with the path relative to the sandbox root.
+// Returning filepath.SkipDir from visit prunes a directory; filepath.SkipAll
+// stops the walk.
+func (e *Editor) Walk(visit func(rel string, isDir bool) error) error {
+	root := e.sandbox.Root()
+	vp, err := e.sandbox.ValidatePath(root)
+	if err != nil {
+		return err
+	}
+	if err := e.walk(root, vp, visit); err != nil && !errors.Is(err, filepath.SkipAll) {
+		return err
+	}
+	return nil
+}
+
+func (e *Editor) walk(root string, dir sandbox.ValidPath, visit func(rel string, isDir bool) error) error {
+	_, entries, err := e.List(dir)
+	if err != nil {
+		return nil
+	}
+	for _, entry := range entries {
+		full := filepath.Join(string(dir), entry.Name())
+		vp, err := e.sandbox.ValidatePath(full)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(root, full)
+		if err != nil {
+			continue
+		}
+		isDir := entry.IsDir()
+		if verr := visit(filepath.ToSlash(rel), isDir); verr != nil {
+			if errors.Is(verr, filepath.SkipDir) {
+				continue
+			}
+			return verr
+		}
+		if isDir {
+			if werr := e.walk(root, vp, visit); werr != nil {
+				return werr
+			}
+		}
+	}
+	return nil
 }
 
 func looksBinary(data []byte) bool {

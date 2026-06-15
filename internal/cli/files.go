@@ -2,13 +2,12 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/original-flipster69/koko/internal/editor"
 	"github.com/original-flipster69/koko/internal/ignore"
-	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
 const visionMaxFiles = 1000
@@ -20,7 +19,7 @@ func (v vision) desc() string { return "List files visible to the agent (after d
 func (v vision) args() string { return "" }
 func (v vision) do(opts cmdOpts) (bool, string, string) {
 	scheme := opts.scheme()
-	files, capped, err := visibleFiles(opts.a.Sandbox(), opts.a.Ignore())
+	files, capped, err := visibleFiles(opts.a.Editor(), opts.a.Ignore())
 	if err != nil {
 		return true, "", scheme.Error(fmt.Sprintf("vision failed: %v", err))
 	}
@@ -38,38 +37,24 @@ func (v vision) do(opts cmdOpts) (bool, string, string) {
 	return true, "", scheme.Info("vision", summary) + "\n" + strings.TrimRight(b.String(), "\n")
 }
 
-func visibleFiles(sb *sandbox.Sandbox, ig *ignore.Matcher) ([]string, bool, error) {
-	root := sb.Root()
+func visibleFiles(ed *editor.Editor, ig *ignore.Matcher) ([]string, bool, error) {
 	var out []string
 	capped := false
-	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil || rel == "." {
-			return nil
-		}
-		if ig.IsIgnored(rel, info.IsDir()) {
-			if info.IsDir() {
+	err := ed.Walk(func(rel string, isDir bool) error {
+		if ig.IsIgnored(rel, isDir) {
+			if isDir {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if _, err := sb.ValidatePath(path); err != nil {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if info.IsDir() {
+		if isDir {
 			return nil
 		}
 		if len(out) >= visionMaxFiles {
 			capped = true
 			return filepath.SkipAll
 		}
-		out = append(out, filepath.ToSlash(rel))
+		out = append(out, rel)
 		return nil
 	})
 	if err != nil {
