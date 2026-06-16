@@ -148,14 +148,7 @@ func Run(opts Flags) error {
 	}
 
 	cmds := make(map[string]command)
-	register(cmds,
-		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{}, vision{},
-		run{sb},
-		memoriesCmd{memoStore},
-		playsCmd{playsReg},
-		model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
-		reload{cfgPath, opts, apply}, cageCmd{kokoRoot, sb.Root()},
-	)
+	register(cmds, commandList(sb, memoStore, playsReg, cfg, kokoRoot, cfgPath, sb.Root(), opts, apply)...)
 	register(cmds, help{cmds})
 
 	knownCommands := make([]string, 0, len(cmds))
@@ -290,6 +283,21 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 func register(cmds map[string]command, list ...cmdDef) {
 	for _, c := range list {
 		cmds[":"+c.name()] = command{c.desc(), c.args(), c.do}
+	}
+}
+
+// commandList is the single source of truth for the built-in colon commands
+// (everything except :help, which is registered separately because it needs the
+// finished command map). name()/desc()/args() ignore the injected deps, so it
+// can be called with zero values purely to enumerate commands.
+func commandList(sb *sandbox.Sandbox, memo *memories.Store, plays *plays.Registry, cfg *config.Config, kokoRoot, cfgPath, sandboxRoot string, flags Flags, apply func(config.Config) (applied, restart []string)) []cmdDef {
+	return []cmdDef{
+		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{}, vision{},
+		run{sb},
+		memoriesCmd{memo},
+		playsCmd{plays},
+		model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
+		reload{cfgPath, flags, apply}, cageCmd{kokoRoot, sandboxRoot},
 	}
 }
 
