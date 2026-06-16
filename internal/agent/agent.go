@@ -758,7 +758,11 @@ func (a *Agent) listDir(ctx context.Context, tc provider.ToolCall) string {
 	}
 	var lines []string
 	for _, e := range entries {
-		rel, _ := filepath.Rel(a.sandbox.Root(), filepath.Join(resolved, e.Name()))
+		full := filepath.Join(resolved, e.Name())
+		if _, err := a.sandbox.ValidatePath(full); err != nil {
+			continue
+		}
+		rel, _ := filepath.Rel(a.sandbox.Root(), full)
 		if a.ignore.IsIgnored(rel, e.IsDir()) {
 			continue
 		}
@@ -897,7 +901,11 @@ func (a *Agent) buildTree(dir sandbox.ValidPath, prefix string, depth, maxDepth 
 	}
 	var visible []os.DirEntry
 	for _, e := range entries {
-		rel, _ := filepath.Rel(a.sandbox.Root(), filepath.Join(resolved, e.Name()))
+		full := filepath.Join(resolved, e.Name())
+		if _, err := a.sandbox.ValidatePath(full); err != nil {
+			continue
+		}
+		rel, _ := filepath.Rel(a.sandbox.Root(), full)
 		if a.ignore.IsIgnored(rel, e.IsDir()) {
 			continue
 		}
@@ -985,9 +993,15 @@ func (a *Agent) searchFiles(ctx context.Context, tc provider.ToolCall) string {
 			if skipDirs[info.Name()] || a.ignore.IsIgnored(rel, true) {
 				return filepath.SkipDir
 			}
+			if _, err := a.sandbox.ValidatePath(path); err != nil {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if a.ignore.IsIgnored(rel, false) {
+			return nil
+		}
+		if _, err := a.sandbox.ValidatePath(path); err != nil {
 			return nil
 		}
 		if info.Size() > searchMaxFileSize {
