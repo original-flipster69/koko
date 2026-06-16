@@ -174,7 +174,7 @@ func Run(opts Flags) error {
 		cur := a.Scheme()
 		name := parts[0]
 		if c, ok := cmds[name]; ok {
-			return c.fn(cmdOpts{input: input, a: a})
+			return true, "", c.fn(cmdOpts{input: input, a: a})
 		}
 		playName := strings.TrimPrefix(name, ":")
 		if p, ok := playsReg.Get(playName); ok {

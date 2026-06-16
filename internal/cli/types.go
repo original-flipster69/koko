@@ -11,7 +11,7 @@ type cmdDef interface {
 	name() string
 	desc() string
 	args() string
-	do(opts cmdOpts) (handled bool, prompt string, output string)
+	do(opts cmdOpts) string
 }
 
 type cmdOpts struct {
@@ -30,5 +30,5 @@ func (c cmdOpts) scheme() ui.Scheme {
 type command struct {
 	desc string
 	args string
-	fn   func(opts cmdOpts) (handled bool, prompt string, output string)
+	fn   func(opts cmdOpts) string
 }

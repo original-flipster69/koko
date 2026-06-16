@@ -12,11 +12,11 @@ type playsCmd struct{ registry *plays.Registry }
 func (p playsCmd) name() string { return "plays" }
 func (p playsCmd) desc() string { return "List installed plays" }
 func (p playsCmd) args() string { return "" }
-func (p playsCmd) do(opts cmdOpts) (bool, string, string) {
+func (p playsCmd) do(opts cmdOpts) string {
 	scheme := opts.scheme()
 	list := p.registry.List()
 	if len(list) == 0 {
-		return true, "", scheme.Info("plays", fmt.Sprintf("none installed — add *.md files in %s", p.registry.Dir()))
+		return scheme.Info("plays", fmt.Sprintf("none installed — add *.md files in %s", p.registry.Dir()))
 	}
 	var b strings.Builder
 	for _, pl := range list {
@@ -26,5 +26,5 @@ func (p playsCmd) do(opts cmdOpts) (bool, string, string) {
 		}
 		b.WriteString(scheme.Info(pl.Name, desc) + "\n")
 	}
-	return true, "", strings.TrimRight(b.String(), "\n")
+	return strings.TrimRight(b.String(), "\n")
 }

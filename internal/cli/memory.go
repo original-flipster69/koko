@@ -13,8 +13,8 @@ type memoriesCmd struct{ store *memories.Store }
 func (m memoriesCmd) name() string { return "memories" }
 func (m memoriesCmd) desc() string { return "Manage memories" }
 func (m memoriesCmd) args() string { return "[<name> | add <name> <body> | delete <name>]" }
-func (m memoriesCmd) do(opts cmdOpts) (bool, string, string) {
-	return true, "", memoryCommand(m.store, opts.scheme(), opts.input, opts.parts())
+func (m memoriesCmd) do(opts cmdOpts) string {
+	return memoryCommand(m.store, opts.scheme(), opts.input, opts.parts())
 }
 
 func memoryCommand(store *memories.Store, scheme ui.Scheme, input string, parts []string) string {

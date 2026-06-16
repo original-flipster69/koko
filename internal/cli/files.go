@@ -17,14 +17,14 @@ type vision struct{}
 func (v vision) name() string { return "vision" }
 func (v vision) desc() string { return "List files visible to the agent (after deny & ignore)" }
 func (v vision) args() string { return "" }
-func (v vision) do(opts cmdOpts) (bool, string, string) {
+func (v vision) do(opts cmdOpts) string {
 	scheme := opts.scheme()
 	files, capped, err := visibleFiles(opts.a.Editor(), opts.a.Ignore())
 	if err != nil {
-		return true, "", scheme.Error(fmt.Sprintf("vision failed: %v", err))
+		return scheme.Error(fmt.Sprintf("vision failed: %v", err))
 	}
 	if len(files) == 0 {
-		return true, "", scheme.Info("vision", "no files visible")
+		return scheme.Info("vision", "no files visible")
 	}
 	var b strings.Builder
 	for _, f := range files {
@@ -34,7 +34,7 @@ func (v vision) do(opts cmdOpts) (bool, string, string) {
 	if capped {
 		summary += fmt.Sprintf(" (showing first %d)", visionMaxFiles)
 	}
-	return true, "", scheme.Info("vision", summary) + "\n" + strings.TrimRight(b.String(), "\n")
+	return scheme.Info("vision", summary) + "\n" + strings.TrimRight(b.String(), "\n")
 }
 
 func visibleFiles(ed *editor.Editor, ig *ignore.Matcher) ([]string, bool, error) {

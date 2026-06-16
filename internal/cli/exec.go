@@ -13,12 +13,12 @@ type run struct{ sb *sandbox.Sandbox }
 func (r run) name() string { return "run" }
 func (r run) desc() string { return "Run a shell command directly" }
 func (r run) args() string { return "<cmd>" }
-func (r run) do(opts cmdOpts) (bool, string, string) {
+func (r run) do(opts cmdOpts) string {
 	if len(opts.parts()) < 2 {
-		return true, "", opts.scheme().Error("usage: :run <command>")
+		return opts.scheme().Error("usage: :run <command>")
 	}
 	cmdStr := strings.TrimPrefix(opts.input, ":run ")
-	return true, "", runShell(r.sb, cmdStr, opts.scheme())
+	return runShell(r.sb, cmdStr, opts.scheme())
 }
 
 func runShell(sb *sandbox.Sandbox, cmdStr string, scheme ui.Scheme) string {
