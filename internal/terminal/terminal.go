@@ -10,7 +10,7 @@ import (
 )
 
 func Run(
-	a *lever.Lever,
+	l *lever.Lever,
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,
@@ -21,8 +21,8 @@ func Run(
 	confirmCh := make(chan bool, 1)
 	w := &tuiWriter{atStart: true}
 
-	a.SetOutput(w)
-	a.SetConfirm(func(action string) bool {
+	l.SetOutput(w)
+	l.SetConfirm(func(action string) bool {
 		w.program.Send(confirmRequestMsg(action))
 		select {
 		case ok := <-confirmCh:
@@ -31,9 +31,9 @@ func Run(
 			return false
 		}
 	})
-	a.SetSuppressSpinner(true)
+	l.SetSuppressSpinner(true)
 
-	m := newModel(a, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, knownCommands, scheme)
+	m := newModel(l, ctx, cancel, kokoDir, splashes, slashHandler, confirmCh, knownCommands, scheme)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	w.program = p
