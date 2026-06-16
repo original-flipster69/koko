@@ -91,9 +91,18 @@ func ParseEffort(s string) (Effort, bool) {
 
 func (e Effort) String() string {
 	if e == EffortDefault {
-		return "default"
+		return "🍌 default"
 	}
-	return string(e)
+	emo := ""
+	switch e {
+	case EffortLow:
+		emo = "🥡"
+	case EffortMedium:
+		emo = "🍝"
+	case EffortHigh:
+		emo = "🍱"
+	}
+	return fmt.Sprintf("%v %v", emo, string(e))
 }
 
 type Provider interface {

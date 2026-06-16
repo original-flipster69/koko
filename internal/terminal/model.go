@@ -416,5 +416,8 @@ func (m model) View() string {
 		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, inputView)
 	}
 
-	return m.viewport.View() + "\n" + statusBarStyle.Render(statusLine) + "\n" + inputBarStyle.Render(inputLine)
+	footer := lipgloss.PlaceHorizontal(m.termWidth, lipgloss.Right,
+		statusBarStyle.Render(fmt.Sprintf("effort: %s ", m.agent.Effort().String())))
+
+	return m.viewport.View() + "\n" + statusLine + "\n" + inputBarStyle.Render(inputLine) + "\n" + footer
 }
