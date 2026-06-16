@@ -9,7 +9,7 @@ before:
 builds:
   - id: koko
     binary: koko
-    main: ./
+    main: ./cmd/koko
     env:
       - CGO_ENABLED=0
     goos:
