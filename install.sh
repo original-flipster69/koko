@@ -114,12 +114,29 @@ install_binary() {
   fi
 }
 
+install_config() {
+  CONFIG_DIR="${HOME}/.koko"
+  CONFIG_FILE="${CONFIG_DIR}/config.toml"
+  if [ -f "$CONFIG_FILE" ]; then
+    echo "Keeping existing config at ${CONFIG_FILE}."
+    return
+  fi
+  BLUEPRINT_URL="https://raw.githubusercontent.com/${REPO}/${TAG}/config.example.toml"
+  mkdir -p "$CONFIG_DIR"
+  if curl -fsSL -o "$CONFIG_FILE" "$BLUEPRINT_URL"; then
+    echo "Wrote starter config to ${CONFIG_FILE}."
+  else
+    echo "Warning: could not fetch starter config (skipping)." >&2
+  fi
+}
+
 require curl tar awk
 require_one_of shasum sha256sum
 detect_platform
 fetch_latest_tag
 download_and_verify
 install_binary
+install_config
 
 echo
 echo "Installed ${BINARY_NAME} ${TAG} to ${INSTALL_DIR}/${BINARY_NAME}"

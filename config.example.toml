@@ -1,0 +1,110 @@
+# koko configuration blueprint
+#
+# This file documents every available setting with its default value and the
+# accepted alternatives. It is copied to ~/.koko/config.toml on installation
+# only when no config.toml exists yet — your own settings are never overwritten.
+#
+# All keys are optional: anything you omit falls back to the built-in default
+# shown here. Delete what you don't need.
+#
+# Precedence (lowest to highest): built-in defaults < ~/.koko/config.toml <
+# a project-local .koko/config.toml in the sandbox root < environment < CLI flags.
+
+[llm]
+# Which provider to talk to. One of: anthropic | mistral | ollama
+provider = "mistral"
+
+# Model name. Must match the chosen provider, e.g.
+#   anthropic: claude-opus-4-8, claude-sonnet-4-6
+#   mistral:   mistral-medium-3-5 (reasoning-capable), mistral-large-latest
+#   ollama:    llama3, qwen3, ... (whatever you have pulled locally)
+model = "mistral-medium-3-5"
+
+# Optional API base URL. Leave empty for the provider default. Useful for a
+# local Ollama (http://localhost:11434) or an OpenAI-compatible endpoint.
+# Plain http is only allowed for localhost.
+url = ""
+
+# Hard cap on output tokens per response (anthropic only sends this).
+max_tokens = 16384
+
+# Budget for the whole session (input + output). 0 = unlimited.
+max_session_tokens = 1000000
+
+# API keys are NOT read from this file. Set them via environment variables:
+#   CLAUDE_API_KEY    (anthropic)
+#   MISTRAL_API_KEY   (mistral)
+# Ollama needs no key.
+
+[sandbox]
+# Root directory the agent may operate in. Empty/omitted = current working dir.
+# Must be an absolute path if set.
+# root = "/home/you/project"
+
+# Extra absolute directories the agent may also access.
+additional_dirs = []
+
+# Glob patterns that are always denied, regardless of directory. These files
+# are never read or written, even inside the sandbox.
+deny_files = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "credentials.json", "*.secret", "*.password"]
+
+# Maximum size (bytes) of a single file read or write. Default: 1 MiB.
+max_file_size = 1048576
+
+# Redact detected PII from anything sent to the provider.
+scrub_pii = true
+
+# Skip the confirmation prompt shown when koko starts with root privileges.
+suppress_elevated_warning = false
+
+# Skip the privacy warning shown when using a non-local (remote) provider.
+suppress_privacy_warning = false
+
+[sandbox.exec]
+# Resource profile for shell commands. One of:
+#   strict     (30s cpu,  512MB mem, 100MB file)
+#   default    (300s cpu, 2GB mem,   500MB file)
+#   permissive (1800s cpu, 8GB mem,  2GB file)
+#   off        (no limits)
+profile = "default"
+
+# Optional allowlist: if non-empty, the first token of every command must be in
+# this list. Deny patterns still take precedence.
+allow = []
+
+# Extra deny patterns, added on top of the built-in safety denylist
+# (sudo, ssh, eval, curl|sh, ...).
+deny = []
+
+[ignore]
+# How to decide which files are hidden from listing/search/vision.
+#   gitignore (respect .gitignore files)
+#   custom    (use the patterns in `files` below instead)
+mode = "gitignore"
+
+# Patterns used only when mode = "custom".
+files = []
+
+[style]
+# Verbs cycled through the spinner while the agent is working.
+thinking_verbs = ["banana munching", "marinating", "concocting", "brewing"]
+
+# 256-color palette overrides (0-255). Uncomment any role to recolor it.
+# Defaults shown.
+[style.color_scheme]
+# primary     = 99
+# secondary   = 135
+# highlight   = 183
+# accent      = 55
+# label       = 141
+# value       = 255
+# muted       = 243
+# error       = 197
+# success     = 114
+# code        = 214
+# splash      = 99
+# diff_add_fg = 156
+# diff_add_bg = 22
+# diff_del_fg = 210
+# diff_del_bg = 52
+# diff_gutter = 240
