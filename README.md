@@ -210,7 +210,7 @@ koko [flags]
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-provider` | LLM provider: `Claude`, `mistral`, `ollama` | `mistral` |
-| `-model` | Model name | `mistral-large-latest` |
+| `-model` | Model name | `mistral-medium-3-5` |
 | `-llm-url` | API URL (for local or custom endpoints) | Provider default |
 | `-sandbox` | Sandbox root directory | Current working directory |
 | `-config` | Config file path | `~/.koko/config.toml` |

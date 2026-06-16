@@ -65,6 +65,7 @@ type model struct {
 	cmdHandler    CmdHandler
 	knownCommands map[string]bool
 	scheme        ui.Scheme
+	effortLabel   string
 	inputRows     int
 }
 
@@ -98,6 +99,7 @@ func newModel(a *agent.Agent, ctx context.Context, cancel context.CancelFunc, ko
 		cmdHandler:    cmdHandler,
 		knownCommands: known,
 		scheme:        scheme,
+		effortLabel:   a.Effort().String(),
 	}
 	return m
 }
@@ -201,6 +203,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(input, ":") && m.cmdHandler != nil {
 				handled, prompt, output := m.cmdHandler(input, m.agent)
 				m.scheme = m.agent.Scheme()
+				m.effortLabel = m.agent.Effort().String()
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}
@@ -417,7 +420,7 @@ func (m model) View() string {
 	}
 
 	footer := lipgloss.PlaceHorizontal(m.termWidth, lipgloss.Right,
-		statusBarStyle.Render(fmt.Sprintf("effort: %s ", m.agent.Effort().String())))
+		statusBarStyle.Render(fmt.Sprintf("effort: %s ", m.effortLabel)))
 
 	return m.viewport.View() + "\n" + statusLine + "\n" + inputBarStyle.Render(inputLine) + "\n" + footer
 }

@@ -85,7 +85,7 @@ func defaultConf() *Config {
 	return &Config{
 		Llm: LlmConfig{
 			Provider:         Mistral,
-			Model:            "mistral-large-latest",
+			Model:            "mistral-medium-3-5",
 			Url:              "",
 			MaxTokens:        16384,
 			MaxSessionTokens: 1_000_000,
