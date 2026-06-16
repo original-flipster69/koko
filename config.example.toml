@@ -37,11 +37,11 @@ max_session_tokens = 1000000
 # Ollama needs no key.
 
 [sandbox]
-# Root directory the agent may operate in. Empty/omitted = current working dir.
+# Root directory the lever may operate in. Empty/omitted = current working dir.
 # Must be an absolute path if set.
 # root = "/home/you/project"
 
-# Extra absolute directories the agent may also access.
+# Extra absolute directories the lever may also access.
 additional_dirs = []
 
 # Glob patterns that are always denied, regardless of directory. These files
@@ -86,7 +86,7 @@ mode = "gitignore"
 files = []
 
 [style]
-# Verbs cycled through the spinner while the agent is working.
+# Verbs cycled through the spinner while the lever is working.
 thinking_verbs = ["banana munching", "marinating", "concocting", "brewing"]
 
 # 256-color palette overrides (0-255). Uncomment any role to recolor it.

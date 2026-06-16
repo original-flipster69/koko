@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/original-flipster69/koko/internal/agent"
 	"github.com/original-flipster69/koko/internal/audit"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
+	"github.com/original-flipster69/koko/internal/lever"
 	"github.com/original-flipster69/koko/internal/memories"
 	"github.com/original-flipster69/koko/internal/plays"
 	"github.com/original-flipster69/koko/internal/policy"
@@ -114,9 +114,9 @@ func Run(opts Flags) error {
 		projectCtx += "Stored memories (use list_memories to read bodies, save_memory/delete_memory to modify):\n" + idx
 	}
 
-	var outFilters []agent.OutboundFilter
+	var outFilters []lever.OutboundFilter
 	if cfg.Sandbox.ScrubPII {
-		outFilters = append(outFilters, agent.ScrubPIIFilter)
+		outFilters = append(outFilters, lever.ScrubPIIFilter)
 	}
 
 	confirm := func(action string) bool {
@@ -128,7 +128,7 @@ func Run(opts Flags) error {
 	}
 
 	cpuSec, memMB, fileMB := cfg.Sandbox.Exec.Limits()
-	a := agent.New(llm, sb, os.Stdout, confirm, auditLog, agent.Options{
+	a := lever.New(llm, sb, os.Stdout, confirm, auditLog, lever.Options{
 		Memory:           memoStore,
 		CmdPolicy:        cmdPolicy,
 		Ignore:           ignoreMatcher,
@@ -159,7 +159,7 @@ func Run(opts Flags) error {
 		knownCommands = append(knownCommands, ":"+p.Name)
 	}
 
-	colonHandler := func(input string, a *agent.Agent) (bool, string, string) {
+	colonHandler := func(input string, a *lever.Lever) (bool, string, string) {
 		parts := strings.Fields(input)
 		if len(parts) == 0 {
 			return true, "", ""
@@ -205,7 +205,7 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applied, restart []string) {
+func applyConfig(cur *config.Config, next config.Config, a *lever.Lever) (applied, restart []string) {
 	d := cur.Diff(&next)
 
 	if d.Provider {
@@ -233,9 +233,9 @@ func applyConfig(cur *config.Config, next config.Config, a *agent.Agent) (applie
 		applied = append(applied, "max session tokens")
 	}
 	if d.ScrubPII {
-		var filters []agent.OutboundFilter
+		var filters []lever.OutboundFilter
 		if next.Sandbox.ScrubPII {
-			filters = append(filters, agent.ScrubPIIFilter)
+			filters = append(filters, lever.ScrubPIIFilter)
 		}
 		a.SetOutboundFilters(filters)
 		cur.Sandbox.ScrubPII = next.Sandbox.ScrubPII

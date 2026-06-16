@@ -1,4 +1,4 @@
-package agent
+package lever
 
 import (
 	"testing"
@@ -96,7 +96,7 @@ func TestToolQuiet_ReadFileIsQuiet(t *testing.T) {
 }
 
 func TestBuildTools_ReturnsAllToolsInOrder(t *testing.T) {
-	a := &Agent{}
+	a := &Lever{}
 	defs := a.buildTools()
 	if len(defs) != len(tools) {
 		t.Fatalf("buildTools returned %d, expected %d", len(defs), len(tools))

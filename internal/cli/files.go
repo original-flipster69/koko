@@ -15,7 +15,7 @@ const visionMaxFiles = 1000
 type vision struct{}
 
 func (v vision) name() string { return "vision" }
-func (v vision) desc() string { return "List files visible to the agent (after deny & ignore)" }
+func (v vision) desc() string { return "List files visible to the lever (after deny & ignore)" }
 func (v vision) args() string { return "" }
 func (v vision) do(opts cmdOpts) string {
 	scheme := opts.scheme()

@@ -1,4 +1,4 @@
-package agent
+package lever
 
 import (
 	"context"
@@ -18,26 +18,26 @@ const (
 	summaryHeader           = "Previous conversation context:\n\n"
 )
 
-func (a *Agent) ClearHistory() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.history = a.history[:1]
+func (l *Lever) ClearHistory() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.history = l.history[:1]
 }
 
-func (a *Agent) HistoryLen() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return len(a.history) - 1
+func (l *Lever) HistoryLen() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.history) - 1
 }
 
-func (a *Agent) SaveSession(dir string) error {
-	a.mu.Lock()
-	snapshot := append([]provider.Msg(nil), a.history[1:]...)
-	a.mu.Unlock()
+func (l *Lever) SaveSession(dir string) error {
+	l.mu.Lock()
+	snapshot := append([]provider.Msg(nil), l.history[1:]...)
+	l.mu.Unlock()
 	return saveSession(dir, snapshot)
 }
 
-func (a *Agent) LoadSession(dir string) error {
+func (l *Lever) LoadSession(dir string) error {
 	msgs, err := loadSession(dir)
 	if err != nil {
 		return err
@@ -45,46 +45,46 @@ func (a *Agent) LoadSession(dir string) error {
 	for len(msgs) > 0 && msgs[0].Role == provider.System {
 		msgs = msgs[1:]
 	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	newHist := make([]provider.Msg, 0, 1+len(msgs))
-	newHist = append(newHist, a.history[0])
+	newHist = append(newHist, l.history[0])
 	newHist = append(newHist, msgs...)
-	a.history = newHist
+	l.history = newHist
 	return nil
 }
 
-func (a *Agent) Compact() (int, int) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if len(a.history) <= 2 {
+func (l *Lever) Compact() (int, int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.history) <= 2 {
 		return 0, 0
 	}
-	oldTokens := a.estimateTokens()
-	summary := summarizeMessages(a.history[1:])
-	a.history = []provider.Msg{
-		a.history[0],
+	oldTokens := l.estimateTokens()
+	summary := summarizeMessages(l.history[1:])
+	l.history = []provider.Msg{
+		l.history[0],
 		{Role: provider.User, Content: summary},
 		{Role: provider.Assistant, Content: compactAck},
 	}
-	a.lastInputTokens = 0
-	newTokens := a.measureTokens(context.Background())
-	a.lastInputTokens = newTokens
+	l.lastInputTokens = 0
+	newTokens := l.measureTokens(context.Background())
+	l.lastInputTokens = newTokens
 	return oldTokens, newTokens
 }
 
-func (a *Agent) trimHistory(ctx context.Context) {
-	if a.estimateTokens() <= maxHistoryTokens {
+func (l *Lever) trimHistory(ctx context.Context) {
+	if l.estimateTokens() <= maxHistoryTokens {
 		return
 	}
 	target := maxHistoryTokens * 3 / 4
-	totalCost := estimateMessagesTokens(a.history)
+	totalCost := estimateMessagesTokens(l.history)
 
 	cutEnd := 0
 	droppedCost := 0
-	for i := 2; i <= len(a.history)-2; i++ {
-		droppedCost += msgTokens(a.history[i-1])
-		if a.history[i].Role != provider.User {
+	for i := 2; i <= len(l.history)-2; i++ {
+		droppedCost += msgTokens(l.history[i-1])
+		if l.history[i].Role != provider.User {
 			continue
 		}
 		cutEnd = i
@@ -97,26 +97,26 @@ func (a *Agent) trimHistory(ctx context.Context) {
 		return
 	}
 
-	systemMsg := a.history[0]
-	dropped := a.history[1:cutEnd]
+	systemMsg := l.history[0]
+	dropped := l.history[1:cutEnd]
 	summary := summarizeMessages(dropped)
-	kept := a.history[cutEnd:]
+	kept := l.history[cutEnd:]
 
 	newHist := make([]provider.Msg, 0, len(kept)+3)
 	newHist = append(newHist, systemMsg)
 	newHist = append(newHist, provider.Msg{Role: provider.User, Content: summary})
 	newHist = append(newHist, provider.Msg{Role: provider.Assistant, Content: trimAck})
 	newHist = append(newHist, kept...)
-	a.history = newHist
-	a.lastInputTokens = a.measureTokens(ctx)
+	l.history = newHist
+	l.lastInputTokens = l.measureTokens(ctx)
 	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept))
 }
 
-func (a *Agent) estimateTokens() int {
-	if a.lastInputTokens > 0 {
-		return a.lastInputTokens
+func (l *Lever) estimateTokens() int {
+	if l.lastInputTokens > 0 {
+		return l.lastInputTokens
 	}
-	return estimateMessagesTokens(a.history)
+	return estimateMessagesTokens(l.history)
 }
 
 func estimateMessagesTokens(msgs []provider.Msg) int {

@@ -6,7 +6,7 @@
 ![Go](https://img.shields.io/badge/-Go-00ADD8?logo=go&logoColor=00add8&labelColor=grey&style=flat)
 ![original.flipster](https://img.shields.io/badge/-original.flipster-grey?logo=data%3Aimage%2Fgif%3Bbase64%2CR0lGODlhQABIAIQRACAo+wAAACklJFExblwglP+LFn0sEqMixlBIReIqAJ6Oif/FFv+LFv+LFv//AP/FFv///ymYGimYGimYGimYGimYGimYGimYGimYGimYGimYGimYGimYGimYGimYGimYGiH+EUNyZWF0ZWQgd2l0aCBHSU1QACH5BAEKAB8ALAAAAABAAEgAAAX+4CeOZGmeH0GgX8K+8NuQs0kkeFzHfHyvItwt8RvdeshkC0gkNAKBREOaOiqvMFXjCVUIoIGtCqvcfWZWJ1cBUSAQgji0MW6JdlTsdgvjQv4Qb3BxcnwoK3tAPFNgToqIW1B/gpSDcmEudimRYHQ9dAEPD1BSNZyTlamEX0N3BGAMDGGKfa8PBg+yc1wIgW8KbpSEb6udTwYMorGzn68MA7EGBlFEAai9qnHEhGA4AbixA6NTzQEMB9CxuoCp7dlfUOoDAweynovO9PSybb6+26tWVdJm7hk9dPZoyXCGDt23a4LggZkIRYAwOAqg6DtQD9OnBOY4HrAGEQ4sdSj+lwXQNjAAx33MeNz4po/NP24oRenUqa5iqgAH50VZFMTWyH8m4yXbyZTnsmHEgHKkdudFDinmBrCJ+A1ZrKZgczGYtpKSF6FTcGRi4YIRP2EFv4YFG80nsYwDZuXIokXSzbhzA4uVZTHqFzp12KpQY21bQcGQexY2iVjF3hJpvPmCJxdyZMJ3ZwFJHGTtkABRvXpeLbYs5cRESFwG2Zii7ds6b+ueiICaotgj1BJ5gm238WVkjVM02aQF8NKIibshCeaPJOUQ/GrXTbnJFFo4vkvvTTI79fO3rZ9/oH754cXfSWiZMh4eoO3tleI3jx7MG0xSNFfVJpFEpct56qn+h4wy+1Vn3lhlhbFFbJdVUQpqJqmEoHkQTLMUgxtyWBBZve3xnCYiMIbaF8kklyB/H/K0H39iTVOiGLJhRh9qKyVTF4LxhLUOf7DkggyPEipkhBZY9SbAhxpOJJgsUS442IpRIIbZYk40KYCVIFIE2W1yjSULc5VxqeaO/3U2mDo6HSTSALgok5JT01iUZZqLqaUGVjyCKZhUdIYSGYnG0PGdZRM2+gp5ydjmpihAAdUUbgcyV0qAXJqYFi+AyWgoU6MyVedOT1Em4aadehoeht9ACMZcpeqEzDTJgVbipiaqecMe30FBnldfyXIpFKfmVmdPWGJC36KjwQesl/H+eBWkqdeiamhdl4hXCpdLqjFhGMImZSaclH6Ty6x2QjhKF52UkkgdNXjHhQPklvVFcnGF2hOzsUa40hcLSKilbHw4QVLBEn6BQEZkpoSSbtOtBMYCBSR5xl6ZKAyBAwwzLEBGhSnFr26SRQUMFBkHsADD9wQHnzUFO2CzyF4UxqI60pAlMWhfjGxxARhnB0HBlYUbCQQZ31xw0DmXHMrPcJarJ8krEQ1yAFuLUYe0XBe8gAMtWywHS18EhuEgAwfNMtFcZ+x1tIzZHEDZ+FKEdq2kRnTJRC1rvctiKc7nsgPZjY14xklVJPWxjoEhxx8305ylgIUrXEABiINhc3b+ggQA8WTmpBs5yXp+XLbqSZJm4SuHfwzFy6APArF/5sA6kRfBWJM350cXzCkLQ3DBct4L1I7RdeTxyJ8Xoctu90SJvPDDEwXLPrvyy2cnh0neQx/V0bN3LjfmJzAZO9f4co6hzmxMZJ/ok/0H8tZGI0249b8ezjWR/iGGeeDxBe/9B3AFkF3y9Lc/4qlPbKwDRO2ssRKIZWSCEtyc5dwnhQbyT2Fk41zeQEY754FhZRTszcde9rKF3Q1fSevBzDA2NqZNJHnXqR8Ffccwv5DtZQVAHxL6wrLk2Q1fODRg9KCwtd4g7mhl6yAZpEUbIJLtbkdT4n/yhxqxbc1grruPQp9c1rT2uayHt/kiatrHQCVhgYg4LGPGkidByt3NcliE4YnIoCPs2W1sTGShIN3HusoljI/EwwrR5qg93dgMXz+UECIXcTdAAu9jkGwf5QrGuRaaYZIyeNvsWMi+M2LMNp8EpQyAdbeyUURuwEqlKj9xuCdiEmmynGUZjMfClhlCl5NkZaKAOctYAguYIQAAOw==&logoSize=auto&labelColor=grey&color=292524)
 
-A security- and privacy-first sandboxed coding assistant for the terminal. `koko` connects to all of your favorite LLM providers and provides least privilege access to your files and the shell. Nothing that you don't want to is leaving your machine. Worry-free agentic coding.
+A security- and privacy-first sandboxed coding assistant for the terminal. `koko` connects to all of your favorite LLM providers and provides least privilege access to your files and the shell. Nothing that you don't want to is leaving your machine. Worry-free code generation.
 
 ## Features
 
@@ -28,7 +28,7 @@ Switch the active model at runtime with `:model <name>` or set defaults in `~/.k
 
 The sandbox is the core security boundary. Every file operation is validated against it before execution.
 
-- **Directory allowlist** — the agent can only read, write, or list inside explicitly allowed directories. Default is the current working directory; additional dirs can be configured.
+- **Directory allowlist** — the lever can only read, write, or list inside explicitly allowed directories. Default is the current working directory; additional dirs can be configured.
 - **Symlink-safe path resolution** — paths are canonicalized through symlinks before validation. Final-component opens use `O_NOFOLLOW` to prevent TOCTOU swaps.
 - **Typed validation token** — paths must pass `ValidatePath` (which returns a typed `ValidPath`) before reaching any I/O method. The compiler enforces "no raw paths in editor."
 - **`.git` always denied** — any path inside a `.git` directory is unconditionally blocked, regardless of config. Without this, a denied file's contents could still be reconstructed from committed git blobs in `.git/objects`, defeating the deny patterns.
@@ -41,7 +41,7 @@ The sandbox is the core security boundary. Every file operation is validated aga
 
 ### Elevated-Privilege Guard
 
-If koko is launched by a user with root privileges (effective UID 0), it prints a warning that running a non-deterministic agent with elevated privileges is strongly discouraged and requires explicit `y` confirmation before starting. Declining aborts the launch. The check is on by default; opt out by setting `suppress_elevated_warning = true` under `[sandbox]` in `~/.koko/config.toml`.
+If koko is launched by a user with root privileges (effective UID 0), it prints a warning that running a non-deterministic coding tool with elevated privileges is strongly discouraged and requires explicit `y` confirmation before starting. Declining aborts the launch. The check is on by default; opt out by setting `suppress_elevated_warning = true` under `[sandbox]` in `~/.koko/config.toml`.
 
 ### Command Policy
 
@@ -52,9 +52,9 @@ Shell commands run through `exec_command` are gated by a regex-based policy:
 - **User confirmation** — every `exec_command` invocation prompts for explicit approval before running.
 - **Exec hardening** — commands run with `ulimit` caps on CPU seconds, memory, and output file size. Stdout/stderr are bounded.
 
-### Agent Tools
+### Available Tools
 
-The agent has 12 tools, all mediated through the sandbox:
+The lever has 12 tools, all mediated through the sandbox:
 
 **Files**
 
@@ -105,7 +105,7 @@ koko scans the sandbox root for marker files (`go.mod`, `package.json`, `Cargo.t
 
 ### Vision Sanity Check
 
-`:vision` is a local, non-LLM command that walks the sandbox and lists every file the agent can actually see after applying the **deny** patterns and the **ignore** rules — the same `ValidatePath` + ignore filters the file tools use, so the listing is exactly what the agent can reach. `.git` is absent because it is always denied at the sandbox layer (see above), not because `:vision` special-cases it. It's a quick way to confirm sensitive files are excluded and to see exactly what's exposed before letting the agent loose.
+`:vision` is a local, non-LLM command that walks the sandbox and lists every file the LLM can actually see after applying the **deny** patterns and the **ignore** rules — the same `ValidatePath` + ignore filters the file tools use, so the listing is exactly what the LLM can reach. `.git` is absent because it is always denied at the sandbox layer (see above), not because `:vision` special-cases it. It's a quick way to confirm sensitive files are excluded and to see exactly what's exposed before letting the LLM roam freely.
 
 ### Audit Logging
 
@@ -113,7 +113,7 @@ Every tool invocation is recorded to `~/.koko/audit.jsonl` with timestamp, tool 
 
 ### Memory
 
-Persistent cross-session memories live at `~/.koko/memories/`. The agent can save (`save_memory`) and delete (`delete_memory`) typed entries (user / feedback / project / reference) that surface as context in future sessions. You can also manage them directly with the `:memories` command — `:memories` lists them, `:memories <name>` reads one, `:memories add <name> <body>` stores a new `project` memory, and `:memories delete <name>` removes one.
+Persistent cross-session memories live at `~/.koko/memories/`. The tool can save (`save_memory`) and delete (`delete_memory`) typed entries (user / feedback / project / reference) that surface as context in future sessions. You can also manage them directly with the `:memories` command — `:memories` lists them, `:memories <name>` reads one, `:memories add <name> <body>` stores a new `project` memory, and `:memories delete <name>` removes one.
 
 ### Plays
 
@@ -137,7 +137,7 @@ Optional parameters (`key=value`, any order):
 
 ### Plan Mode
 
-Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the agent proposes a plan via `exit_plan_mode` and you approve it.
+Toggle with `:plan` to switch into a read-only investigation mode. Write tools are disabled until the LLM proposes a plan via `exit_plan_mode` and you approve it.
 
 ### Command Highlighting
 
@@ -145,30 +145,30 @@ As you type, koko recognizes when the current line is a known command or install
 
 ### Interactive REPL
 
-| Command | Description |
-|---------|-------------|
-| `:help` | Show available commands |
-| `:koko` | Print the koko mascot |
-| `:clear` | Reset conversation history |
-| `:history` | Show message count |
-| `:tokens` | Show token usage stats |
-| `:undo` | Revert the last file change |
-| `:run <cmd>` | Run a shell command directly (bypasses agent) |
-| `:compact` | Summarize history to reclaim context |
-| `:model [name]` | Show or switch the active model |
+| Command | Description                                        |
+|---------|----------------------------------------------------|
+| `:help` | Show available commands                            |
+| `:koko` | Print the koko mascot                              |
+| `:clear` | Reset conversation history                         |
+| `:history` | Show message count                                 |
+| `:tokens` | Show token usage stats                             |
+| `:undo` | Revert the last file change                        |
+| `:run <cmd>` | Run a shell command directly (bypasses LLM)        |
+| `:compact` | Summarize history to reclaim context               |
+| `:model [name]` | Show or switch the active model                    |
 | `:effort [default\|low\|medium\|high]` | Show or set reasoning effort (mapped per provider) |
-| `:config` | Display the active configuration |
-| `:save` | Save the current session to disk |
-| `:resume` | Restore a saved session |
-| `:reload` | Reload config from its sources without restarting |
-| `:plays` | List installed plays |
-| `:vision` | List files the agent can see (after deny & ignore) |
-| `:memories [<name> \| add <name> <body> \| delete <name>]` | List, read, add, or delete memories |
-| `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script |
-| `:plan` | Toggle plan mode |
-| `:<play>` | Run a named play (e.g., `:review`) |
+| `:config` | Display the active configuration                   |
+| `:save` | Save the current session to disk                   |
+| `:resume` | Restore a saved session                            |
+| `:reload` | Reload config from its sources without restarting  |
+| `:plays` | List installed plays                               |
+| `:vision` | List files the LLM can see (after deny & ignore)   |
+| `:memories [<name> \| add <name> <body> \| delete <name>]` | List, read, add, or delete memories                |
+| `:cage <username> [dir=…] [group=…] [os=…]` | Generate a low-privilege user setup script         |
+| `:plan` | Toggle plan mode                                   |
+| `:<play>` | Run a named play (e.g., `:review`)                 |
 
-Sessions are auto-saved when the agent finishes a turn.
+Sessions are auto-saved whenever a turn is finished.
 
 ## Installation
 

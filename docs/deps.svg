@@ -25,7 +25,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever -->
 <g id="node2" class="node">
 <title>github.com/original&#45;flipster69/koko/internal/agent</title>
 <g id="a_node2"><a xlink:href="https://pkg.go.dev/github.com/original-flipster69/koko/internal/agent" xlink:title="github.com/original&#45;flipster69/koko/internal/agent" target="_graphviz">
@@ -35,7 +35,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent -->
+<!-- github.com/original&#45;flipster69/koko&#45;&gt;github.com/original&#45;flipster69/koko/internal/lever -->
 <g id="edge1" class="edge">
 <title>github.com/original&#45;flipster69/koko:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent</title>
 <g id="a_edge1"><a xlink:title="github.com/original&#45;flipster69/koko &#45;&gt; github.com/original&#45;flipster69/koko/internal/agent">
@@ -253,7 +253,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/audit -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/audit -->
 <g id="edge13" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/audit</title>
 <g id="a_edge13"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/audit">
@@ -272,7 +272,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/diff -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/diff -->
 <g id="edge14" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/diff</title>
 <g id="a_edge14"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/diff">
@@ -291,7 +291,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/editor -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/editor -->
 <g id="edge15" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/editor</title>
 <g id="a_edge15"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/editor">
@@ -300,7 +300,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/ignore -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/ignore -->
 <g id="edge16" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/ignore</title>
 <g id="a_edge16"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/ignore">
@@ -309,7 +309,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/memories -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/memories -->
 <g id="edge17" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/memory</title>
 <g id="a_edge17"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/memory">
@@ -318,7 +318,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/policy -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/policy -->
 <g id="edge18" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/policy</title>
 <g id="a_edge18"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/policy">
@@ -337,7 +337,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy -->
 <g id="edge19" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/privacy</title>
 <g id="a_edge19"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/privacy">
@@ -346,7 +346,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/provider -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/provider -->
 <g id="edge20" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/provider</title>
 <g id="a_edge20"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/provider">
@@ -355,7 +355,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox -->
 <g id="edge21" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/sandbox</title>
 <g id="a_edge21"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/sandbox">
@@ -364,7 +364,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/agent&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui -->
+<!-- github.com/original&#45;flipster69/koko/internal/lever&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui -->
 <g id="edge22" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/agent:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/ui</title>
 <g id="a_edge22"><a xlink:title="github.com/original&#45;flipster69/koko/internal/agent &#45;&gt; github.com/original&#45;flipster69/koko/internal/ui">
@@ -391,7 +391,7 @@
 </a>
 </g>
 </g>
-<!-- github.com/original&#45;flipster69/koko/internal/terminal&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent -->
+<!-- github.com/original&#45;flipster69/koko/internal/terminal&#45;&gt;github.com/original&#45;flipster69/koko/internal/lever -->
 <g id="edge25" class="edge">
 <title>github.com/original&#45;flipster69/koko/internal/terminal:e&#45;&gt;github.com/original&#45;flipster69/koko/internal/agent</title>
 <g id="a_edge25"><a xlink:title="github.com/original&#45;flipster69/koko/internal/terminal &#45;&gt; github.com/original&#45;flipster69/koko/internal/agent">

@@ -6,14 +6,14 @@ import (
 )
 
 func TestGenerateDarwin(t *testing.T) {
-	s, err := Generate(Options{Username: "agent", GOOS: "darwin"})
+	s, err := Generate(Options{Username: "lever", GOOS: "darwin"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Filename != "cage-agent.sh" {
+	if s.Filename != "cage-lever.sh" {
 		t.Errorf("filename = %q", s.Filename)
 	}
-	for _, want := range []string{"dscl", "createhomedir", `NEW_USER="agent"`, `GROUP="collabo"`, "chmod -R 2770"} {
+	for _, want := range []string{"dscl", "createhomedir", `NEW_USER="lever"`, `GROUP="collabo"`, "chmod -R 2770"} {
 		if !strings.Contains(s.Body, want) {
 			t.Errorf("darwin script missing %q", want)
 		}
@@ -24,7 +24,7 @@ func TestGenerateDarwin(t *testing.T) {
 }
 
 func TestGenerateLinux(t *testing.T) {
-	s, err := Generate(Options{Username: "agent", GOOS: "linux"})
+	s, err := Generate(Options{Username: "lever", GOOS: "linux"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestGenerateLinux(t *testing.T) {
 }
 
 func TestGenerateDefaultGroup(t *testing.T) {
-	s, err := Generate(Options{Username: "agent", GOOS: "linux"})
+	s, err := Generate(Options{Username: "lever", GOOS: "linux"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestGenerateDefaultGroup(t *testing.T) {
 }
 
 func TestGenerateCustomGroup(t *testing.T) {
-	s, err := Generate(Options{Username: "agent", Group: "devs", GOOS: "linux"})
+	s, err := Generate(Options{Username: "lever", Group: "devs", GOOS: "linux"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestGenerateCustomGroup(t *testing.T) {
 }
 
 func TestGenerateOSOverride(t *testing.T) {
-	s, err := Generate(Options{Username: "agent", GOOS: "darwin"})
+	s, err := Generate(Options{Username: "lever", GOOS: "darwin"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestGenerateOSOverride(t *testing.T) {
 }
 
 func TestGenerateUnsupportedOS(t *testing.T) {
-	if _, err := Generate(Options{Username: "agent", GOOS: "windows"}); err == nil {
+	if _, err := Generate(Options{Username: "lever", GOOS: "windows"}); err == nil {
 		t.Error("expected error for unsupported OS")
 	}
 }
@@ -92,15 +92,15 @@ func TestGenerateRejectsBadUsernames(t *testing.T) {
 func TestGenerateRejectsBadGroups(t *testing.T) {
 	bad := []string{"1bad", "Has Space", "semi;colon", "a/b"}
 	for _, g := range bad {
-		if _, err := Generate(Options{Username: "agent", Group: g, GOOS: "linux"}); err == nil {
+		if _, err := Generate(Options{Username: "lever", Group: g, GOOS: "linux"}); err == nil {
 			t.Errorf("expected rejection of group %q", g)
 		}
 	}
 }
 
 func TestGeneratePasswordIsRandomAndShellSafe(t *testing.T) {
-	s1, _ := Generate(Options{Username: "agent", GOOS: "linux"})
-	s2, _ := Generate(Options{Username: "agent", GOOS: "linux"})
+	s1, _ := Generate(Options{Username: "lever", GOOS: "linux"})
+	s2, _ := Generate(Options{Username: "lever", GOOS: "linux"})
 	if s1.Body == s2.Body {
 		t.Error("two generations produced identical scripts; password not random")
 	}

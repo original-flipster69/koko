@@ -98,7 +98,7 @@ NEW_GID=$(pick_id "$(dscl . -list /Groups PrimaryGroupID | awk '{print $2}')")
 
 dscl . -create "/Users/$NEW_USER"
 dscl . -create "/Users/$NEW_USER" UserShell /bin/zsh
-dscl . -create "/Users/$NEW_USER" RealName "$NEW_USER (caged agent)"
+dscl . -create "/Users/$NEW_USER" RealName "$NEW_USER (caged lever)"
 dscl . -create "/Users/$NEW_USER" UniqueID "$NEW_UID"
 dscl . -create "/Users/$NEW_USER" PrimaryGroupID 20
 dscl . -create "/Users/$NEW_USER" NFSHomeDirectory "/Users/$NEW_USER"
@@ -137,7 +137,7 @@ NEW_UID=$(pick_id "$(getent passwd | awk -F: '{print $3}')")
 NEW_GID=$(pick_id "$(getent group | awk -F: '{print $3}')")
 
 groupadd -g "$NEW_GID" -f "$GROUP"
-useradd -m -u "$NEW_UID" -s /bin/bash -c "caged agent" -G "$GROUP" "$NEW_USER"
+useradd -m -u "$NEW_UID" -s /bin/bash -c "caged lever" -G "$GROUP" "$NEW_USER"
 printf '%s:%s\n' "$NEW_USER" "$PASSWORD" | chpasswd
 usermod -aG "$GROUP" "$(logname)"
 
