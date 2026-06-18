@@ -1,4 +1,4 @@
-package lever
+package pushpuppet
 
 import (
 	"encoding/json"

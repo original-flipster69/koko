@@ -1,4 +1,4 @@
-package lever
+package pushpuppet
 
 import (
 	"context"
@@ -172,7 +172,7 @@ func TestEstimateMessagesTokens_Heuristic(t *testing.T) {
 }
 
 func TestEstimateTokens_UsesCacheWhenSet(t *testing.T) {
-	a := &Lever{
+	a := &PushPuppet{
 		history:         []provider.Msg{{Content: "very long content that the heuristic would otherwise score above the cache value"}},
 		lastInputTokens: 42,
 	}
@@ -182,7 +182,7 @@ func TestEstimateTokens_UsesCacheWhenSet(t *testing.T) {
 }
 
 func TestTrimHistory_NoopUnderThreshold(t *testing.T) {
-	a := &Lever{history: []provider.Msg{
+	a := &PushPuppet{history: []provider.Msg{
 		{Role: provider.System, Content: "sys"},
 		{Role: provider.User, Content: "hi"},
 		{Role: provider.Assistant, Content: "hello"},
@@ -196,7 +196,7 @@ func TestTrimHistory_NoopUnderThreshold(t *testing.T) {
 
 func TestTrimHistory_PreservesSystemAndEndsAtUser(t *testing.T) {
 	bigChunk := strings.Repeat("x", 500_000)
-	a := &Lever{history: []provider.Msg{
+	a := &PushPuppet{history: []provider.Msg{
 		{Role: provider.System, Content: "sys"},
 		{Role: provider.User, Content: "first"},
 		{Role: provider.Assistant, Content: bigChunk},
@@ -225,7 +225,7 @@ func TestTrimHistory_PreservesSystemAndEndsAtUser(t *testing.T) {
 }
 
 func TestLoadSession_BackwardCompatStripsLeadingSystem(t *testing.T) {
-	a := &Lever{history: []provider.Msg{
+	a := &PushPuppet{history: []provider.Msg{
 		{Role: provider.System, Content: "CURRENT system prompt"},
 	}}
 

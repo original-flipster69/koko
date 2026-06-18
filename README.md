@@ -28,7 +28,7 @@ Switch the active model at runtime with `:model <name>` or set defaults in `~/.k
 
 The sandbox is the core security boundary. Every file operation is validated against it before execution.
 
-- **Directory allowlist** — the lever can only read, write, or list inside explicitly allowed directories. Default is the current working directory; additional dirs can be configured.
+- **Directory allowlist** — the push puppet can only read, write, or list inside explicitly allowed directories. Default is the current working directory; additional dirs can be configured.
 - **Symlink-safe path resolution** — paths are canonicalized through symlinks before validation. Final-component opens use `O_NOFOLLOW` to prevent TOCTOU swaps.
 - **Typed validation token** — paths must pass `ValidatePath` (which returns a typed `ValidPath`) before reaching any I/O method. The compiler enforces "no raw paths in editor."
 - **`.git` always denied** — any path inside a `.git` directory is unconditionally blocked, regardless of config. Without this, a denied file's contents could still be reconstructed from committed git blobs in `.git/objects`, defeating the deny patterns.
@@ -54,7 +54,7 @@ Shell commands run through `exec_command` are gated by a regex-based policy:
 
 ### Available Tools
 
-The lever has 12 tools, all mediated through the sandbox:
+The push puppet has 12 tools, all mediated through the sandbox:
 
 **Files**
 

@@ -11,11 +11,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/original-flipster69/koko/internal/lever"
+	"github.com/original-flipster69/koko/internal/pushpuppet"
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
-type leverDoneMsg struct{ err error }
+type pushPuppetDoneMsg struct{ err error }
 type confirmRequestMsg string
 type spinnerTickMsg struct{}
 type splashTickMsg struct{}
@@ -42,7 +42,7 @@ type model struct {
 	input    textarea.Model
 	content  *strings.Builder
 
-	lever      *lever.Lever
+	pushPuppet *pushpuppet.PushPuppet
 	ctx        context.Context
 	cancel     context.CancelFunc
 	runCancel  context.CancelFunc
@@ -53,14 +53,14 @@ type model struct {
 	termWidth  int
 	termHeight int
 
-	confirmCh    chan bool
-	confirmMode  bool
-	confirmText  string
-	leverBusy    bool
-	ready        bool
-	quitting     bool
-	spinnerTick  int
-	spinnerLabel string
+	confirmCh      chan bool
+	confirmMode    bool
+	confirmText    string
+	pushPuppetBusy bool
+	ready          bool
+	quitting       bool
+	spinnerTick    int
+	spinnerLabel   string
 
 	cmdHandler    CmdHandler
 	knownCommands map[string]bool
@@ -69,9 +69,9 @@ type model struct {
 	inputRows     int
 }
 
-type CmdHandler func(input string, a *lever.Lever) (handled bool, prompt string, output string)
+type CmdHandler func(input string, a *pushpuppet.PushPuppet) (handled bool, prompt string, output string)
 
-func newModel(a *lever.Lever, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, knownCommands []string, scheme ui.Scheme) model {
+func newModel(a *pushpuppet.PushPuppet, ctx context.Context, cancel context.CancelFunc, kokoDir string, splashes []string, cmdHandler CmdHandler, confirmCh chan bool, knownCommands []string, scheme ui.Scheme) model {
 	ta := textarea.New()
 	ta.Placeholder = "ask koko anything... (alt+enter or ctrl+j for newline)"
 	ta.Focus()
@@ -90,7 +90,7 @@ func newModel(a *lever.Lever, ctx context.Context, cancel context.CancelFunc, ko
 	m := model{
 		input:         ta,
 		content:       &strings.Builder{},
-		lever:         a,
+		pushPuppet:    a,
 		ctx:           ctx,
 		cancel:        cancel,
 		kokoDir:       kokoDir,
@@ -152,11 +152,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
-			if m.leverBusy {
+			if m.pushPuppetBusy {
 				if m.runCancel != nil {
 					m.runCancel()
 				}
-				m.leverBusy = false
+				m.pushPuppetBusy = false
 				m.appendOutput(fmt.Sprintf("\n%s%sinterrupted%s\n", ui.Dim, m.scheme.Muted, ui.Reset))
 				return m, nil
 			}
@@ -201,9 +201,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.appendOutput("\n" + block + "\n\n")
 
 			if strings.HasPrefix(input, ":") && m.cmdHandler != nil {
-				handled, prompt, output := m.cmdHandler(input, m.lever)
-				m.scheme = m.lever.Scheme()
-				m.effortLabel = m.lever.Effort().String()
+				handled, prompt, output := m.cmdHandler(input, m.pushPuppet)
+				m.scheme = m.pushPuppet.Scheme()
+				m.effortLabel = m.pushPuppet.Effort().String()
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}
@@ -215,24 +215,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			m.leverBusy = true
+			m.pushPuppetBusy = true
 			m.spinnerTick = 0
-			m.spinnerLabel = m.lever.ThinkingVerb()
+			m.spinnerLabel = m.pushPuppet.ThinkingVerb()
 			runCtx, runCancel := context.WithCancel(m.ctx)
 			m.runCancel = runCancel
 			runInput := input
 			return m, tea.Batch(
 				func() tea.Msg {
-					err := m.lever.Run(runCtx, runInput)
+					err := m.pushPuppet.Run(runCtx, runInput)
 					runCancel()
-					return leverDoneMsg{err: err}
+					return pushPuppetDoneMsg{err: err}
 				},
 				spinnerTickCmd(0),
 			)
 		}
 
 	case spinnerTickMsg:
-		if m.leverBusy {
+		if m.pushPuppetBusy {
 			m.spinnerTick++
 			cmds = append(cmds, spinnerTickCmd(m.spinnerTick))
 		}
@@ -258,14 +258,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case leverDoneMsg:
-		m.leverBusy = false
+	case pushPuppetDoneMsg:
+		m.pushPuppetBusy = false
 		if msg.err != nil {
 			m.appendOutput("\n" + m.scheme.Error(msg.err.Error()) + "\n")
 		} else {
-			m.appendOutput(m.scheme.TokenStats(m.lever.TotalInput, m.lever.TotalOutput) + "\n")
+			m.appendOutput(m.scheme.TokenStats(m.pushPuppet.TotalInput, m.pushPuppet.TotalOutput) + "\n")
 		}
-		_ = m.lever.SaveSession(m.kokoDir)
+		_ = m.pushPuppet.SaveSession(m.kokoDir)
 		return m, nil
 
 	case confirmRequestMsg:
@@ -275,7 +275,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if !m.leverBusy || m.confirmMode {
+	if !m.pushPuppetBusy || m.confirmMode {
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
@@ -404,7 +404,7 @@ func (m model) View() string {
 	}
 
 	var statusLine string
-	if m.leverBusy {
+	if m.pushPuppetBusy {
 		statusLine = fmt.Sprintf("  %s", m.spinnerView())
 	}
 

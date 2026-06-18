@@ -1,4 +1,4 @@
-package lever
+package pushpuppet
 
 import (
 	"testing"
@@ -96,7 +96,7 @@ func TestToolQuiet_ReadFileIsQuiet(t *testing.T) {
 }
 
 func TestBuildTools_ReturnsAllToolsInOrder(t *testing.T) {
-	a := &Lever{}
+	a := &PushPuppet{}
 	defs := a.buildTools()
 	if len(defs) != len(tools) {
 		t.Fatalf("buildTools returned %d, expected %d", len(defs), len(tools))

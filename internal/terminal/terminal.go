@@ -5,12 +5,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/original-flipster69/koko/internal/lever"
+	"github.com/original-flipster69/koko/internal/pushpuppet"
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
 func Run(
-	l *lever.Lever,
+	l *pushpuppet.PushPuppet,
 	kokoDir string,
 	splashes []string,
 	slashHandler CmdHandler,

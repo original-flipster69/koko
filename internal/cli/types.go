@@ -3,7 +3,7 @@ package cli
 import (
 	"strings"
 
-	"github.com/original-flipster69/koko/internal/lever"
+	"github.com/original-flipster69/koko/internal/pushpuppet"
 	"github.com/original-flipster69/koko/internal/ui"
 )
 
@@ -16,7 +16,7 @@ type cmdDef interface {
 
 type cmdOpts struct {
 	input string
-	a     *lever.Lever
+	a     *pushpuppet.PushPuppet
 }
 
 func (c cmdOpts) parts() []string {

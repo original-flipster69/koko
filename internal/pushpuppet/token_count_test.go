@@ -1,4 +1,4 @@
-package lever
+package pushpuppet
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func (f *fakeCounter) CountTokens(ctx context.Context, msgs []provider.Msg, tool
 
 func TestMeasureTokensUsesCounter(t *testing.T) {
 	fc := &fakeCounter{n: 4242}
-	a := &Lever{counter: fc, history: []provider.Msg{
+	a := &PushPuppet{counter: fc, history: []provider.Msg{
 		{Role: provider.System, Content: "s"},
 		{Role: provider.User, Content: "hi"},
 	}}
@@ -35,7 +35,7 @@ func TestMeasureTokensUsesCounter(t *testing.T) {
 
 func TestMeasureTokensFallsBackOnError(t *testing.T) {
 	fc := &fakeCounter{err: errors.New("boom")}
-	a := &Lever{counter: fc, history: []provider.Msg{{Role: provider.User, Content: "hello world"}}}
+	a := &PushPuppet{counter: fc, history: []provider.Msg{{Role: provider.User, Content: "hello world"}}}
 	got := a.measureTokens(context.Background())
 	if want := estimateMessagesTokens(a.history); got != want {
 		t.Errorf("got %d, want fallback %d", got, want)
@@ -43,7 +43,7 @@ func TestMeasureTokensFallsBackOnError(t *testing.T) {
 }
 
 func TestMeasureTokensFallsBackWhenNoCounter(t *testing.T) {
-	a := &Lever{history: []provider.Msg{{Role: provider.User, Content: "hello world"}}}
+	a := &PushPuppet{history: []provider.Msg{{Role: provider.User, Content: "hello world"}}}
 	got := a.measureTokens(context.Background())
 	if want := estimateMessagesTokens(a.history); got != want {
 		t.Errorf("got %d, want fallback %d", got, want)

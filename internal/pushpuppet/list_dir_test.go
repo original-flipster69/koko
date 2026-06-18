@@ -1,4 +1,4 @@
-package lever
+package pushpuppet
 
 import (
 	"context"
@@ -13,13 +13,13 @@ import (
 	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
-func newListLever(t *testing.T, root string, deny []string) *Lever {
+func newListPushPuppet(t *testing.T, root string, deny []string) *PushPuppet {
 	t.Helper()
 	sb, err := sandbox.New(root, []string{root}, deny, 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Lever{sandbox: sb, editor: editor.New(sb), ignore: ignore.NewFromPatterns(nil)}
+	return &PushPuppet{sandbox: sb, editor: editor.New(sb), ignore: ignore.NewFromPatterns(nil)}
 }
 
 func mkfile(t *testing.T, root, rel string) {
@@ -40,7 +40,7 @@ func TestListDirExcludesGitAndDenied(t *testing.T) {
 	mkfile(t, root, "secret.key")  // denied (*.key)
 	mkfile(t, root, ".git/config") // inside .git → always denied
 
-	a := newListLever(t, root, []string{".env", "*.key"})
+	a := newListPushPuppet(t, root, []string{".env", "*.key"})
 	out := a.listDir(context.Background(), provider.ToolCall{Args: map[string]string{"path": root}})
 
 	if !strings.Contains(out, "main.go") {
@@ -58,7 +58,7 @@ func TestListDirTreeExcludesGit(t *testing.T) {
 	mkfile(t, root, "src/app.go")
 	mkfile(t, root, ".git/config")
 
-	a := newListLever(t, root, nil)
+	a := newListPushPuppet(t, root, nil)
 	out := a.listDir(context.Background(), provider.ToolCall{Args: map[string]string{"path": root, "recursive": "true"}})
 
 	if !strings.Contains(out, "app.go") {

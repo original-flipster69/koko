@@ -14,12 +14,12 @@ import (
 	"github.com/original-flipster69/koko/internal/audit"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
-	"github.com/original-flipster69/koko/internal/lever"
 	"github.com/original-flipster69/koko/internal/memories"
 	"github.com/original-flipster69/koko/internal/plays"
 	"github.com/original-flipster69/koko/internal/policy"
 	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/provider"
+	"github.com/original-flipster69/koko/internal/pushpuppet"
 	"github.com/original-flipster69/koko/internal/sandbox"
 	"github.com/original-flipster69/koko/internal/terminal"
 	"github.com/original-flipster69/koko/internal/ui"
@@ -114,9 +114,9 @@ func Run(opts Flags) error {
 		projectCtx += "Stored memories (use list_memories to read bodies, save_memory/delete_memory to modify):\n" + idx
 	}
 
-	var outFilters []lever.OutboundFilter
+	var outFilters []pushpuppet.OutboundFilter
 	if cfg.Sandbox.ScrubPII {
-		outFilters = append(outFilters, lever.ScrubPIIFilter)
+		outFilters = append(outFilters, pushpuppet.ScrubPIIFilter)
 	}
 
 	confirm := func(action string) bool {
@@ -128,7 +128,7 @@ func Run(opts Flags) error {
 	}
 
 	cpuSec, memMB, fileMB := cfg.Sandbox.Exec.Limits()
-	a := lever.New(llm, sb, os.Stdout, confirm, auditLog, lever.Options{
+	a := pushpuppet.New(llm, sb, os.Stdout, confirm, auditLog, pushpuppet.Options{
 		Memory:           memoStore,
 		CmdPolicy:        cmdPolicy,
 		Ignore:           ignoreMatcher,
@@ -159,7 +159,7 @@ func Run(opts Flags) error {
 		knownCommands = append(knownCommands, ":"+p.Name)
 	}
 
-	colonHandler := func(input string, a *lever.Lever) (bool, string, string) {
+	colonHandler := func(input string, a *pushpuppet.PushPuppet) (bool, string, string) {
 		parts := strings.Fields(input)
 		if len(parts) == 0 {
 			return true, "", ""
@@ -205,7 +205,7 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func applyConfig(cur *config.Config, next config.Config, a *lever.Lever) (applied, restart []string) {
+func applyConfig(cur *config.Config, next config.Config, a *pushpuppet.PushPuppet) (applied, restart []string) {
 	d := cur.Diff(&next)
 
 	if d.Provider {
@@ -233,9 +233,9 @@ func applyConfig(cur *config.Config, next config.Config, a *lever.Lever) (applie
 		applied = append(applied, "max session tokens")
 	}
 	if d.ScrubPII {
-		var filters []lever.OutboundFilter
+		var filters []pushpuppet.OutboundFilter
 		if next.Sandbox.ScrubPII {
-			filters = append(filters, lever.ScrubPIIFilter)
+			filters = append(filters, pushpuppet.ScrubPIIFilter)
 		}
 		a.SetOutboundFilters(filters)
 		cur.Sandbox.ScrubPII = next.Sandbox.ScrubPII

@@ -1,4 +1,4 @@
-package lever
+package pushpuppet
 
 import (
 	"context"
@@ -13,7 +13,7 @@ type tool struct {
 	Verb        string
 	ReadOnly    bool
 	Quiet       bool
-	Handler     func(*Lever, context.Context, provider.ToolCall) string
+	Handler     func(*PushPuppet, context.Context, provider.ToolCall) string
 }
 
 var tools = []tool{
@@ -23,7 +23,7 @@ var tools = []tool{
 		Verb:        "◇ reading",
 		ReadOnly:    true,
 		Quiet:       true,
-		Handler:     (*Lever).readFile,
+		Handler:     (*PushPuppet).readFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -38,7 +38,7 @@ var tools = []tool{
 		Name:        "write_file",
 		Description: "Create a NEW file. Refuses to run if the path already exists unless overwrite=true is explicitly passed (reserved for deliberate full rewrites). For ANY modification of existing files, use replace_in_file — never write_file.",
 		Verb:        "✎ writing",
-		Handler:     (*Lever).writeFile,
+		Handler:     (*PushPuppet).writeFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -53,7 +53,7 @@ var tools = []tool{
 		Name:        "replace_in_file",
 		Description: "Replace a unique substring in an existing file. You MUST call read_file on this path earlier in the session before calling replace_in_file — the tool will refuse otherwise. If the file changes on disk after your read, you must re-read it. old_text must match byte-for-byte — whitespace, punctuation, capitalization, and line breaks all count. Copy old_text directly from the read_file output. If a short phrase appears multiple times, expand old_text with surrounding context until it is unique.",
 		Verb:        "✎ editing",
-		Handler:     (*Lever).replaceInFile,
+		Handler:     (*PushPuppet).replaceInFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -68,7 +68,7 @@ var tools = []tool{
 		Name:        "rename_file",
 		Description: "Move or rename a file",
 		Verb:        "⇄ moving",
-		Handler:     (*Lever).renameFile,
+		Handler:     (*PushPuppet).renameFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -82,7 +82,7 @@ var tools = []tool{
 		Name:        "delete_file",
 		Description: "Delete a file. Supports undo via /undo.",
 		Verb:        "✕ deleting",
-		Handler:     (*Lever).deleteFile,
+		Handler:     (*PushPuppet).deleteFile,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -96,7 +96,7 @@ var tools = []tool{
 		Description: "List the contents of a directory. Use recursive=true for a tree view.",
 		Verb:        "≡ listing",
 		ReadOnly:    true,
-		Handler:     (*Lever).listDir,
+		Handler:     (*PushPuppet).listDir,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -113,7 +113,7 @@ var tools = []tool{
 		Verb:        "⌕ searching",
 		ReadOnly:    true,
 		Quiet:       true,
-		Handler:     (*Lever).searchFiles,
+		Handler:     (*PushPuppet).searchFiles,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -130,7 +130,7 @@ var tools = []tool{
 		Description: "Execute a shell command and return its output. Runs in the sandbox root directory. Requires user approval.",
 		Verb:        "⚡ running",
 		Quiet:       true,
-		Handler:     (*Lever).execCmd,
+		Handler:     (*PushPuppet).execCmd,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -143,7 +143,7 @@ var tools = []tool{
 		Name:        "save_memory",
 		Description: "Save a persistent memories for future sessions. Types: user (preferences, role), feedback (corrections, validated approaches), project (ongoing work context), reference (pointers to external systems).",
 		Verb:        "◆ remembering",
-		Handler:     (*Lever).saveMemory,
+		Handler:     (*PushPuppet).saveMemory,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -159,7 +159,7 @@ var tools = []tool{
 		Name:        "delete_memory",
 		Description: "Remove a stored memories by name.",
 		Verb:        "◆ forgetting",
-		Handler:     (*Lever).deleteMemory,
+		Handler:     (*PushPuppet).deleteMemory,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -173,14 +173,14 @@ var tools = []tool{
 		Description: "List all stored memories with their types, descriptions, and bodies.",
 		Verb:        "◆ recalling",
 		ReadOnly:    true,
-		Handler:     (*Lever).listMemories,
+		Handler:     (*PushPuppet).listMemories,
 		Params:      provider.Schema{Type: "object"},
 	},
 	{
 		Name:        "exit_plan_mode",
 		Description: "Present a plan to the user for approval and exit plan mode. Only callable while plan mode is active. Call this once investigation is done and you have a concrete plan to propose.",
 		ReadOnly:    true,
-		Handler:     (*Lever).exitPlanMode,
+		Handler:     (*PushPuppet).exitPlanMode,
 		Params: provider.Schema{
 			Type: "object",
 			Properties: map[string]provider.Property{
@@ -216,7 +216,7 @@ func toolQuiet(name string) bool {
 	return ok && t.Quiet
 }
 
-func (l *Lever) buildTools() []provider.ToolDef {
+func (pp *PushPuppet) buildTools() []provider.ToolDef {
 	out := make([]provider.ToolDef, len(tools))
 	for i, t := range tools {
 		out[i] = provider.ToolDef{
