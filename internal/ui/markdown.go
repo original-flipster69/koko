@@ -254,6 +254,7 @@ func (m *MarkdownStream) renderLine(line string) string {
 	if h := headingLevel(trimmed); h > 0 {
 		text := strings.TrimSpace(trimmed[h:])
 		text = stripBoldMarkers(text)
+		text = stripCodeMarkers(text)
 		color := m.scheme.Primary
 		if h >= 2 {
 			color = m.scheme.Secondary
@@ -294,6 +295,13 @@ func stripBoldMarkers(s string) string {
 	}
 	if strings.HasPrefix(s, "__") && strings.HasSuffix(s, "__") && len(s) > 4 {
 		return s[2 : len(s)-2]
+	}
+	return s
+}
+
+func stripCodeMarkers(s string) string {
+	if strings.HasPrefix(s, "`") && strings.HasSuffix(s, "`") && len(s) > 2 {
+		return s[1 : len(s)-1]
 	}
 	return s
 }
