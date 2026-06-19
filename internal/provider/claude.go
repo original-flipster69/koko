@@ -156,7 +156,10 @@ func (a *claude) CountTokens(ctx context.Context, msgs []Msg, tools []ToolDef) (
 }
 
 func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
-	resp, err := sendReq(ctx, a.client, a.baseURL+"/messages", a.request(msgs, tools, true), a.headers())
+	streamCtx, guard := newStallGuard(ctx, streamIdleTimeout)
+	defer guard.done()
+
+	resp, err := sendReq(streamCtx, a.client, a.baseURL+"/messages", a.request(msgs, tools, true), a.headers())
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +173,7 @@ func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, on
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	for scanner.Scan() {
+		guard.progress()
 		line := scanner.Text()
 
 		if !strings.HasPrefix(line, "data: ") {
@@ -236,6 +240,10 @@ func (a *claude) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, on
 				onDelta(StreamDelta{Done: true, Response: result})
 			}
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("reading stream: %w", streamErr(streamCtx, err))
 	}
 
 	return result, nil

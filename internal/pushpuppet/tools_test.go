@@ -1,8 +1,64 @@
 package pushpuppet
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/original-flipster69/koko/internal/provider"
 )
+
+func TestNormalizeToolName(t *testing.T) {
+	cases := map[string]string{
+		"read_file":               "read_file",
+		"  read_file  ":           "read_file",
+		"工具调用: read_file":         "read_file",
+		"工具调用：replace_in_file":    "replace_in_file",
+		"functions.list_dir":      "list_dir",
+		"tool_call -> search_files": "search_files",
+		"-engine":                 "-engine",
+		"工具调用: nonexistent_tool":  "工具调用: nonexistent_tool",
+	}
+	for in, want := range cases {
+		if got := normalizeToolName(in); got != want {
+			t.Errorf("normalizeToolName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestSanitizeToolName(t *testing.T) {
+	long := "engineMessage: The user wants a summary of all tests. " + strings.Repeat("blah ", 200)
+	got := sanitizeToolName(long)
+	if got != "engineMessage:…" {
+		t.Errorf("reasoning-as-name should collapse to first token, got %q", got)
+	}
+	if r := []rune(sanitizeToolName(strings.Repeat("x", 500))); len(r) > 49 {
+		t.Errorf("long single token must be bounded, got %d runes", len(r))
+	}
+	if got := sanitizeToolName("  engine  "); got != "engine" {
+		t.Errorf("clean short token should pass through trimmed, got %q", got)
+	}
+	if got := sanitizeToolName("   "); got != "(empty)" {
+		t.Errorf("blank name should map to (empty), got %q", got)
+	}
+}
+
+func TestToolCallSig(t *testing.T) {
+	a := provider.ToolCall{Name: "search_files", Args: map[string]string{"pattern": "x", "glob": "*.go"}}
+	b := provider.ToolCall{Name: "search_files", Args: map[string]string{"glob": "*.go", "pattern": "x"}}
+	if toolCallSig(a) != toolCallSig(b) {
+		t.Error("identical calls with reordered args must produce the same signature")
+	}
+
+	c := provider.ToolCall{Name: "search_files", Args: map[string]string{"pattern": "y", "glob": "*.go"}}
+	if toolCallSig(a) == toolCallSig(c) {
+		t.Error("calls with different arg values must produce different signatures")
+	}
+
+	d := provider.ToolCall{Name: "list_dir", Args: map[string]string{"pattern": "x", "glob": "*.go"}}
+	if toolCallSig(a) == toolCallSig(d) {
+		t.Error("calls to different tools must produce different signatures")
+	}
+}
 
 func TestToolRegistry_AllEntriesWellFormed(t *testing.T) {
 	for _, tc := range tools {

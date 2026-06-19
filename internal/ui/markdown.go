@@ -300,10 +300,23 @@ func stripBoldMarkers(s string) string {
 }
 
 func stripCodeMarkers(s string) string {
-	if strings.HasPrefix(s, "`") && strings.HasSuffix(s, "`") && len(s) > 2 {
-		return s[1 : len(s)-1]
+	if !strings.Contains(s, "`") {
+		return s
 	}
-	return s
+	var b strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '`' {
+			if end := strings.IndexByte(s[i+1:], '`'); end >= 0 {
+				b.WriteString(s[i+1 : i+1+end])
+				i += end + 2
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
 }
 
 func trimListMarker(s string) (string, bool) {

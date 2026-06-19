@@ -112,7 +112,10 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		})
 	}
 
-	resp, err := sendReq(ctx, m.client, m.baseURL+"/chat/completions", reqBody, map[string]string{
+	streamCtx, guard := newStallGuard(ctx, streamIdleTimeout)
+	defer guard.done()
+
+	resp, err := sendReq(streamCtx, m.client, m.baseURL+"/chat/completions", reqBody, map[string]string{
 		"Authorization": "Bearer " + m.apiKey,
 		"Accept":        "text/event-stream",
 	})
@@ -129,11 +132,13 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 	var content strings.Builder
 	var usage Usg
 	var finishReason string
-	toolAccs := make(map[int]*toolAcc)
+	var toolAccs []*toolAcc
+	byIndex := make(map[int]*toolAcc)
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
+		guard.progress()
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data:") {
 			continue
@@ -158,13 +163,11 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 				}
 			}
 			for _, tc := range delta.ToolCalls {
-				acc, ok := toolAccs[tc.Index]
-				if !ok {
-					acc = &toolAcc{}
-					toolAccs[tc.Index] = acc
-				}
-				if tc.Function.Name != "" {
-					acc.name = tc.Function.Name
+				acc := byIndex[tc.Index]
+				if tc.Function.Name != "" || acc == nil {
+					acc = &toolAcc{name: tc.Function.Name}
+					toolAccs = append(toolAccs, acc)
+					byIndex[tc.Index] = acc
 				}
 				if tc.Function.Arguments != "" {
 					acc.args.WriteString(tc.Function.Arguments)
@@ -179,21 +182,22 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("reading stream: %w", err)
+		return nil, fmt.Errorf("reading stream: %w", streamErr(streamCtx, err))
 	}
 
 	result := &Response{Content: content.String(), Usage: usage, StopReason: finishReason}
 
-	for i := 0; i < len(toolAccs); i++ {
-		acc, ok := toolAccs[i]
-		if !ok {
+	for _, acc := range toolAccs {
+		if acc.name == "" {
 			continue
 		}
-		rawArgs := acc.args.String()
-		var parsed map[string]interface{}
-		if err := json.Unmarshal([]byte(rawArgs), &parsed); err != nil {
-			slog.Warn("mistral stream tool args parse failed", "tool", acc.name, "raw_len", len(rawArgs), "err", err)
-			continue
+		parsed := map[string]interface{}{}
+		rawArgs := strings.TrimSpace(acc.args.String())
+		if rawArgs != "" {
+			if err := json.Unmarshal([]byte(rawArgs), &parsed); err != nil {
+				slog.Warn("mistral stream tool args parse failed", "tool", acc.name, "raw_len", len(rawArgs), "err", err)
+				continue
+			}
 		}
 		args := coerceArgs(parsed)
 		result.ToolCalls = append(result.ToolCalls, ToolCall{
