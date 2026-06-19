@@ -254,7 +254,7 @@ func toolQuiet(name string) bool {
 	return ok && t.Quiet
 }
 
-func (pp *PushPuppet) buildTools() []provider.ToolDef {
+func (p *PushPuppet) buildTools() []provider.ToolDef {
 	out := make([]provider.ToolDef, len(tools))
 	for i, t := range tools {
 		out[i] = provider.ToolDef{
