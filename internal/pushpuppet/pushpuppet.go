@@ -419,9 +419,6 @@ func (pp *PushPuppet) Run(ctx context.Context, userInput string) error {
 		}
 
 		var roundResults strings.Builder
-		if resp.Content != "" {
-			roundResults.WriteString(resp.Content + "\n")
-		}
 		for _, tc := range toolCalls {
 			slog.Info("executing tool", "tool", tc.Name)
 			pp.toolCallCount++
