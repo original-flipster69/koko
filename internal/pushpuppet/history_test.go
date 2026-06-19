@@ -224,6 +224,29 @@ func TestTrimHistory_PreservesSystemAndEndsAtUser(t *testing.T) {
 	}
 }
 
+func TestTrimHistory_ScalesToRealTokenCount(t *testing.T) {
+	build := func(lastReal int) *PushPuppet {
+		h := []provider.Msg{{Role: provider.System, Content: "sys"}}
+		for i := 0; i < 12; i++ {
+			h = append(h, provider.Msg{Role: provider.User, Content: "req"})
+			h = append(h, provider.Msg{Role: provider.Assistant, Content: strings.Repeat("x", 40000)})
+		}
+		return &PushPuppet{history: h, lastInputTokens: lastReal}
+	}
+
+	est := estimateMessagesTokens(build(0).history)
+
+	a := build(est)
+	a.trimHistory(context.Background())
+
+	b := build(est * 4)
+	b.trimHistory(context.Background())
+
+	if len(b.history) >= len(a.history) {
+		t.Errorf("higher real token count must trim more aggressively: scale1 kept %d msgs, scale4 kept %d msgs", len(a.history), len(b.history))
+	}
+}
+
 func TestLoadSession_BackwardCompatStripsLeadingSystem(t *testing.T) {
 	a := &PushPuppet{history: []provider.Msg{
 		{Role: provider.System, Content: "CURRENT system prompt"},

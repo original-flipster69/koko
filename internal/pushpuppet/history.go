@@ -74,21 +74,26 @@ func (pp *PushPuppet) Compact() (int, int) {
 }
 
 func (pp *PushPuppet) trimHistory(ctx context.Context) {
-	if pp.estimateTokens() <= maxHistoryTokens {
+	realTotal := pp.estimateTokens()
+	if realTotal <= maxHistoryTokens {
 		return
 	}
 	target := maxHistoryTokens * 3 / 4
-	totalCost := estimateMessagesTokens(pp.history)
+
+	scale := 1.0
+	if estTotal := estimateMessagesTokens(pp.history); estTotal > 0 {
+		scale = float64(realTotal) / float64(estTotal)
+	}
 
 	cutEnd := 0
-	droppedCost := 0
+	droppedReal := 0.0
 	for i := 2; i <= len(pp.history)-2; i++ {
-		droppedCost += msgTokens(pp.history[i-1])
+		droppedReal += float64(msgTokens(pp.history[i-1])) * scale
 		if pp.history[i].Role != provider.User {
 			continue
 		}
 		cutEnd = i
-		if totalCost-droppedCost <= target {
+		if float64(realTotal)-droppedReal <= float64(target) {
 			break
 		}
 	}
@@ -109,7 +114,7 @@ func (pp *PushPuppet) trimHistory(ctx context.Context) {
 	newHist = append(newHist, kept...)
 	pp.history = newHist
 	pp.lastInputTokens = pp.measureTokens(ctx)
-	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept))
+	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept), "real_before", realTotal, "scale", scale)
 }
 
 func (pp *PushPuppet) estimateTokens() int {
