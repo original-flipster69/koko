@@ -112,7 +112,10 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		})
 	}
 
-	resp, err := sendReq(ctx, m.client, m.baseURL+"/chat/completions", reqBody, map[string]string{
+	streamCtx, guard := newStallGuard(ctx, streamIdleTimeout)
+	defer guard.done()
+
+	resp, err := sendReq(streamCtx, m.client, m.baseURL+"/chat/completions", reqBody, map[string]string{
 		"Authorization": "Bearer " + m.apiKey,
 		"Accept":        "text/event-stream",
 	})
@@ -135,6 +138,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 	for scanner.Scan() {
+		guard.progress()
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data:") {
 			continue
@@ -178,7 +182,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("reading stream: %w", err)
+		return nil, fmt.Errorf("reading stream: %w", streamErr(streamCtx, err))
 	}
 
 	result := &Response{Content: content.String(), Usage: usage, StopReason: finishReason}
