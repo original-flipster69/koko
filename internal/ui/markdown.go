@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -289,12 +290,17 @@ func headingLevel(s string) int {
 	return 0
 }
 
+var (
+	boldSpan = regexp.MustCompile(`\*\*([^*]+?)\*\*`)
+	codeSpan = regexp.MustCompile("`([^`]*)`")
+)
+
 func stripBoldMarkers(s string) string {
-	return strings.ReplaceAll(s, "**", "")
+	return boldSpan.ReplaceAllString(s, "$1")
 }
 
 func stripCodeMarkers(s string) string {
-	return strings.ReplaceAll(s, "`", "")
+	return codeSpan.ReplaceAllString(s, "$1")
 }
 
 func trimListMarker(s string) (string, bool) {
