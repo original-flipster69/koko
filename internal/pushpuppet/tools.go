@@ -2,6 +2,7 @@ package pushpuppet
 
 import (
 	"context"
+	"strings"
 
 	"github.com/original-flipster69/koko/internal/provider"
 )
@@ -198,6 +199,43 @@ var toolsByName = func() map[string]*tool {
 	}
 	return m
 }()
+
+func normalizeToolName(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if _, ok := toolsByName[trimmed]; ok {
+		return trimmed
+	}
+	for _, sep := range []string{":", "：", "->", "→", "."} {
+		if i := strings.LastIndex(trimmed, sep); i >= 0 {
+			cand := strings.TrimSpace(trimmed[i+len(sep):])
+			if _, ok := toolsByName[cand]; ok {
+				return cand
+			}
+		}
+	}
+	return name
+}
+
+func sanitizeToolName(name string) string {
+	trimmed := strings.TrimSpace(name)
+	token := trimmed
+	if i := strings.IndexAny(token, " \t\r\n"); i >= 0 {
+		token = token[:i]
+	}
+	truncated := len(token) < len(trimmed)
+	const maxLen = 48
+	if r := []rune(token); len(r) > maxLen {
+		token = string(r[:maxLen])
+		truncated = true
+	}
+	if token == "" {
+		return "(empty)"
+	}
+	if truncated {
+		return token + "…"
+	}
+	return token
+}
 
 func toolVerb(name string) string {
 	if t, ok := toolsByName[name]; ok && t.Verb != "" {

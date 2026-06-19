@@ -1,8 +1,44 @@
 package pushpuppet
 
 import (
+	"strings"
 	"testing"
 )
+
+func TestNormalizeToolName(t *testing.T) {
+	cases := map[string]string{
+		"read_file":                 "read_file",
+		"  read_file  ":             "read_file",
+		"工具调用: read_file":           "read_file",
+		"工具调用：replace_in_file":      "replace_in_file",
+		"functions.list_dir":        "list_dir",
+		"tool_call -> search_files": "search_files",
+		"-engine":                   "-engine",
+		"工具调用: nonexistent_tool":    "工具调用: nonexistent_tool",
+	}
+	for in, want := range cases {
+		if got := normalizeToolName(in); got != want {
+			t.Errorf("normalizeToolName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestSanitizeToolName(t *testing.T) {
+	long := "engineMessage: The user wants a summary of all tests. " + strings.Repeat("blah ", 200)
+	got := sanitizeToolName(long)
+	if got != "engineMessage:…" {
+		t.Errorf("reasoning-as-name should collapse to first token, got %q", got)
+	}
+	if r := []rune(sanitizeToolName(strings.Repeat("x", 500))); len(r) > 49 {
+		t.Errorf("long single token must be bounded, got %d runes", len(r))
+	}
+	if got := sanitizeToolName("  engine  "); got != "engine" {
+		t.Errorf("clean short token should pass through trimmed, got %q", got)
+	}
+	if got := sanitizeToolName("   "); got != "(empty)" {
+		t.Errorf("blank name should map to (empty), got %q", got)
+	}
+}
 
 func TestToolRegistry_AllEntriesWellFormed(t *testing.T) {
 	for _, tc := range tools {

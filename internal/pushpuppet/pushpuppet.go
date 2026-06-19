@@ -398,6 +398,17 @@ func (pp *PushPuppet) Run(ctx context.Context, userInput string) error {
 		if len(toolCalls) == 0 {
 			toolCalls = pp.parseInlineToolCalls(resp.Content)
 		}
+		for i := range toolCalls {
+			raw := toolCalls[i].Name
+			name := normalizeToolName(raw)
+			if _, ok := toolsByName[name]; !ok {
+				name = sanitizeToolName(raw)
+			}
+			if name != raw {
+				slog.Warn("sanitized malformed tool name", "raw_len", len(raw), "name", name)
+				toolCalls[i].Name = name
+			}
+		}
 
 		slog.Info("round complete", "round", rounds, "content_len", len(resp.Content), "tool_calls", len(toolCalls))
 
