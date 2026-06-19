@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+//FIXME: might have be increased... maybe also expose to config?
 const streamIdleTimeout = 30 * time.Second
 
 var errStreamStalled = errors.New("stream stalled: no data received within timeout")
