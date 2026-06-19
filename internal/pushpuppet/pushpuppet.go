@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -332,6 +333,7 @@ func (pp *PushPuppet) Run(ctx context.Context, userInput string) error {
 
 	rounds := 0
 	finishedNaturally := false
+	var prevSigs map[string]bool
 	for range maxToolRounds {
 		rounds++
 		if pp.maxSessionTokens > 0 && (pp.TotalInput+pp.TotalOutput) >= pp.maxSessionTokens {
@@ -422,6 +424,7 @@ func (pp *PushPuppet) Run(ctx context.Context, userInput string) error {
 		if resp.Content != "" {
 			roundResults.WriteString(resp.Content + "\n")
 		}
+		curSigs := make(map[string]bool, len(toolCalls))
 		for _, tc := range toolCalls {
 			slog.Info("executing tool", "tool", tc.Name)
 			pp.toolCallCount++
@@ -430,7 +433,14 @@ func (pp *PushPuppet) Run(ctx context.Context, userInput string) error {
 				fmt.Fprintf(pp.output, "\n%s%s%s\n", pp.scheme.Primary, toolVerb(tc.Name), ui.Reset)
 				fmt.Fprintf(pp.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
 			}
-			result := pp.execTool(ctx, tc)
+			sig := toolCallSig(tc)
+			var result string
+			if prevSigs[sig] {
+				result = repeatedCallNudge
+			} else {
+				result = pp.execTool(ctx, tc)
+			}
+			curSigs[sig] = true
 			pp.auditLog.Record(tc.Name, tc.Args, result)
 			isError := strings.HasPrefix(result, "error:")
 			if quiet && isError {
@@ -445,6 +455,7 @@ func (pp *PushPuppet) Run(ctx context.Context, userInput string) error {
 			}
 			roundResults.WriteString(fmt.Sprintf("<tool_output name=%q>\n%s\n</tool_output>\n", tc.Name, truncateForHistory(result)))
 		}
+		prevSigs = curSigs
 
 		assistantContent := resp.Content
 		if assistantContent == "" {
@@ -1057,6 +1068,25 @@ func (pp *PushPuppet) searchFiles(ctx context.Context, tc provider.ToolCall) str
 	}
 	redactedResults, _ := privacy.Redact(results.String())
 	return fmt.Sprintf("%s:\n%s", header, redactedResults)
+}
+
+const repeatedCallNudge = "error: identical to your previous tool call (same tool and arguments), which returned the same result. Do not repeat it — change approach: use list_dir to locate files by name, adjust the search pattern, or stop and report what you have."
+
+func toolCallSig(tc provider.ToolCall) string {
+	keys := make([]string, 0, len(tc.Args))
+	for k := range tc.Args {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString(tc.Name)
+	for _, k := range keys {
+		b.WriteByte(0)
+		b.WriteString(k)
+		b.WriteByte(1)
+		b.WriteString(tc.Args[k])
+	}
+	return b.String()
 }
 
 func (pp *PushPuppet) parseInlineToolCalls(content string) []provider.ToolCall {

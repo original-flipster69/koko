@@ -2,7 +2,27 @@ package pushpuppet
 
 import (
 	"testing"
+
+	"github.com/original-flipster69/koko/internal/provider"
 )
+
+func TestToolCallSig(t *testing.T) {
+	a := provider.ToolCall{Name: "search_files", Args: map[string]string{"pattern": "x", "glob": "*.go"}}
+	b := provider.ToolCall{Name: "search_files", Args: map[string]string{"glob": "*.go", "pattern": "x"}}
+	if toolCallSig(a) != toolCallSig(b) {
+		t.Error("identical calls with reordered args must produce the same signature")
+	}
+
+	c := provider.ToolCall{Name: "search_files", Args: map[string]string{"pattern": "y", "glob": "*.go"}}
+	if toolCallSig(a) == toolCallSig(c) {
+		t.Error("calls with different arg values must produce different signatures")
+	}
+
+	d := provider.ToolCall{Name: "list_dir", Args: map[string]string{"pattern": "x", "glob": "*.go"}}
+	if toolCallSig(a) == toolCallSig(d) {
+		t.Error("calls to different tools must produce different signatures")
+	}
+}
 
 func TestToolRegistry_AllEntriesWellFormed(t *testing.T) {
 	for _, tc := range tools {
