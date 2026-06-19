@@ -66,6 +66,7 @@ type model struct {
 	knownCommands map[string]bool
 	scheme        ui.Scheme
 	effortLabel   string
+	planModeLabel string
 	inputRows     int
 }
 
@@ -100,6 +101,7 @@ func newModel(a *pushpuppet.PushPuppet, ctx context.Context, cancel context.Canc
 		knownCommands: known,
 		scheme:        scheme,
 		effortLabel:   a.Effort().String(),
+		planModeLabel: fmt.Sprintf("%v", a.PlanMode()),
 	}
 	return m
 }
@@ -204,6 +206,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				handled, prompt, output := m.cmdHandler(input, m.pushPuppet)
 				m.scheme = m.pushPuppet.Scheme()
 				m.effortLabel = m.pushPuppet.Effort().String()
+				m.planModeLabel = fmt.Sprintf("%v", m.pushPuppet.PlanMode())
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}
@@ -420,7 +423,9 @@ func (m model) View() string {
 	}
 
 	footer := lipgloss.PlaceHorizontal(m.termWidth, lipgloss.Right,
-		statusBarStyle.Render(fmt.Sprintf("effort: %s ", m.effortLabel)))
+		statusBarStyle.Render(fmt.Sprintf("effort: %s ", m.effortLabel))) + "\n\n" +
+		lipgloss.PlaceHorizontal(m.termWidth, lipgloss.Left,
+			statusBarStyle.Render(fmt.Sprintf("plan mode: %s ", m.planModeLabel)))
 
 	return m.viewport.View() + "\n" + statusLine + "\n" + inputBarStyle.Render(inputLine) + "\n" + footer
 }
