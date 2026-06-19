@@ -147,6 +147,14 @@ func TestRenderLineHeadingInlineCode(t *testing.T) {
 	}
 }
 
+func TestRenderLineHeadingInlineBold(t *testing.T) {
+	got := stripANSI(renderLine("## The **important** part"))
+	want := "The important part"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestRenderLineBullet(t *testing.T) {
 	got := stripANSI(renderLine("- item"))
 	want := "• item"

@@ -290,33 +290,11 @@ func headingLevel(s string) int {
 }
 
 func stripBoldMarkers(s string) string {
-	if strings.HasPrefix(s, "**") && strings.HasSuffix(s, "**") && len(s) > 4 {
-		return s[2 : len(s)-2]
-	}
-	if strings.HasPrefix(s, "__") && strings.HasSuffix(s, "__") && len(s) > 4 {
-		return s[2 : len(s)-2]
-	}
-	return s
+	return strings.ReplaceAll(s, "**", "")
 }
 
 func stripCodeMarkers(s string) string {
-	if !strings.Contains(s, "`") {
-		return s
-	}
-	var b strings.Builder
-	i := 0
-	for i < len(s) {
-		if s[i] == '`' {
-			if end := strings.IndexByte(s[i+1:], '`'); end >= 0 {
-				b.WriteString(s[i+1 : i+1+end])
-				i += end + 2
-				continue
-			}
-		}
-		b.WriteByte(s[i])
-		i++
-	}
-	return b.String()
+	return strings.ReplaceAll(s, "`", "")
 }
 
 func trimListMarker(s string) (string, bool) {
