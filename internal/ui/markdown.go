@@ -253,9 +253,7 @@ func (m *MarkdownStream) renderLine(line string) string {
 	indent := line[:len(line)-len(trimmed)]
 
 	if h := headingLevel(trimmed); h > 0 {
-		text := strings.TrimSpace(trimmed[h:])
-		text = stripBoldMarkers(text)
-		text = stripCodeMarkers(text)
+		text := stripInlineMarkers(strings.TrimSpace(trimmed[h:]))
 		color := m.scheme.Primary
 		if h >= 2 {
 			color = m.scheme.Secondary
@@ -290,17 +288,10 @@ func headingLevel(s string) int {
 	return 0
 }
 
-var (
-	boldSpan = regexp.MustCompile(`\*\*([^*]+?)\*\*`)
-	codeSpan = regexp.MustCompile("`([^`]*)`")
-)
+var headingMarkerReg = regexp.MustCompile("\\*\\*([^*]+?)\\*\\*|`([^`]*)`")
 
-func stripBoldMarkers(s string) string {
-	return boldSpan.ReplaceAllString(s, "$1")
-}
-
-func stripCodeMarkers(s string) string {
-	return codeSpan.ReplaceAllString(s, "$1")
+func stripInlineMarkers(s string) string {
+	return headingMarkerReg.ReplaceAllString(s, "$1$2")
 }
 
 func trimListMarker(s string) (string, bool) {
