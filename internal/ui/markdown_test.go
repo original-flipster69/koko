@@ -139,6 +139,14 @@ func TestRenderLineHeading(t *testing.T) {
 	}
 }
 
+func TestRenderLineHeadingInlineCode(t *testing.T) {
+	got := stripANSI(renderLine("### 📁 `internal/terminal/` (Terminal UI)"))
+	want := "📁 internal/terminal/ (Terminal UI)"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestRenderLineBullet(t *testing.T) {
 	got := stripANSI(renderLine("- item"))
 	want := "• item"
