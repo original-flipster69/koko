@@ -34,6 +34,7 @@ func NewFromPatterns(lines []string) *Matcher {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+		line = strings.TrimPrefix(line, "/")
 		p := pattern{}
 		if strings.HasPrefix(line, "!") {
 			p.negated = true
