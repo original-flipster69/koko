@@ -41,6 +41,7 @@ func (o *ollama) Effort() Effort     { return o.effort }
 func (o *ollama) SetEffort(e Effort) { o.effort = e }
 
 func toOllamaMsgs(messages []Msg) []ollamaMsg {
+	messages = flattenToolMessages(messages)
 	var out []ollamaMsg
 	for _, m := range messages {
 		msg := ollamaMsg{Role: string(m.Role), Content: m.Content}

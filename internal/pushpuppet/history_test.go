@@ -8,10 +8,18 @@ import (
 	"github.com/original-flipster69/koko/internal/provider"
 )
 
-func toolMsg(name, body string) provider.Msg {
+func toolMsg(name, path string) provider.Msg {
+	args := map[string]string{}
+	if path != "" {
+		if name == "rename_file" {
+			args["new_path"] = path
+		} else {
+			args["path"] = path
+		}
+	}
 	return provider.Msg{
-		Role:    provider.User,
-		Content: "<tool_output name=\"" + name + "\">\n" + body + "\n</tool_output>\n",
+		Role:      provider.Assistant,
+		ToolCalls: []provider.ToolCall{{ID: "id0000001", Name: name, Args: args}},
 	}
 }
 
@@ -72,10 +80,10 @@ func TestSummarizeMessages_BasicFacts(t *testing.T) {
 	msgs := []provider.Msg{
 		{Role: provider.User, Content: "fix the bug in main.go"},
 		{Role: provider.Assistant, Content: "looking"},
-		toolMsg("read_file", "[main.go lines 1-10 of 10]"),
-		toolMsg("write_file", "wrote main.go"),
+		toolMsg("read_file", "main.go"),
+		toolMsg("write_file", "main.go"),
 		{Role: provider.User, Content: "now refactor parser.go"},
-		toolMsg("replace_in_file", "updated parser.go"),
+		toolMsg("replace_in_file", "parser.go"),
 	}
 	summary := summarizeMessages(msgs)
 
@@ -108,15 +116,15 @@ func TestSummarizeMessages_LongUserRequestTruncation(t *testing.T) {
 func TestSummarizeMessages_PreservesPreviousSummary(t *testing.T) {
 	priorSummary := summarizeMessages([]provider.Msg{
 		{Role: provider.User, Content: "earlier request"},
-		toolMsg("write_file", "wrote alpha.go"),
-		toolMsg("read_file", "[beta.go lines 1-3 of 3]"),
+		toolMsg("write_file", "alpha.go"),
+		toolMsg("read_file", "beta.go"),
 	})
 
 	msgs := []provider.Msg{
 		{Role: provider.User, Content: priorSummary},
 		{Role: provider.Assistant, Content: trimAck},
 		{Role: provider.User, Content: "new request"},
-		toolMsg("write_file", "wrote gamma.go"),
+		toolMsg("write_file", "gamma.go"),
 	}
 	merged := summarizeMessages(msgs)
 

@@ -23,8 +23,20 @@ func saveSession(dir string, history []provider.Msg) error {
 			redacted[i] = m
 			continue
 		}
-		content, _ := privacy.RedactAll(m.Content)
-		redacted[i] = provider.Msg{Role: m.Role, Content: content}
+		rm := m
+		rm.Content, _ = privacy.RedactAll(m.Content)
+		if len(m.ToolCalls) > 0 {
+			calls := make([]provider.ToolCall, len(m.ToolCalls))
+			for j, tc := range m.ToolCalls {
+				args := make(map[string]string, len(tc.Args))
+				for k, v := range tc.Args {
+					args[k], _ = privacy.RedactAll(v)
+				}
+				calls[j] = provider.ToolCall{ID: tc.ID, Name: tc.Name, Args: args}
+			}
+			rm.ToolCalls = calls
+		}
+		redacted[i] = rm
 	}
 	data, err := json.MarshalIndent(sessionFile{History: redacted}, "", "  ")
 	if err != nil {

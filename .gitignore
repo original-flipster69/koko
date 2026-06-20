@@ -38,3 +38,4 @@ go.work.sum
 TASKS.md
 IDEAS.md
 .DS_Store
+tmp/

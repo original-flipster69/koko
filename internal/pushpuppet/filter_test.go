@@ -6,6 +6,23 @@ import (
 	"github.com/original-flipster69/koko/internal/provider"
 )
 
+func TestScrubPIIFilter_PreservesToolCallsAndName(t *testing.T) {
+	in := []provider.Msg{
+		{Role: provider.Assistant, ToolCalls: []provider.ToolCall{{ID: "id1", Name: "read_file", Args: map[string]string{"path": "go.mod"}}}},
+		{Role: provider.Tool, ToolCallID: "id1", ToolName: "read_file", Content: "module x"},
+	}
+	out := ScrubPIIFilter(in)
+	if len(out[0].ToolCalls) != 1 || out[0].ToolCalls[0].Name != "read_file" || out[0].ToolCalls[0].ID != "id1" {
+		t.Errorf("assistant tool_calls dropped/altered: %+v", out[0])
+	}
+	if out[0].ToolCalls[0].Args["path"] != "go.mod" {
+		t.Errorf("tool call args lost: %+v", out[0].ToolCalls[0].Args)
+	}
+	if out[1].Role != provider.Tool || out[1].ToolName != "read_file" || out[1].ToolCallID != "id1" {
+		t.Errorf("tool message identity dropped: %+v", out[1])
+	}
+}
+
 func TestScrubPIIFilter_PreservesSystemMessage(t *testing.T) {
 	in := []provider.Msg{
 		{Role: provider.System, Content: "system prompt — should NOT be scrubbed"},

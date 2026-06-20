@@ -18,26 +18,26 @@ const (
 	summaryHeader           = "Previous conversation context:\n\n"
 )
 
-func (pp *PushPuppet) ClearHistory() {
-	pp.mu.Lock()
-	defer pp.mu.Unlock()
-	pp.history = pp.history[:1]
+func (p *PushPuppet) ClearHistory() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.history = p.history[:1]
 }
 
-func (pp *PushPuppet) HistoryLen() int {
-	pp.mu.Lock()
-	defer pp.mu.Unlock()
-	return len(pp.history) - 1
+func (p *PushPuppet) HistoryLen() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.history) - 1
 }
 
-func (pp *PushPuppet) SaveSession(dir string) error {
-	pp.mu.Lock()
-	snapshot := append([]provider.Msg(nil), pp.history[1:]...)
-	pp.mu.Unlock()
+func (p *PushPuppet) SaveSession(dir string) error {
+	p.mu.Lock()
+	snapshot := append([]provider.Msg(nil), p.history[1:]...)
+	p.mu.Unlock()
 	return saveSession(dir, snapshot)
 }
 
-func (pp *PushPuppet) LoadSession(dir string) error {
+func (p *PushPuppet) LoadSession(dir string) error {
 	msgs, err := loadSession(dir)
 	if err != nil {
 		return err
@@ -45,51 +45,51 @@ func (pp *PushPuppet) LoadSession(dir string) error {
 	for len(msgs) > 0 && msgs[0].Role == provider.System {
 		msgs = msgs[1:]
 	}
-	pp.mu.Lock()
-	defer pp.mu.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	newHist := make([]provider.Msg, 0, 1+len(msgs))
-	newHist = append(newHist, pp.history[0])
+	newHist = append(newHist, p.history[0])
 	newHist = append(newHist, msgs...)
-	pp.history = newHist
+	p.history = newHist
 	return nil
 }
 
-func (pp *PushPuppet) Compact() (int, int) {
-	pp.mu.Lock()
-	defer pp.mu.Unlock()
-	if len(pp.history) <= 2 {
+func (p *PushPuppet) Compact() (int, int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.history) <= 2 {
 		return 0, 0
 	}
-	oldTokens := pp.estimateTokens()
-	summary := summarizeMessages(pp.history[1:])
-	pp.history = []provider.Msg{
-		pp.history[0],
+	oldTokens := p.estimateTokens()
+	summary := summarizeMessages(p.history[1:])
+	p.history = []provider.Msg{
+		p.history[0],
 		{Role: provider.User, Content: summary},
 		{Role: provider.Assistant, Content: compactAck},
 	}
-	pp.lastInputTokens = 0
-	newTokens := pp.measureTokens(context.Background())
-	pp.lastInputTokens = newTokens
+	p.lastInputTokens = 0
+	newTokens := p.measureTokens(context.Background())
+	p.lastInputTokens = newTokens
 	return oldTokens, newTokens
 }
 
-func (pp *PushPuppet) trimHistory(ctx context.Context) {
-	realTotal := pp.estimateTokens()
+func (p *PushPuppet) trimHistory(ctx context.Context) {
+	realTotal := p.estimateTokens()
 	if realTotal <= maxHistoryTokens {
 		return
 	}
 	target := maxHistoryTokens * 3 / 4
 
 	scale := 1.0
-	if estTotal := estimateMessagesTokens(pp.history); estTotal > 0 {
+	if estTotal := estimateMessagesTokens(p.history); estTotal > 0 {
 		scale = float64(realTotal) / float64(estTotal)
 	}
 
 	cutEnd := 0
 	droppedReal := 0.0
-	for i := 2; i <= len(pp.history)-2; i++ {
-		droppedReal += float64(msgTokens(pp.history[i-1])) * scale
-		if pp.history[i].Role != provider.User {
+	for i := 2; i <= len(p.history)-2; i++ {
+		droppedReal += float64(msgTokens(p.history[i-1])) * scale
+		if p.history[i].Role != provider.User {
 			continue
 		}
 		cutEnd = i
@@ -102,26 +102,26 @@ func (pp *PushPuppet) trimHistory(ctx context.Context) {
 		return
 	}
 
-	systemMsg := pp.history[0]
-	dropped := pp.history[1:cutEnd]
+	systemMsg := p.history[0]
+	dropped := p.history[1:cutEnd]
 	summary := summarizeMessages(dropped)
-	kept := pp.history[cutEnd:]
+	kept := p.history[cutEnd:]
 
 	newHist := make([]provider.Msg, 0, len(kept)+3)
 	newHist = append(newHist, systemMsg)
 	newHist = append(newHist, provider.Msg{Role: provider.User, Content: summary})
 	newHist = append(newHist, provider.Msg{Role: provider.Assistant, Content: trimAck})
 	newHist = append(newHist, kept...)
-	pp.history = newHist
-	pp.lastInputTokens = pp.measureTokens(ctx)
+	p.history = newHist
+	p.lastInputTokens = p.measureTokens(ctx)
 	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept), "real_before", realTotal, "scale", scale)
 }
 
-func (pp *PushPuppet) estimateTokens() int {
-	if pp.lastInputTokens > 0 {
-		return pp.lastInputTokens
+func (p *PushPuppet) estimateTokens() int {
+	if p.lastInputTokens > 0 {
+		return p.lastInputTokens
 	}
-	return estimateMessagesTokens(pp.history)
+	return estimateMessagesTokens(p.history)
 }
 
 func estimateMessagesTokens(msgs []provider.Msg) int {
@@ -133,7 +133,14 @@ func estimateMessagesTokens(msgs []provider.Msg) int {
 }
 
 func msgTokens(m provider.Msg) int {
-	return len([]rune(m.Content))*10/35 + 4
+	n := len([]rune(m.Content))
+	for _, tc := range m.ToolCalls {
+		n += len(tc.Name)
+		for k, v := range tc.Args {
+			n += len(k) + len([]rune(v))
+		}
+	}
+	return n*10/35 + 4
 }
 
 func truncateForHistory(result string) string {
@@ -154,23 +161,53 @@ func summarizeMessages(msgs []provider.Msg) string {
 	var userRequests []string
 
 	for _, m := range msgs {
-		if m.Role == provider.User {
+		switch m.Role {
+		case provider.User:
 			if strings.HasPrefix(m.Content, "Previous conversation") {
 				extractSummaryFacts(m.Content, &filesModified, &filesRead, &commandsRun, &errors, &userRequests)
 				continue
 			}
-			if strings.Contains(m.Content, "<tool_output") {
-				extractToolOutputFacts(m.Content, &filesModified, &filesRead, &commandsRun, &errors)
+			req := m.Content
+			if req == "" {
 				continue
 			}
-			req := m.Content
 			if len(req) > maxSummarizedRequestLen {
 				req = req[:maxSummarizedRequestLen] + "..."
 			}
 			userRequests = append(userRequests, req)
-			continue
+		case provider.Assistant:
+			for _, tc := range m.ToolCalls {
+				switch tc.Name {
+				case "write_file", "replace_in_file", "delete_file":
+					if path := tc.Args["path"]; path != "" {
+						filesModified = append(filesModified, path)
+					}
+				case "rename_file":
+					if path := tc.Args["new_path"]; path != "" {
+						filesModified = append(filesModified, path)
+					}
+				case "read_file":
+					if path := tc.Args["path"]; path != "" {
+						filesRead = append(filesRead, path)
+					}
+				case "exec_command":
+					cmd := tc.Args["command"]
+					if cmd == "" {
+						cmd = "(command)"
+					}
+					commandsRun = append(commandsRun, cmd)
+				}
+			}
+		case provider.Tool:
+			line := m.Content
+			if i := strings.IndexByte(line, '\n'); i >= 0 {
+				line = line[:i]
+			}
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "error:") && len(line) < 200 {
+				errors = append(errors, line)
+			}
 		}
-		extractToolOutputFacts(m.Content, &filesModified, &filesRead, &commandsRun, &errors)
 	}
 
 	if len(userRequests) > 0 {

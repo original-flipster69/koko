@@ -17,7 +17,7 @@ func TestStringParam(t *testing.T) {
 }
 
 func TestIntParam(t *testing.T) {
-	p := IntParam("line number")
+	p := IntParam("line number", nil, nil, nil)
 	if p.Type != "integer" {
 		t.Errorf("Type: got %q, want %q", p.Type, "integer")
 	}
@@ -27,7 +27,7 @@ func TestIntParam(t *testing.T) {
 }
 
 func TestBoolParam(t *testing.T) {
-	p := BoolParam("force flag")
+	p := BoolParam("force flag", nil)
 	if p.Type != "boolean" {
 		t.Errorf("Type: got %q, want %q", p.Type, "boolean")
 	}

@@ -2,6 +2,8 @@ package pushpuppet
 
 import (
 	"context"
+	"log/slog"
+	"slices"
 
 	"github.com/original-flipster69/koko/internal/provider"
 )
@@ -16,6 +18,10 @@ type tool struct {
 	Handler     func(*PushPuppet, context.Context, provider.ToolCall) string
 }
 
+func ptr[T any](v T) *T {
+	return &v
+}
+
 var tools = []tool{
 	{
 		Name:        "read_file",
@@ -28,8 +34,8 @@ var tools = []tool{
 			Type: "object",
 			Properties: map[string]provider.Property{
 				"path":   provider.StringParam("Path to the file to read"),
-				"offset": provider.StringParam("Start line number (1-based, optional)"),
-				"limit":  provider.StringParam("Number of lines to read (optional, defaults to entire file)"),
+				"offset": provider.IntParam("Start line number (1-based, optional)", ptr(1), nil, nil),
+				"limit":  provider.IntParam("Number of lines to read (optional, defaults to entire file)", ptr(1), nil, nil),
 			},
 			Required: []string{"path"},
 		},
@@ -44,7 +50,7 @@ var tools = []tool{
 			Properties: map[string]provider.Property{
 				"path":      provider.StringParam("Path to the new file"),
 				"content":   provider.StringParam("Full content for the new file"),
-				"overwrite": provider.StringParam("Set to \"true\" ONLY when deliberately replacing an existing file wholesale. Defaults to false; any modification should go through replace_in_file instead."),
+				"overwrite": provider.BoolParam("Set to `true` ONLY when deliberately replacing an existing file wholesale. Any modification should go through `replace_in_file` instead.", ptr(false)),
 			},
 			Required: []string{"path", "content"},
 		},
@@ -101,8 +107,8 @@ var tools = []tool{
 			Type: "object",
 			Properties: map[string]provider.Property{
 				"path":      provider.StringParam("Path to the directory"),
-				"recursive": provider.StringParam("Set to 'true' for recursive tree view"),
-				"depth":     provider.StringParam("Max depth for recursive listing (1-10, default 3)"),
+				"recursive": provider.BoolParam("Set to `true` for recursive tree view", nil),
+				"depth":     provider.IntParam("Max depth for recursive listing (1-10, default 3)", ptr(1), ptr(10), ptr(3)),
 			},
 			Required: []string{"path"},
 		},
@@ -119,7 +125,7 @@ var tools = []tool{
 			Properties: map[string]provider.Property{
 				"pattern":       provider.StringParam("Text pattern to search for"),
 				"path":          provider.StringParam("Directory to search in (defaults to sandbox root)"),
-				"context_lines": provider.StringParam("Number of context lines before/after each match (0-10, default 2)"),
+				"context_lines": provider.IntParam("Number of context lines before/after each match", ptr(0), ptr(10), ptr(2)),
 				"glob":          provider.StringParam("File name glob filter (e.g. \"*.go\", \"*.ts\", \"Makefile\")"),
 			},
 			Required: []string{"pattern"},
@@ -216,14 +222,22 @@ func toolQuiet(name string) bool {
 	return ok && t.Quiet
 }
 
-func (pp *PushPuppet) buildTools() []provider.ToolDef {
-	out := make([]provider.ToolDef, len(tools))
-	for i, t := range tools {
+var excluded = []string{"save_memory", "delete_memory", "list_memories"}
+
+func (p *PushPuppet) buildTools() []provider.ToolDef {
+	out := make([]provider.ToolDef, len(tools)-len(excluded))
+	i := 0
+	for _, t := range tools {
+		if slices.Contains(excluded, t.Name) {
+			slog.Info("tool ignored", "tool", t.Name)
+			continue
+		}
 		out[i] = provider.ToolDef{
 			Name:        t.Name,
 			Description: t.Description,
 			Params:      t.Params,
 		}
+		i++
 	}
 	return out
 }

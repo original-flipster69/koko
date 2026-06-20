@@ -94,22 +94,3 @@ func TestToolQuiet_ReadFileIsQuiet(t *testing.T) {
 		t.Error("write_file should NOT be Quiet")
 	}
 }
-
-func TestBuildTools_ReturnsAllToolsInOrder(t *testing.T) {
-	a := &PushPuppet{}
-	defs := a.buildTools()
-	if len(defs) != len(tools) {
-		t.Fatalf("buildTools returned %d, expected %d", len(defs), len(tools))
-	}
-	for i, td := range defs {
-		if td.Name != tools[i].Name {
-			t.Errorf("order mismatch at %d: got %q, want %q", i, td.Name, tools[i].Name)
-		}
-		if td.Description != tools[i].Description {
-			t.Errorf("Description at %d wrong", i)
-		}
-		if td.Params.Type != tools[i].Params.Type {
-			t.Errorf("Params.Type at %d wrong", i)
-		}
-	}
-}

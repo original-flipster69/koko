@@ -49,6 +49,7 @@ func (a *claude) Effort() Effort     { return a.effort }
 func (a *claude) SetEffort(e Effort) { a.effort = e }
 
 func (a *claude) request(msgs []Msg, tools []ToolDef, stream bool) claudeReq {
+	msgs = flattenToolMessages(msgs)
 	var system string
 	var apiMessages []claudeMsg
 	for _, m := range msgs {

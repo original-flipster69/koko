@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -68,29 +70,123 @@ func mistralReasoningEffort(e Effort) string {
 
 func toMistralMsgs(msgs []Msg) []mistralMsg {
 	var out []mistralMsg
+	// toolOK tracks whether a tool message may legally follow at this point —
+	// true only directly after an assistant with tool_calls, or another tool
+	// message. Orphan tool messages (e.g. from a legacy/edited session) are
+	// downgraded to user text so Mistral's role ordering stays valid.
+	toolOK := false
 	for _, msg := range msgs {
-		if len(msg.Imgs) == 0 {
-			out = append(out, mistralMsg{Role: string(msg.Role), Content: msg.Content})
+		if msg.Role == Assistant && len(msg.ToolCalls) == 0 && len(msg.Imgs) == 0 && strings.TrimSpace(msg.Content) == "" {
 			continue
 		}
-		var blocks []map[string]interface{}
-		for _, img := range msg.Imgs {
-			blocks = append(blocks, map[string]interface{}{
-				"type": "image_url",
-				"image_url": map[string]string{
-					"url": "data:" + img.Mime + ";base64," + img.Data,
-				},
+		switch {
+		case msg.Role == Tool:
+			if toolOK {
+				out = append(out, mistralMsg{
+					Role:       "tool",
+					ToolCallID: msg.ToolCallID,
+					Name:       msg.ToolName,
+					Content:    msg.Content,
+				})
+			} else {
+				block := fmt.Sprintf("<tool_output name=%q>\n%s\n</tool_output>\n", msg.ToolName, msg.Content)
+				if n := len(out); n > 0 && out[n-1].Role == "user" {
+					if s, ok := out[n-1].Content.(string); ok {
+						out[n-1].Content = s + block
+					} else {
+						out = append(out, mistralMsg{Role: "user", Content: toolResultsPreamble + block})
+					}
+				} else {
+					out = append(out, mistralMsg{Role: "user", Content: toolResultsPreamble + block})
+				}
+				toolOK = false
+			}
+			if len(msg.Imgs) > 0 {
+				out = append(out, mistralMsg{Role: "user", Content: mistralImageBlocks(msg.Imgs, "")})
+				toolOK = false
+			}
+		case msg.Role == Assistant && len(msg.ToolCalls) > 0:
+			var content interface{}
+			if msg.Content != "" {
+				content = msg.Content
+			}
+			out = append(out, mistralMsg{
+				Role:      "assistant",
+				Content:   content,
+				ToolCalls: toMistralToolCalls(msg.ToolCalls),
 			})
+			toolOK = true
+		case len(msg.Imgs) > 0:
+			out = append(out, mistralMsg{Role: string(msg.Role), Content: mistralImageBlocks(msg.Imgs, msg.Content)})
+			toolOK = false
+		default:
+			out = append(out, mistralMsg{Role: string(msg.Role), Content: msg.Content})
+			toolOK = false
 		}
-		if msg.Content != "" {
-			blocks = append(blocks, map[string]interface{}{
-				"type": "text",
-				"text": msg.Content,
-			})
-		}
-		out = append(out, mistralMsg{Role: string(msg.Role), Content: blocks})
 	}
 	return out
+}
+
+func mistralImageBlocks(imgs []Img, text string) []map[string]interface{} {
+	var blocks []map[string]interface{}
+	for _, img := range imgs {
+		blocks = append(blocks, map[string]interface{}{
+			"type": "image_url",
+			"image_url": map[string]string{
+				"url": "data:" + img.Mime + ";base64," + img.Data,
+			},
+		})
+	}
+	if text != "" {
+		blocks = append(blocks, map[string]interface{}{"type": "text", "text": text})
+	}
+	return blocks
+}
+
+func toMistralToolCalls(calls []ToolCall) []mistralReqToolCall {
+	out := make([]mistralReqToolCall, 0, len(calls))
+	for _, tc := range calls {
+		argsJSON, err := json.Marshal(tc.Args)
+		if err != nil {
+			argsJSON = []byte("{}")
+		}
+		out = append(out, mistralReqToolCall{
+			Id:       tc.ID,
+			Type:     "function",
+			Function: mistralReqFunc{Name: tc.Name, Arguments: string(argsJSON)},
+		})
+	}
+	return out
+}
+
+const toolIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+// Mistral requires tool_call ids to be exactly 9 alphanumeric characters.
+func ensureToolID(id string) string {
+	if validToolID(id) {
+		return id
+	}
+	buf := make([]byte, 9)
+	if _, err := rand.Read(buf); err != nil {
+		return "toolcall0"
+	}
+	for i := range buf {
+		buf[i] = toolIDAlphabet[int(buf[i])%len(toolIDAlphabet)]
+	}
+	return string(buf)
+}
+
+func validToolID(id string) bool {
+	if len(id) != 9 {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, onDelta func(StreamDelta)) (*Response, error) {
@@ -112,6 +208,13 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		})
 	}
 
+	log, _ := os.OpenFile(filepath.Join("/Users/flipster/.koko/", "koko.debug"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	debugLog := slog.New(slog.NewJSONHandler(log, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	bodyJSON, err := json.Marshal(reqBody)
+	if err == nil {
+		debugLog.Info("mistral request body", "body", string(bodyJSON))
+	}
+
 	streamCtx, guard := newStallGuard(ctx, streamIdleTimeout)
 	defer guard.done()
 
@@ -125,6 +228,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 	defer resp.Body.Close()
 
 	type toolAcc struct {
+		id   string
 		name string
 		args strings.Builder
 	}
@@ -165,9 +269,12 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 			for _, tc := range delta.ToolCalls {
 				acc := byIndex[tc.Index]
 				if tc.Function.Name != "" || acc == nil {
-					acc = &toolAcc{name: tc.Function.Name}
+					acc = &toolAcc{id: tc.Id, name: tc.Function.Name}
 					toolAccs = append(toolAccs, acc)
 					byIndex[tc.Index] = acc
+				}
+				if tc.Id != "" {
+					acc.id = tc.Id
 				}
 				if tc.Function.Arguments != "" {
 					acc.args.WriteString(tc.Function.Arguments)
@@ -201,6 +308,7 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 		}
 		args := coerceArgs(parsed)
 		result.ToolCalls = append(result.ToolCalls, ToolCall{
+			ID:   ensureToolID(acc.id),
 			Name: acc.name,
 			Args: args,
 		})
@@ -213,8 +321,22 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 }
 
 type mistralMsg struct {
-	Role    string      `json:"role"`
-	Content interface{} `json:"content"`
+	Role       string               `json:"role"`
+	Content    interface{}          `json:"content"`
+	ToolCalls  []mistralReqToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string               `json:"tool_call_id,omitempty"`
+	Name       string               `json:"name,omitempty"`
+}
+
+type mistralReqToolCall struct {
+	Id       string         `json:"id"`
+	Type     string         `json:"type"`
+	Function mistralReqFunc `json:"function"`
+}
+
+type mistralReqFunc struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type mistralFunc struct {
@@ -249,7 +371,8 @@ type mistralStreamChunk struct {
 }
 
 type mistralToolCall struct {
-	Index    int `json:"index"`
+	Index    int    `json:"index"`
+	Id       string `json:"id"`
 	Function struct {
 		Name      string `json:"name"`
 		Arguments string `json:"arguments"`
