@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -206,13 +204,6 @@ func (m *mistral) ChatStream(ctx context.Context, msgs []Msg, tools []ToolDef, o
 				Params:      t.Params,
 			},
 		})
-	}
-
-	log, _ := os.OpenFile(filepath.Join("/Users/flipster/.koko/", "koko.debug"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	debugLog := slog.New(slog.NewJSONHandler(log, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	bodyJSON, err := json.Marshal(reqBody)
-	if err == nil {
-		debugLog.Info("mistral request body", "body", string(bodyJSON))
 	}
 
 	streamCtx, guard := newStallGuard(ctx, streamIdleTimeout)
