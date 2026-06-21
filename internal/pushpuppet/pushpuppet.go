@@ -299,7 +299,7 @@ func (p *PushPuppet) measureTokens(ctx context.Context) int {
 }
 
 const (
-	maxToolRounds       = 20
+	maxToolRounds       = 30
 	maxSessionToolCalls = 1000
 
 	searchTimeout         = 30 * time.Second
@@ -331,10 +331,10 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 	for range maxToolRounds {
 		rounds++
 		if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) >= p.maxSessionTokens {
-			return fmt.Errorf("session token budget exhausted (%d/%d) — start p new session or raise max_session_tokens", p.TotalInput+p.TotalOutput, p.maxSessionTokens)
+			return fmt.Errorf("session token budget exhausted (%d/%d) — start a new session or raise max_session_tokens", p.TotalInput+p.TotalOutput, p.maxSessionTokens)
 		}
 		if p.toolCallCount >= maxSessionToolCalls {
-			return fmt.Errorf("session tool-call ceiling reached (%d) — start p new session", maxSessionToolCalls)
+			return fmt.Errorf("session tool-call ceiling reached (%d) — start a new session", maxSessionToolCalls)
 		}
 		p.trimHistory(ctx)
 		var spinner *ui.Spinner

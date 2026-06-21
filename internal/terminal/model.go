@@ -19,14 +19,30 @@ type pushPuppetDoneMsg struct{ err error }
 type confirmRequestMsg string
 type spinnerTickMsg struct{}
 type splashTickMsg struct{}
+type statusTickMsg struct{}
+type fadeTickMsg struct{}
 
 const splashFrameDuration = 400 * time.Millisecond
+const statusSwitchDuration = 8 * time.Second
+const fadeTickDuration = 50 * time.Millisecond
 
 var splashSequence = []int{1, 0, 1, 0, 2, 0}
 
 func splashTickCmd() tea.Cmd {
 	return tea.Tick(splashFrameDuration, func(time.Time) tea.Msg {
 		return splashTickMsg{}
+	})
+}
+
+func statusTickCmd() tea.Cmd {
+	return tea.Tick(statusSwitchDuration, func(time.Time) tea.Msg {
+		return statusTickMsg{}
+	})
+}
+
+func fadeTickCmd() tea.Cmd {
+	return tea.Tick(fadeTickDuration, func(time.Time) tea.Msg {
+		return fadeTickMsg{}
 	})
 }
 
@@ -62,11 +78,15 @@ type model struct {
 	spinnerTick    int
 	spinnerLabel   string
 
-	cmdHandler    CmdHandler
-	knownCommands map[string]bool
-	scheme        ui.Scheme
-	effortLabel   string
-	inputRows     int
+	cmdHandler     CmdHandler
+	knownCommands  map[string]bool
+	scheme         ui.Scheme
+	effortLabel    string
+	planModeOn     bool
+	statusLabel    string
+	statusFade     float64
+	statusFadingIn bool
+	inputRows      int
 }
 
 type CmdHandler func(input string, a *pushpuppet.PushPuppet) (handled bool, prompt string, output string)
@@ -88,18 +108,21 @@ func newModel(a *pushpuppet.PushPuppet, ctx context.Context, cancel context.Canc
 	}
 
 	m := model{
-		input:         ta,
-		content:       &strings.Builder{},
-		pushPuppet:    a,
-		ctx:           ctx,
-		cancel:        cancel,
-		kokoDir:       kokoDir,
-		splashes:      splashes,
-		confirmCh:     confirmCh,
-		cmdHandler:    cmdHandler,
-		knownCommands: known,
-		scheme:        scheme,
-		effortLabel:   a.Effort().String(),
+		input:      ta,
+		content:    &strings.Builder{},
+		pushPuppet: a,
+		ctx:        ctx,
+		cancel:     cancel,
+		kokoDir:    kokoDir,
+		splashes:   splashes,
+		confirmCh:  confirmCh,
+		cmdHandler: cmdHandler, knownCommands: known,
+		scheme:         scheme,
+		effortLabel:    a.Effort().String(),
+		planModeOn:     a.PlanMode(),
+		statusLabel:    fmt.Sprintf("effort: %s", a.Effort().String()),
+		statusFade:     1.0,
+		statusFadingIn: true,
 	}
 	return m
 }
@@ -121,6 +144,8 @@ func (m model) Init() tea.Cmd {
 	if len(m.splashes) > 1 {
 		cmds = append(cmds, splashTickCmd())
 	}
+	cmds = append(cmds, statusTickCmd())
+	cmds = append(cmds, fadeTickCmd())
 	return tea.Batch(cmds...)
 }
 
@@ -204,6 +229,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				handled, prompt, output := m.cmdHandler(input, m.pushPuppet)
 				m.scheme = m.pushPuppet.Scheme()
 				m.effortLabel = m.pushPuppet.Effort().String()
+				m.planModeOn = m.pushPuppet.PlanMode()
+				// Update status label if it's currently showing effort or plan
+				if strings.HasPrefix(m.statusLabel, "effort:") {
+					m.statusLabel = fmt.Sprintf("effort: %s", m.effortLabel)
+				} else if strings.HasPrefix(m.statusLabel, "plan:") {
+					m.statusLabel = fmt.Sprintf("plan: %s", map[bool]string{true: "ON", false: "OFF"}[m.planModeOn])
+				}
 				if output != "" {
 					m.appendOutput(output + "\n")
 				}
@@ -230,7 +262,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				spinnerTickCmd(0),
 			)
 		}
-
 	case spinnerTickMsg:
 		if m.pushPuppetBusy {
 			m.spinnerTick++
@@ -248,6 +279,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+
+	case statusTickMsg:
+		// Toggle between effort and plan mode labels
+		if strings.HasPrefix(m.statusLabel, "effort:") {
+			m.statusLabel = fmt.Sprintf("plan: %s", map[bool]string{true: "ON", false: "OFF"}[m.planModeOn])
+			m.statusFade = 0.0
+			m.statusFadingIn = true
+		} else {
+			m.statusLabel = fmt.Sprintf("effort: %s", m.effortLabel)
+			m.statusFade = 0.0
+			m.statusFadingIn = true
+		}
+		cmds = append(cmds, statusTickCmd())
+		return m, tea.Batch(cmds...)
+
+	case fadeTickMsg:
+		// Handle fade in/out animation
+		if m.statusFadingIn {
+			m.statusFade += 0.05
+			if m.statusFade >= 1.0 {
+				m.statusFade = 1.0
+				m.statusFadingIn = false
+			}
+		} else {
+			m.statusFade -= 0.05
+			if m.statusFade <= 0.0 {
+				m.statusFade = 0.0
+				m.statusFadingIn = true
+			}
+		}
+		cmds = append(cmds, fadeTickCmd())
+		return m, tea.Batch(cmds...)
 
 	case outputMsg:
 		atBottom := m.viewport.AtBottom()
@@ -392,8 +455,19 @@ var userEchoStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("141")).
 	Padding(0, 1)
 
-var statusBarStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("243"))
+func getStatusStyle(fade float64) lipgloss.Style {
+	// Map fade value (0.0-1.0) to color intensity
+	// Fade between 238 (very dim gray) and 255 (bright white)
+	if fade <= 0.0 {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	}
+	if fade >= 1.0 {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	}
+	// Interpolate between 238 and 255 based on fade
+	intensity := int(238 + (255-238)*fade)
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("%d", intensity)))
+}
 
 func (m model) View() string {
 	if !m.ready {
@@ -420,7 +494,7 @@ func (m model) View() string {
 	}
 
 	footer := lipgloss.PlaceHorizontal(m.termWidth, lipgloss.Right,
-		statusBarStyle.Render(fmt.Sprintf("effort: %s ", m.effortLabel)))
+		getStatusStyle(m.statusFade).Render(fmt.Sprintf("%s ", m.statusLabel)))
 
 	return m.viewport.View() + "\n" + statusLine + "\n" + inputBarStyle.Render(inputLine) + "\n" + footer
 }
