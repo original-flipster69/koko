@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"path/filepath"
@@ -49,10 +50,20 @@ type Editor struct {
 	mu        sync.Mutex
 	undoStack []undoEntry
 	reads     map[sandbox.ValidPath][32]byte
+	goProject bool
 }
 
 func New(sb *sandbox.Sandbox) *Editor {
-	return &Editor{sandbox: sb, reads: make(map[sandbox.ValidPath][32]byte)}
+	return &Editor{
+		sandbox:   sb,
+		reads:     make(map[sandbox.ValidPath][32]byte),
+		goProject: isGoProject(sb.Root()),
+	}
+}
+
+func isGoProject(root string) bool {
+	_, err := os.Stat(filepath.Join(root, "go.mod"))
+	return err == nil
 }
 
 func (e *Editor) MarkRead(path sandbox.ValidPath, content string) {
@@ -208,6 +219,11 @@ func (e *Editor) Write(path sandbox.ValidPath, content string, overwrite bool) e
 	if _, err := os.Stat(string(path)); err == nil && !overwrite {
 		return fmt.Errorf("refusing to write %s: file already exists. Use replace_in_file for modifications, or pass overwrite=true ONLY when you explicitly intend a full rewrite", path)
 	}
+	formatted, err := e.formatGoSource(path, content)
+	if err != nil {
+		return err
+	}
+	content = formatted
 	e.saveUndo(path)
 	if err := e.writeBytes(path, content); err != nil {
 		return err
@@ -238,6 +254,11 @@ func (e *Editor) Replace(path sandbox.ValidPath, oldText, newText string) (befor
 		if looksBinary([]byte(updated)) {
 			return "", "", fmt.Errorf("refusing to write %q: content appears to be binary", path)
 		}
+		formatted, ferr := e.formatGoSource(path, updated)
+		if ferr != nil {
+			return "", "", ferr
+		}
+		updated = formatted
 		e.saveUndo(path)
 		if err := e.writeBytes(path, updated); err != nil {
 			return "", "", err
@@ -442,6 +463,17 @@ func (e *Editor) walk(root string, dir sandbox.ValidPath, visit func(rel string,
 		}
 	}
 	return nil
+}
+
+func (e *Editor) formatGoSource(path sandbox.ValidPath, content string) (string, error) {
+	if !e.goProject || filepath.Ext(string(path)) != ".go" {
+		return content, nil
+	}
+	formatted, err := format.Source([]byte(content))
+	if err != nil {
+		return "", fmt.Errorf("refusing to write %s: result is not valid Go (%v) — fix the syntax and retry; the file was left unchanged", filepath.Base(string(path)), err)
+	}
+	return string(formatted), nil
 }
 
 func looksBinary(data []byte) bool {

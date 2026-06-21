@@ -436,3 +436,102 @@ func TestUndoEmptyStack(t *testing.T) {
 		t.Fatalf("undo on empty stack should return empty string, got %q", path)
 	}
 }
+
+func setupGo(t *testing.T) (string, *editor.Editor, *sandbox.Sandbox) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	resolved, err := filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(resolved, "go.mod"), []byte("module koko_test\n\ngo 1.21\n"), 0664); err != nil {
+		t.Fatal(err)
+	}
+	sb, err := sandbox.New(resolved, []string{resolved}, nil, 1024*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolved, editor.New(sb), sb
+}
+
+func TestGofmtReplaceNormalizesGo(t *testing.T) {
+	tmpDir, ed, sb := setupGo(t)
+	path := filepath.Join(tmpDir, "main.go")
+	initial := "package main\n\nfunc main() {\n}\n"
+	writeTestFile(t, path, initial)
+	ed.MarkRead(vp(t, sb, path), initial)
+
+	_, after, err := ed.Replace(vp(t, sb, path),
+		"func main() {\n}",
+		"func main() {\n            x := 1\n                  _ = x\n}")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "package main\n\nfunc main() {\n\tx := 1\n\t_ = x\n}\n"
+	if after != want {
+		t.Fatalf("after mismatch:\n  got:  %q\n  want: %q", after, want)
+	}
+	ondisk, _ := os.ReadFile(path)
+	if string(ondisk) != want {
+		t.Fatalf("on-disk mismatch:\n  got:  %q\n  want: %q", string(ondisk), want)
+	}
+}
+
+func TestGofmtReplaceRejectsInvalidGo(t *testing.T) {
+	tmpDir, ed, sb := setupGo(t)
+	path := filepath.Join(tmpDir, "main.go")
+	initial := "package main\n\nfunc main() {\n}\n"
+	writeTestFile(t, path, initial)
+	ed.MarkRead(vp(t, sb, path), initial)
+
+	_, _, err := ed.Replace(vp(t, sb, path), "func main() {\n}", "func main() {")
+	if err == nil {
+		t.Fatal("expected error for invalid Go, got nil")
+	}
+	if !strings.Contains(err.Error(), "not valid Go") {
+		t.Fatalf("expected 'not valid Go' error, got %q", err.Error())
+	}
+	ondisk, _ := os.ReadFile(path)
+	if string(ondisk) != initial {
+		t.Fatalf("file should be unchanged after rejected edit:\n  got:  %q\n  want: %q", string(ondisk), initial)
+	}
+}
+
+func TestGofmtWriteRejectsInvalidGoAndLeavesNoFile(t *testing.T) {
+	tmpDir, ed, sb := setupGo(t)
+	path := filepath.Join(tmpDir, "new.go")
+
+	if err := ed.Write(vp(t, sb, path), "package main\n\nfunc main() {", false); err == nil {
+		t.Fatal("expected error for invalid Go, got nil")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("rejected write should not create the file, stat err = %v", err)
+	}
+}
+
+func TestGofmtSkipsWhenNotGoProject(t *testing.T) {
+	tmpDir, ed, sb := setup(t)
+	path := filepath.Join(tmpDir, "main.go")
+	content := "package main\n\n\n\nfunc  main( ){\n            x:=1\n_=x}\n"
+	if err := ed.Write(vp(t, sb, path), content, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ondisk, _ := os.ReadFile(path)
+	if string(ondisk) != content {
+		t.Fatalf("no go.mod present — .go file must be written verbatim:\n  got:  %q\n  want: %q", string(ondisk), content)
+	}
+}
+
+func TestGofmtSkipsNonGoFile(t *testing.T) {
+	tmpDir, ed, sb := setupGo(t)
+	path := filepath.Join(tmpDir, "notes.txt")
+	content := "  not   go  code\n\t\tkeep   spacing\n"
+	if err := ed.Write(vp(t, sb, path), content, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ondisk, _ := os.ReadFile(path)
+	if string(ondisk) != content {
+		t.Fatalf("non-Go file must be written verbatim:\n  got:  %q\n  want: %q", string(ondisk), content)
+	}
+}
