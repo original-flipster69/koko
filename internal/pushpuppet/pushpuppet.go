@@ -509,6 +509,12 @@ func (p *PushPuppet) toolTag(name string) string {
 	return fmt.Sprintf("%s%s%s %s [Result]%s\n", ui.Bold, p.scheme.Secondary, sym, name, ui.Reset)
 }
 
+func agentExecEnv() []string {
+	cache := filepath.Join(os.TempDir(), "koko-go-cache")
+	_ = os.MkdirAll(cache, 0o700)
+	return append(os.Environ(), "GOCACHE="+cache)
+}
+
 func wrapWithUlimit(cmd string, cpuSec, memMB, fileMB int) string {
 	var prefix strings.Builder
 	if cpuSec > 0 {
@@ -823,6 +829,7 @@ func (p *PushPuppet) execCmd(ctx context.Context, tc provider.ToolCall) string {
 	wrapped := wrapWithUlimit(cmdStr, p.execCPUSecs, p.execMemoryMB, p.execMaxFileMB)
 	cmd := p.sandbox.WrapExec(sandbox.NewExecContext(cmdCtx), wrapped)
 	cmd.Dir = p.sandbox.Root()
+	cmd.Env = agentExecEnv()
 	captured := &boundedBuffer{max: execMaxCapture}
 	cmd.Stdout = io.MultiWriter(captured, p.output)
 	cmd.Stderr = io.MultiWriter(captured, p.output)
