@@ -11,6 +11,14 @@ import (
 
 var version = "dev"
 
+var BuildVersion = ""
+
+func init() {
+	if BuildVersion != "" {
+		version = BuildVersion
+	}
+}
+
 func main() {
 	provider := flag.String("provider", "", "LLM provider: anthropic, mistral, ollama")
 	model := flag.String("model", "", "Model name to use")

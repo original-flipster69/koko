@@ -46,6 +46,20 @@ func fadeTickCmd() tea.Cmd {
 	})
 }
 
+func (m model) toggledStatusLabel() string {
+	if strings.HasPrefix(m.statusLabel, "effort:") {
+		return m.planLabel()
+	}
+	return fmt.Sprintf("effort: %s", m.effortLabel)
+}
+
+func (m model) planLabel() string {
+	if m.planModeOn {
+		return "plan: ON"
+	}
+	return "plan: OFF"
+}
+
 var (
 	zodiac      = []string{"♈︎", "♉︎", "♊︎", "♋︎", "♌︎", "♍︎", "♎︎", "♏︎", "♐︎", "♑︎", "♒︎", "♓︎"}
 	transitions = []string{"·", "✧", "•", "✦", "⋆", "✶", "∙", "✱"}
@@ -78,15 +92,15 @@ type model struct {
 	spinnerTick    int
 	spinnerLabel   string
 
-	cmdHandler     CmdHandler
-	knownCommands  map[string]bool
-	scheme         ui.Scheme
-	effortLabel    string
-	planModeOn     bool
-	statusLabel    string
-	statusFade     float64
-	statusFadingIn bool
-	inputRows      int
+	cmdHandler      CmdHandler
+	knownCommands   map[string]bool
+	scheme          ui.Scheme
+	effortLabel     string
+	planModeOn      bool
+	statusLabel     string
+	statusFade      float64
+	statusFadingOut bool
+	inputRows       int
 }
 
 type CmdHandler func(input string, a *pushpuppet.PushPuppet) (handled bool, prompt string, output string)
@@ -117,12 +131,11 @@ func newModel(a *pushpuppet.PushPuppet, ctx context.Context, cancel context.Canc
 		splashes:   splashes,
 		confirmCh:  confirmCh,
 		cmdHandler: cmdHandler, knownCommands: known,
-		scheme:         scheme,
-		effortLabel:    a.Effort().String(),
-		planModeOn:     a.PlanMode(),
-		statusLabel:    fmt.Sprintf("effort: %s", a.Effort().String()),
-		statusFade:     1.0,
-		statusFadingIn: true,
+		scheme:      scheme,
+		effortLabel: a.Effort().String(),
+		planModeOn:  a.PlanMode(),
+		statusLabel: fmt.Sprintf("effort: %s", a.Effort().String()),
+		statusFade:  1.0,
 	}
 	return m
 }
@@ -230,11 +243,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scheme = m.pushPuppet.Scheme()
 				m.effortLabel = m.pushPuppet.Effort().String()
 				m.planModeOn = m.pushPuppet.PlanMode()
-				// Update status label if it's currently showing effort or plan
 				if strings.HasPrefix(m.statusLabel, "effort:") {
 					m.statusLabel = fmt.Sprintf("effort: %s", m.effortLabel)
 				} else if strings.HasPrefix(m.statusLabel, "plan:") {
-					m.statusLabel = fmt.Sprintf("plan: %s", map[bool]string{true: "ON", false: "OFF"}[m.planModeOn])
+					m.statusLabel = m.planLabel()
 				}
 				if output != "" {
 					m.appendOutput(output + "\n")
@@ -281,35 +293,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case statusTickMsg:
-		// Toggle between effort and plan mode labels
-		if strings.HasPrefix(m.statusLabel, "effort:") {
-			m.statusLabel = fmt.Sprintf("plan: %s", map[bool]string{true: "ON", false: "OFF"}[m.planModeOn])
-			m.statusFade = 0.0
-			m.statusFadingIn = true
-		} else {
-			m.statusLabel = fmt.Sprintf("effort: %s", m.effortLabel)
-			m.statusFade = 0.0
-			m.statusFadingIn = true
-		}
-		cmds = append(cmds, statusTickCmd())
+		m.statusFadingOut = true
+		cmds = append(cmds, statusTickCmd(), fadeTickCmd())
 		return m, tea.Batch(cmds...)
 
 	case fadeTickMsg:
-		// Handle fade in/out animation
-		if m.statusFadingIn {
-			m.statusFade += 0.05
-			if m.statusFade >= 1.0 {
-				m.statusFade = 1.0
-				m.statusFadingIn = false
-			}
-		} else {
+		if m.statusFadingOut {
 			m.statusFade -= 0.05
 			if m.statusFade <= 0.0 {
 				m.statusFade = 0.0
-				m.statusFadingIn = true
+				m.statusFadingOut = false
+				m.statusLabel = m.toggledStatusLabel()
+			}
+			cmds = append(cmds, fadeTickCmd())
+		} else if m.statusFade < 1.0 {
+			m.statusFade += 0.05
+			if m.statusFade >= 1.0 {
+				m.statusFade = 1.0
+			} else {
+				cmds = append(cmds, fadeTickCmd())
 			}
 		}
-		cmds = append(cmds, fadeTickCmd())
 		return m, tea.Batch(cmds...)
 
 	case outputMsg:
@@ -455,18 +459,29 @@ var userEchoStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("141")).
 	Padding(0, 1)
 
+const (
+	statusFadeLo = 232
+	statusFadeHi = 255
+)
+
+var statusFadeStyles = buildStatusFadeStyles()
+
+func buildStatusFadeStyles() []lipgloss.Style {
+	styles := make([]lipgloss.Style, statusFadeHi-statusFadeLo+1)
+	for i := range styles {
+		styles[i] = lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("%d", statusFadeLo+i)))
+	}
+	return styles
+}
+
 func getStatusStyle(fade float64) lipgloss.Style {
-	// Map fade value (0.0-1.0) to color intensity
-	// Fade between 238 (very dim gray) and 255 (bright white)
-	if fade <= 0.0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	if fade < 0.0 {
+		fade = 0.0
 	}
-	if fade >= 1.0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	if fade > 1.0 {
+		fade = 1.0
 	}
-	// Interpolate between 238 and 255 based on fade
-	intensity := int(238 + (255-238)*fade)
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("%d", intensity)))
+	return statusFadeStyles[int(fade*float64(len(statusFadeStyles)-1))]
 }
 
 func (m model) View() string {
