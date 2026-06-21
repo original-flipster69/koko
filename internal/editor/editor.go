@@ -465,6 +465,21 @@ func (e *Editor) walk(root string, dir sandbox.ValidPath, visit func(rel string,
 	return nil
 }
 
+// FIXME: This is a deliberately minimal first cut — gofmt-on-write as a blunt
+// format-or-reject gate. Real, in-depth concept work is still needed before
+// this can be trusted as the editor's formatting strategy. Open questions:
+//   - Scope: only gofmt (whitespace/parse) is handled. Imports (goimports),
+//     build-tag-gated files, generated files, cgo, and non-Go formatters
+//     (prettier, rustfmt, …) are all out of scope and need a coherent design.
+//   - Rejection vs. repair: rejecting unparseable output pushes the burden back
+//     onto the model; we may instead want to persist-and-flag, or attempt a
+//     structural/line-based merge rather than a fuzzy string splice upstream.
+//   - Project detection: keying off a root go.mod is crude (monorepos, nested
+//     modules, GOPATH-less fragments). Needs to align with project.Scan.
+//   - Determinism: go/format follows the local toolchain's gofmt; a repo may
+//     want a pinned version. Decide whether that matters here.
+//
+// Treat the current behavior as a stopgap, not the final formatting contract.
 func (e *Editor) formatGoSource(path sandbox.ValidPath, content string) (string, error) {
 	if !e.goProject || filepath.Ext(string(path)) != ".go" {
 		return content, nil

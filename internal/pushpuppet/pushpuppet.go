@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strconv"
@@ -520,7 +521,7 @@ func wrapWithUlimit(cmd string, cpuSec, memMB, fileMB int) string {
 	if cpuSec > 0 {
 		prefix.WriteString(fmt.Sprintf("ulimit -t %d; ", cpuSec))
 	}
-	if memMB > 0 {
+	if memMB > 0 && runtime.GOOS != "darwin" {
 		prefix.WriteString(fmt.Sprintf("ulimit -v %d; ", memMB*1024))
 	}
 	if fileMB > 0 {
@@ -841,6 +842,9 @@ func (p *PushPuppet) execCmd(ctx context.Context, tc provider.ToolCall) string {
 			exitCode = cmd.ProcessState.ExitCode()
 		}
 		return fmt.Sprintf("exit %d\n%s", exitCode, output)
+	}
+	if output == "" {
+		return "exit 0 (no output)"
 	}
 	return output
 }
