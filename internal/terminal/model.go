@@ -47,17 +47,38 @@ func fadeTickCmd() tea.Cmd {
 }
 
 func (m model) toggledStatusLabel() string {
-	if strings.HasPrefix(m.statusLabel, "effort:") {
+	switch {
+	case strings.HasPrefix(m.statusLabel, "effort:"):
 		return m.planLabel()
+	case strings.HasPrefix(m.statusLabel, "plan:"):
+		return m.modelLabel()
+	default:
+		return fmt.Sprintf("effort: %s", m.effortLabel)
 	}
-	return fmt.Sprintf("effort: %s", m.effortLabel)
 }
 
 func (m model) planLabel() string {
 	if m.planModeOn {
-		return "plan: ON"
+		return "plan: 👄 ON"
 	}
-	return "plan: OFF"
+	return "plan: 🫦 OFF"
+}
+
+func (m model) modelLabel() string {
+	return fmt.Sprintf("model: %s %s", m.emo4Provder(), m.modelName)
+}
+
+func (m model) emo4Provder() string {
+	switch m.providerName {
+	case "mistral":
+		return "🐱"
+	case "anthropic":
+		return "💥"
+	case "ollama":
+		return "🦙"
+	default:
+		return "🏴‍☠️"
+	}
 }
 
 var (
@@ -97,6 +118,8 @@ type model struct {
 	scheme          ui.Scheme
 	effortLabel     string
 	planModeOn      bool
+	providerName    string
+	modelName       string
 	statusLabel     string
 	statusFade      float64
 	statusFadingOut bool
@@ -131,11 +154,13 @@ func newModel(a *pushpuppet.PushPuppet, ctx context.Context, cancel context.Canc
 		splashes:   splashes,
 		confirmCh:  confirmCh,
 		cmdHandler: cmdHandler, knownCommands: known,
-		scheme:      scheme,
-		effortLabel: a.Effort().String(),
-		planModeOn:  a.PlanMode(),
-		statusLabel: fmt.Sprintf("effort: %s", a.Effort().String()),
-		statusFade:  1.0,
+		scheme:       scheme,
+		effortLabel:  a.Effort().String(),
+		planModeOn:   a.PlanMode(),
+		providerName: a.ProviderName(),
+		modelName:    a.Model(),
+		statusLabel:  fmt.Sprintf("effort: %s", a.Effort().String()),
+		statusFade:   1.0,
 	}
 	return m
 }
@@ -243,10 +268,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scheme = m.pushPuppet.Scheme()
 				m.effortLabel = m.pushPuppet.Effort().String()
 				m.planModeOn = m.pushPuppet.PlanMode()
+				m.providerName = m.pushPuppet.ProviderName()
+				m.modelName = m.pushPuppet.Model()
 				if strings.HasPrefix(m.statusLabel, "effort:") {
 					m.statusLabel = fmt.Sprintf("effort: %s", m.effortLabel)
 				} else if strings.HasPrefix(m.statusLabel, "plan:") {
 					m.statusLabel = m.planLabel()
+				} else if strings.HasPrefix(m.statusLabel, "model:") {
+					m.statusLabel = m.modelLabel()
 				}
 				if output != "" {
 					m.appendOutput(output + "\n")
@@ -459,7 +488,7 @@ var userEchoStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("141")).
 	Padding(0, 1)
 
-var statusLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+var statusLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
 func slideStatusFooter(termWidth int, label string, progress float64) string {
 	if progress < 0.0 {
