@@ -27,6 +27,7 @@ import (
 	"github.com/original-flipster69/koko/internal/memories"
 	"github.com/original-flipster69/koko/internal/policy"
 	"github.com/original-flipster69/koko/internal/privacy"
+	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/sandbox"
 	"github.com/original-flipster69/koko/internal/ui"
@@ -216,6 +217,7 @@ type Options struct {
 	CmdPolicy        *policy.CmdPolicy
 	Ignore           *ignore.Matcher
 	Scheme           ui.Scheme
+	Stack            project.Stack
 	ProjectCtx       string
 	ThinkingVerbs    []string
 	MaxSessionTokens int
@@ -227,7 +229,7 @@ type Options struct {
 }
 
 func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confirmFunc, auditLog *audit.Log, opts Options) *PushPuppet {
-	ed := editor.New(sb)
+	ed := editor.New(sb, opts.Stack)
 	pp := &PushPuppet{
 		provider:         p,
 		editor:           ed,

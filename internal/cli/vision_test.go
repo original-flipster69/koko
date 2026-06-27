@@ -8,6 +8,7 @@ import (
 
 	"github.com/original-flipster69/koko/internal/editor"
 	"github.com/original-flipster69/koko/internal/ignore"
+	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
@@ -38,7 +39,7 @@ func TestVisibleFiles(t *testing.T) {
 	}
 	ig := ignore.NewFromPatterns([]string{"build/", "*.log"})
 
-	files, capped, err := visibleFiles(editor.New(sb), ig)
+	files, capped, err := visibleFiles(editor.New(sb, project.Stack{}), ig)
 	if err != nil {
 		t.Fatal(err)
 	}

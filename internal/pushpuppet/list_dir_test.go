@@ -9,6 +9,7 @@ import (
 
 	"github.com/original-flipster69/koko/internal/editor"
 	"github.com/original-flipster69/koko/internal/ignore"
+	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/sandbox"
 )
@@ -19,7 +20,7 @@ func newListPushPuppet(t *testing.T, root string, deny []string) *PushPuppet {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &PushPuppet{sandbox: sb, editor: editor.New(sb), ignore: ignore.NewFromPatterns(nil)}
+	return &PushPuppet{sandbox: sb, editor: editor.New(sb, project.Stack{}), ignore: ignore.NewFromPatterns(nil)}
 }
 
 func mkfile(t *testing.T, root, rel string) {

@@ -133,6 +133,7 @@ func Run(opts Flags) error {
 		CmdPolicy:        cmdPolicy,
 		Ignore:           ignoreMatcher,
 		Scheme:           scheme,
+		Stack:            stack,
 		ProjectCtx:       projectCtx,
 		ThinkingVerbs:    cfg.Style.ThinkingVerbs,
 		MaxSessionTokens: cfg.Llm.MaxSessionTokens,

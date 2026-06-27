@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
@@ -53,17 +54,12 @@ type Editor struct {
 	goProject bool
 }
 
-func New(sb *sandbox.Sandbox) *Editor {
+func New(sb *sandbox.Sandbox, stack project.Stack) *Editor {
 	return &Editor{
 		sandbox:   sb,
 		reads:     make(map[sandbox.ValidPath][32]byte),
-		goProject: isGoProject(sb.Root()),
+		goProject: stack.Has("Go"),
 	}
-}
-
-func isGoProject(root string) bool {
-	_, err := os.Stat(filepath.Join(root, "go.mod"))
-	return err == nil
 }
 
 func (e *Editor) MarkRead(path sandbox.ValidPath, content string) {
