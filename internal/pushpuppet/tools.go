@@ -14,6 +14,7 @@ type tool struct {
 	Params      provider.Schema
 	Verb        string
 	ReadOnly    bool
+	AutoVerify  bool
 	Quiet       bool
 	Handler     func(*PushPuppet, context.Context, provider.ToolCall) string
 }
@@ -44,6 +45,7 @@ var tools = []tool{
 		Name:        "write_file",
 		Description: "Create a NEW file. Refuses to run if the path already exists unless overwrite=true is explicitly passed (reserved for deliberate full rewrites). For ANY modification of existing files, use replace_in_file — never write_file.",
 		Verb:        "✎ writing",
+		AutoVerify:  true,
 		Handler:     (*PushPuppet).writeFile,
 		Params: provider.Schema{
 			Type: "object",
@@ -59,6 +61,7 @@ var tools = []tool{
 		Name:        "replace_in_file",
 		Description: "Replace a unique substring in an existing file. You MUST call read_file on this path earlier in the session before calling replace_in_file — the tool will refuse otherwise. If the file changes on disk after your read, you must re-read it. old_text must match byte-for-byte — whitespace, punctuation, capitalization, and line breaks all count. Copy old_text directly from the read_file output. If a short phrase appears multiple times, expand old_text with surrounding context until it is unique.",
 		Verb:        "✎ editing",
+		AutoVerify:  true,
 		Handler:     (*PushPuppet).replaceInFile,
 		Params: provider.Schema{
 			Type: "object",
@@ -227,15 +230,9 @@ func toolReadOnly(name string) bool {
 	return ok && t.ReadOnly
 }
 
-var fileEditingTools = map[string]bool{
-	"write_file":      true,
-	"replace_in_file": true,
-	"rename_file":     true,
-	"delete_file":     true,
-}
-
-func toolEditsFiles(name string) bool {
-	return fileEditingTools[name]
+func toolAutoVerify(name string) bool {
+	t, ok := toolsByName[name]
+	return ok && t.AutoVerify
 }
 
 func toolQuiet(name string) bool {
@@ -265,16 +262,16 @@ func (p *PushPuppet) buildTools() []provider.ToolDef {
 }
 
 var toolSymbols = map[string]string{
-	"read_file":       "◇",
+	"read_file":       "ℹ︎",
 	"write_file":      "✎",
-	"replace_in_file": "✎",
-	"delete_file":     "✕",
+	"replace_in_file": "✐",
+	"delete_file":     "☠︎",
 	"rename_file":     "⇄",
 	"list_dir":        "≡",
 	"search_files":    "⌕",
 	"exec_command":    "⚡",
-	"verify":          "✓",
-	"save_memory":     "◆",
-	"delete_memory":   "◆",
-	"list_memories":   "◆",
+	"verify":          "✔",
+	"save_memory":     "〒",
+	"delete_memory":   "〶",
+	"list_memories":   "〠",
 }

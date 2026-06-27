@@ -451,7 +451,7 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			result := p.execTool(ctx, tc)
 			p.auditLog.Record(tc.Name, tc.Args, result)
 			isError := strings.HasPrefix(result, "error:")
-			if toolEditsFiles(tc.Name) && !isError {
+			if toolAutoVerify(tc.Name) && !isError {
 				edited = true
 			}
 			if strings.HasPrefix(result, "unknown tool:") {

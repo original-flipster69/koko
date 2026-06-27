@@ -2,6 +2,7 @@ package verify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -57,7 +58,7 @@ func (r *Runner) runStage(ctx context.Context, st Stage) StageResult {
 	out, err := cmd.CombinedOutput()
 	output := truncate(string(out), r.outputCap)
 
-	if stageCtx.Err() == context.DeadlineExceeded {
+	if errors.Is(stageCtx.Err(), context.DeadlineExceeded) {
 		return StageResult{
 			Name:   st.Name,
 			Passed: false,

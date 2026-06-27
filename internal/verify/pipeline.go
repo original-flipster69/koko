@@ -11,7 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-const defaultStageTimeout = 2 * time.Minute
+const defaultStageTimeout = 1 * time.Minute
 
 type Stage struct {
 	Name    string
