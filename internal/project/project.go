@@ -62,10 +62,6 @@ func Scan(root string) Stack {
 	return info
 }
 
-func (p Stack) Has(label string) bool {
-	return slices.Contains(p.Detected, label)
-}
-
 func (p Stack) Summary() string {
 	if len(p.Detected) == 0 && !p.HasGit {
 		return ""

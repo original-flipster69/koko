@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"go/format"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +12,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
@@ -51,14 +49,12 @@ type Editor struct {
 	mu        sync.Mutex
 	undoStack []undoEntry
 	reads     map[sandbox.ValidPath][32]byte
-	goProject bool
 }
 
-func New(sb *sandbox.Sandbox, stack project.Stack) *Editor {
+func New(sb *sandbox.Sandbox) *Editor {
 	return &Editor{
-		sandbox:   sb,
-		reads:     make(map[sandbox.ValidPath][32]byte),
-		goProject: stack.Has("Go"),
+		sandbox: sb,
+		reads:   make(map[sandbox.ValidPath][32]byte),
 	}
 }
 
@@ -215,11 +211,6 @@ func (e *Editor) Write(path sandbox.ValidPath, content string, overwrite bool) e
 	if _, err := os.Stat(string(path)); err == nil && !overwrite {
 		return fmt.Errorf("refusing to write %s: file already exists. Use replace_in_file for modifications, or pass overwrite=true ONLY when you explicitly intend a full rewrite", path)
 	}
-	formatted, err := e.formatGoSource(path, content)
-	if err != nil {
-		return err
-	}
-	content = formatted
 	e.saveUndo(path)
 	if err := e.writeBytes(path, content); err != nil {
 		return err
@@ -250,11 +241,6 @@ func (e *Editor) Replace(path sandbox.ValidPath, oldText, newText string) (befor
 		if looksBinary([]byte(updated)) {
 			return "", "", fmt.Errorf("refusing to write %q: content appears to be binary", path)
 		}
-		formatted, ferr := e.formatGoSource(path, updated)
-		if ferr != nil {
-			return "", "", ferr
-		}
-		updated = formatted
 		e.saveUndo(path)
 		if err := e.writeBytes(path, updated); err != nil {
 			return "", "", err
@@ -459,32 +445,6 @@ func (e *Editor) walk(root string, dir sandbox.ValidPath, visit func(rel string,
 		}
 	}
 	return nil
-}
-
-// FIXME: This is a deliberately minimal first cut — gofmt-on-write as a blunt
-// format-or-reject gate. Real, in-depth concept work is still needed before
-// this can be trusted as the editor's formatting strategy. Open questions:
-//   - Scope: only gofmt (whitespace/parse) is handled. Imports (goimports),
-//     build-tag-gated files, generated files, cgo, and non-Go formatters
-//     (prettier, rustfmt, …) are all out of scope and need a coherent design.
-//   - Rejection vs. repair: rejecting unparseable output pushes the burden back
-//     onto the model; we may instead want to persist-and-flag, or attempt a
-//     structural/line-based merge rather than a fuzzy string splice upstream.
-//   - Project detection: keying off a root go.mod is crude (monorepos, nested
-//     modules, GOPATH-less fragments). Needs to align with project.Scan.
-//   - Determinism: go/format follows the local toolchain's gofmt; a repo may
-//     want a pinned version. Decide whether that matters here.
-//
-// Treat the current behavior as a stopgap, not the final formatting contract.
-func (e *Editor) formatGoSource(path sandbox.ValidPath, content string) (string, error) {
-	if !e.goProject || filepath.Ext(string(path)) != ".go" {
-		return content, nil
-	}
-	formatted, err := format.Source([]byte(content))
-	if err != nil {
-		return "", fmt.Errorf("refusing to write %s: result is not valid Go (%v) — fix the syntax and retry; the file was left unchanged", filepath.Base(string(path)), err)
-	}
-	return string(formatted), nil
 }
 
 func looksBinary(data []byte) bool {

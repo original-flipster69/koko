@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/original-flipster69/koko/internal/editor"
-	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/sandbox"
 )
 
@@ -22,7 +21,7 @@ func setup(t *testing.T) (string, *editor.Editor, *sandbox.Sandbox) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return resolved, editor.New(sb, project.Stack{}), sb
+	return resolved, editor.New(sb), sb
 }
 
 func vp(t *testing.T, sb *sandbox.Sandbox, p string) sandbox.ValidPath {

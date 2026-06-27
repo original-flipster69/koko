@@ -27,7 +27,6 @@ import (
 	"github.com/original-flipster69/koko/internal/memories"
 	"github.com/original-flipster69/koko/internal/policy"
 	"github.com/original-flipster69/koko/internal/privacy"
-	"github.com/original-flipster69/koko/internal/project"
 	"github.com/original-flipster69/koko/internal/provider"
 	"github.com/original-flipster69/koko/internal/sandbox"
 	"github.com/original-flipster69/koko/internal/ui"
@@ -222,7 +221,6 @@ type Options struct {
 	CmdPolicy        *policy.CmdPolicy
 	Ignore           *ignore.Matcher
 	Scheme           ui.Scheme
-	Stack            project.Stack
 	Verifier         Verifier
 	ProjectCtx       string
 	ThinkingVerbs    []string
@@ -235,7 +233,7 @@ type Options struct {
 }
 
 func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confirmFunc, auditLog *audit.Log, opts Options) *PushPuppet {
-	ed := editor.New(sb, opts.Stack)
+	ed := editor.New(sb)
 	pp := &PushPuppet{
 		provider:         p,
 		editor:           ed,
@@ -535,12 +533,6 @@ func (p *PushPuppet) toolTag(name string) string {
 		sym = s
 	}
 	return fmt.Sprintf("%s%s%s %s [Result]%s\n", ui.Bold, p.scheme.Secondary, sym, name, ui.Reset)
-}
-
-func agentExecEnv() []string {
-	cache := filepath.Join(os.TempDir(), "koko-go-cache")
-	_ = os.MkdirAll(cache, 0o700)
-	return append(os.Environ(), "GOCACHE="+cache)
 }
 
 func wrapWithUlimit(cmd string, cpuSec, memMB, fileMB int) string {
@@ -868,7 +860,6 @@ func (p *PushPuppet) execCmd(ctx context.Context, tc provider.ToolCall) string {
 	wrapped := wrapWithUlimit(cmdStr, p.execCPUSecs, p.execMemoryMB, p.execMaxFileMB)
 	cmd := p.sandbox.WrapExec(sandbox.NewExecContext(cmdCtx), wrapped)
 	cmd.Dir = p.sandbox.Root()
-	cmd.Env = agentExecEnv()
 	captured := &boundedBuffer{max: execMaxCapture}
 	cmd.Stdout = io.MultiWriter(captured, p.output)
 	cmd.Stderr = io.MultiWriter(captured, p.output)
