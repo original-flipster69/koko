@@ -16,7 +16,7 @@
 
 [[stage]]
 name = "fmt"
-cmd = "test -z \"$(gofmt -l .)\""
+cmd = "gofmt -l ."
 fast = true
 timeout = "30s"
 

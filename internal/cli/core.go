@@ -27,15 +27,6 @@ func (c clear) do(opts cmdOpts) string {
 	return opts.scheme().Info("cleared", "conversation history reset")
 }
 
-type history struct{}
-
-func (h history) name() string { return "history" }
-func (h history) desc() string { return "Show message count" }
-func (h history) args() string { return "" }
-func (h history) do(opts cmdOpts) string {
-	return opts.scheme().Info("messages", fmt.Sprintf("%d", opts.a.HistoryLen()))
-}
-
 type undo struct{}
 
 func (u undo) name() string { return "undo" }

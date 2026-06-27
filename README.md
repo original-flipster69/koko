@@ -150,7 +150,6 @@ As you type, koko recognizes when the current line is a known command or install
 | `:help` | Show available commands                            |
 | `:koko` | Print the koko mascot                              |
 | `:clear` | Reset conversation history                         |
-| `:history` | Show message count                                 |
 | `:tokens` | Show token usage stats                             |
 | `:undo` | Revert the last file change                        |
 | `:run <cmd>` | Run a shell command directly (bypasses LLM)        |

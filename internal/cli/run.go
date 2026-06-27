@@ -286,15 +286,14 @@ func register(cmds map[string]command, list ...cmdDef) {
 // (everything except :help, which is registered separately because it needs the
 // finished command map). name()/desc()/args() ignore the injected deps, so it
 // can be called with zero values purely to enumerate commands.
-func commandList(sb *sandbox.Sandbox, memo *memories.Store, plays *plays.Registry, cfg *config.Config, kokoRoot, cfgPath, sandboxRoot string, flags Flags, apply func(config.Config) (applied, restart []string)) []cmdDef {
-	return []cmdDef{
-		koko{}, clear{}, history{}, undo{}, tokens{}, compact{}, plan{}, vision{},
-		run{sb},
-		memoriesCmd{memo},
-		playsCmd{plays},
-		model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
-		reload{cfgPath, flags, apply}, cageCmd{kokoRoot, sandboxRoot},
-	}
+func commandList(sb *sandbox.Sandbox, memo *memories.Store, plays *plays.Registry, cfg *config.Config, kokoRoot, cfgPath, sandboxRoot string, flags Flags, apply func(config.Config) (applied, restart []string)) []cmdDef {		return []cmdDef{
+			koko{}, clear{}, undo{}, tokens{}, compact{}, plan{}, vision{},
+			run{sb},
+			memoriesCmd{memo},
+			playsCmd{plays},
+			model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
+			reload{cfgPath, flags, apply}, cageCmd{kokoRoot, sandboxRoot},
+		}
 }
 
 func kokoDir() string {
