@@ -23,7 +23,7 @@ type statusTickMsg struct{}
 type fadeTickMsg struct{}
 
 const splashFrameDuration = 400 * time.Millisecond
-const statusSwitchDuration = 8 * time.Second
+const statusSwitchDuration = 16 * time.Second
 const fadeTickDuration = 50 * time.Millisecond
 
 var splashSequence = []int{1, 0, 1, 0, 2, 0}
@@ -299,7 +299,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case fadeTickMsg:
 		if m.statusFadingOut {
-			m.statusFade -= 0.05
+			m.statusFade -= 0.2
 			if m.statusFade <= 0.0 {
 				m.statusFade = 0.0
 				m.statusFadingOut = false
@@ -307,7 +307,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			cmds = append(cmds, fadeTickCmd())
 		} else if m.statusFade < 1.0 {
-			m.statusFade += 0.05
+			m.statusFade += 0.04
 			if m.statusFade >= 1.0 {
 				m.statusFade = 1.0
 			} else {
@@ -459,29 +459,25 @@ var userEchoStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("141")).
 	Padding(0, 1)
 
-const (
-	statusFadeLo = 232
-	statusFadeHi = 255
-)
+var statusLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
 
-var statusFadeStyles = buildStatusFadeStyles()
-
-func buildStatusFadeStyles() []lipgloss.Style {
-	styles := make([]lipgloss.Style, statusFadeHi-statusFadeLo+1)
-	for i := range styles {
-		styles[i] = lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("%d", statusFadeLo+i)))
+func slideStatusFooter(termWidth int, label string, progress float64) string {
+	if progress < 0.0 {
+		progress = 0.0
 	}
-	return styles
-}
-
-func getStatusStyle(fade float64) lipgloss.Style {
-	if fade < 0.0 {
-		fade = 0.0
+	if progress > 1.0 {
+		progress = 1.0
 	}
-	if fade > 1.0 {
-		fade = 1.0
+	runes := []rune(fmt.Sprintf("%s ", label))
+	visible := int(progress*float64(len(runes)) + 0.5)
+	if visible <= 0 {
+		return lipgloss.NewStyle().Width(termWidth).Render("")
 	}
-	return statusFadeStyles[int(fade*float64(len(statusFadeStyles)-1))]
+	if visible > len(runes) {
+		visible = len(runes)
+	}
+	shown := statusLabelStyle.Render(string(runes[:visible]))
+	return lipgloss.PlaceHorizontal(termWidth, lipgloss.Right, shown)
 }
 
 func (m model) View() string {
@@ -508,8 +504,7 @@ func (m model) View() string {
 		inputLine = fmt.Sprintf("%s▶%s %s", m.scheme.Primary, ui.Reset, inputView)
 	}
 
-	footer := lipgloss.PlaceHorizontal(m.termWidth, lipgloss.Right,
-		getStatusStyle(m.statusFade).Render(fmt.Sprintf("%s ", m.statusLabel)))
+	footer := slideStatusFooter(m.termWidth, m.statusLabel, m.statusFade)
 
 	return m.viewport.View() + "\n" + statusLine + "\n" + inputBarStyle.Render(inputLine) + "\n" + footer
 }
