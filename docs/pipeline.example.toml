@@ -1,0 +1,39 @@
+# Verification pipeline — copy to <project>/.koko/pipeline.toml
+#
+# koko runs this AFTER the agent edits files. It is the project's
+# definition-of-done: the agent reacts to the result but cannot run,
+# skip, or fake it. The file is inert until a human approves it once at
+# startup (the literal commands below are shown for approval); the
+# approval is pinned to this file's content and stored in ~/.koko, so any
+# edit here re-prompts. The agent cannot read or write .koko.
+#
+# Each [[stage]] runs in order, fail-fast, with cwd = repo root.
+#   name    — label shown in the verification result
+#   cmd     — shell command; non-zero exit = stage failed
+#   fast    — true stages form the inner loop run after every edit batch;
+#             if no stage is marked fast, all stages run
+#   timeout — Go duration (default 2m)
+
+[[stage]]
+name = "fmt"
+cmd = "test -z \"$(gofmt -l .)\""
+fast = true
+timeout = "30s"
+
+[[stage]]
+name = "build"
+cmd = "go build ./..."
+fast = true
+timeout = "120s"
+
+[[stage]]
+name = "vet"
+cmd = "go vet ./..."
+fast = true
+timeout = "120s"
+
+[[stage]]
+name = "test"
+cmd = "go test ./..."
+fast = false
+timeout = "300s"

@@ -114,8 +114,8 @@ func (s *Sandbox) ValidatePath(path string) (ValidPath, error) {
 		return "", fmt.Errorf("path %q is outside allowed directories", path)
 	}
 
-	if withinGitDir(evaluated) {
-		return "", fmt.Errorf("path %q is inside a .git directory (always denied)", path)
+	if seg := protectedSegment(evaluated); seg != "" {
+		return "", fmt.Errorf("path %q is inside a %s directory (always denied)", path, seg)
 	}
 
 	if s.isDenied(evaluated) {
@@ -125,13 +125,17 @@ func (s *Sandbox) ValidatePath(path string) (ValidPath, error) {
 	return ValidPath(evaluated), nil
 }
 
-func withinGitDir(path string) bool {
+var protectedDirs = []string{".git", ".koko"}
+
+func protectedSegment(path string) string {
 	for _, seg := range strings.Split(filepath.ToSlash(path), "/") {
-		if seg == ".git" {
-			return true
+		for _, protected := range protectedDirs {
+			if seg == protected {
+				return protected
+			}
 		}
 	}
-	return false
+	return ""
 }
 
 var imageExtensions = map[string]string{

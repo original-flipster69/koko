@@ -23,6 +23,7 @@ import (
 	"github.com/original-flipster69/koko/internal/sandbox"
 	"github.com/original-flipster69/koko/internal/terminal"
 	"github.com/original-flipster69/koko/internal/ui"
+	"github.com/original-flipster69/koko/internal/verify"
 )
 
 const (
@@ -114,6 +115,8 @@ func Run(opts Flags) error {
 		projectCtx += "Stored memories (use list_memories to read bodies, save_memory/delete_memory to modify):\n" + idx
 	}
 
+	verifier := loadVerifier(sb.Root(), kokoRoot)
+
 	var outFilters []pushpuppet.OutboundFilter
 	if cfg.Sandbox.ScrubPII {
 		outFilters = append(outFilters, pushpuppet.ScrubPIIFilter)
@@ -134,6 +137,7 @@ func Run(opts Flags) error {
 		Ignore:           ignoreMatcher,
 		Scheme:           scheme,
 		Stack:            stack,
+		Verifier:         verifier,
 		ProjectCtx:       projectCtx,
 		ThinkingVerbs:    cfg.Style.ThinkingVerbs,
 		MaxSessionTokens: cfg.Llm.MaxSessionTokens,
@@ -338,6 +342,48 @@ func isElevated() bool {
 
 func confirmElevated(r io.Reader, w io.Writer) bool {
 	fmt.Fprintf(w, "Running with elevated privileges. Continue? [y/N] ")
+	reader := bufio.NewReader(r)
+	answer, _ := reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	return answer == "y" || answer == "yes"
+}
+
+func loadVerifier(projectRoot, kokoRoot string) pushpuppet.Verifier {
+	pipelinePath := filepath.Join(projectRoot, config.ProjectConfigDir, "pipeline.toml")
+	pipeline, err := verify.Load(pipelinePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "warning: ignoring %s: %v\n", pipelinePath, err)
+		}
+		return nil
+	}
+
+	trust := verify.NewTrustStore(kokoRoot)
+	approved, err := trust.Approved(projectRoot, pipeline.Hash)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cannot read verification trust store: %v\n", err)
+		return nil
+	}
+	if !approved {
+		if !confirmPipeline(os.Stdin, os.Stdout, pipeline.Commands()) {
+			return nil
+		}
+		if err := trust.Approve(projectRoot, pipeline.Hash); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: cannot record pipeline approval: %v\n", err)
+			return nil
+		}
+	}
+
+	return verify.NewTrigger(verify.NewRunner(projectRoot, 0), pipeline)
+}
+
+func confirmPipeline(r io.Reader, w io.Writer, cmds []string) bool {
+	fmt.Fprintf(w, "\nThis project defines a verification pipeline (%s).\n", filepath.Join(config.ProjectConfigDir, "pipeline.toml"))
+	fmt.Fprintf(w, "After the agent edits files, koko will run these commands on your machine:\n\n")
+	for _, c := range cmds {
+		fmt.Fprintf(w, "  $ %s\n", c)
+	}
+	fmt.Fprintf(w, "\nApprove and trust this pipeline for this project? [y/N] ")
 	reader := bufio.NewReader(r)
 	answer, _ := reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))

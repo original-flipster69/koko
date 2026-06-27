@@ -4,6 +4,7 @@ package sandbox
 
 import (
 	"os/exec"
+	"path/filepath"
 )
 
 func ExecAvailable() bool {
@@ -29,6 +30,7 @@ func (s *Sandbox) WrapExec(ctx execContext, shellCmd string) *exec.Cmd {
 		"--ro-bind", "/lib64", "/lib64",
 		"--ro-bind", "/etc", "/etc",
 		"--bind", s.root, s.root,
+		"--tmpfs", filepath.Join(s.root, ".koko"),
 		"--bind", "/tmp", "/tmp",
 		"--proc", "/proc",
 		"--dev", "/dev",

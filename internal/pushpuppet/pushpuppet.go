@@ -46,6 +46,7 @@ type PushPuppet struct {
 	memory           *memories.Store
 	cmdPolicy        *policy.CmdPolicy
 	scheme           ui.Scheme
+	verifier         Verifier
 	tools            []provider.ToolDef
 	output           io.Writer
 	confirm          confirmFunc
@@ -212,12 +213,17 @@ func (p *PushPuppet) PlanMode() bool {
 	return p.planMode
 }
 
+type Verifier interface {
+	VerifyFast(ctx context.Context) (observation string, ran bool)
+}
+
 type Options struct {
 	Memory           *memories.Store
 	CmdPolicy        *policy.CmdPolicy
 	Ignore           *ignore.Matcher
 	Scheme           ui.Scheme
 	Stack            project.Stack
+	Verifier         Verifier
 	ProjectCtx       string
 	ThinkingVerbs    []string
 	MaxSessionTokens int
@@ -241,6 +247,7 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		memory:           opts.Memory,
 		cmdPolicy:        opts.CmdPolicy,
 		scheme:           opts.Scheme,
+		verifier:         opts.Verifier,
 		thinkingVerbs:    opts.ThinkingVerbs,
 		maxSessionTokens: opts.MaxSessionTokens,
 		streamTimeout:    opts.StreamTimeout,
@@ -429,6 +436,7 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			ToolCalls: toolCalls,
 		})
 
+		edited := false
 		toolMsgs := make([]provider.Msg, 0, len(toolCalls))
 		for _, tc := range toolCalls {
 			slog.Info("executing tool", "tool", tc.Name)
@@ -441,6 +449,9 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			result := p.execTool(ctx, tc)
 			p.auditLog.Record(tc.Name, tc.Args, result)
 			isError := strings.HasPrefix(result, "error:")
+			if tc.Name == "write_file" && !isError {
+				edited = true
+			}
 			if strings.HasPrefix(result, "unknown tool:") {
 				quiet = true
 			}
@@ -466,6 +477,16 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			p.pendingImgs = nil
 		}
 		p.history = append(p.history, toolMsgs...)
+
+		if edited && p.verifier != nil {
+			if obs, ran := p.verifier.VerifyFast(ctx); ran {
+				fmt.Fprintf(p.output, "\n%s\n%s%s%s\n", p.scheme.Info("verify", "koko ran the project's verification pipeline"), ui.Dim, obs, ui.Reset)
+				p.history = append(p.history, provider.Msg{
+					Role:    provider.User,
+					Content: "[automated verification — you did not request this and cannot skip it; react to the result]\n" + obs,
+				})
+			}
+		}
 	}
 
 	if !finishedNaturally {
