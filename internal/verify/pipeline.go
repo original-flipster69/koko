@@ -80,12 +80,3 @@ func (p Pipeline) Commands() []string {
 	}
 	return cmds
 }
-
-func (p Pipeline) hasFastStage() bool {
-	for _, s := range p.Stages {
-		if s.Fast {
-			return true
-		}
-	}
-	return false
-}

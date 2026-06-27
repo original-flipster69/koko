@@ -11,7 +11,10 @@ func NewTrigger(runner *Runner, p Pipeline) *Trigger {
 	return &Trigger{runner: runner, pipeline: p}
 }
 
-func (t *Trigger) VerifyFast(ctx context.Context) (string, bool) {
-	res := t.runner.Run(ctx, t.pipeline, t.pipeline.hasFastStage())
+func (t *Trigger) Verify(ctx context.Context, fastOnly bool) (string, bool) {
+	res := t.runner.Run(ctx, t.pipeline, fastOnly)
+	if len(res.Stages) == 0 {
+		return "", false
+	}
 	return res.Observation(), true
 }

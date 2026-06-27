@@ -146,6 +146,16 @@ var tools = []tool{
 		},
 	},
 	{
+		Name:        "verify",
+		Description: "Run the project's verification pipeline (build, lint, tests, etc. as configured) and return the structured result. Use this to check your work — prefer it over running build/test/vet/lint commands yourself via exec_command. Takes no arguments. Note: koko already runs the fast checks automatically after every edit; call this when you want the full pipeline (including slower stages such as tests).",
+		Verb:        "✓ verifying",
+		Handler:     (*PushPuppet).verifyCmd,
+		Params: provider.Schema{
+			Type:       "object",
+			Properties: map[string]provider.Property{},
+		},
+	},
+	{
 		Name:        "save_memory",
 		Description: "Save a persistent memories for future sessions. Types: user (preferences, role), feedback (corrections, validated approaches), project (ongoing work context), reference (pointers to external systems).",
 		Verb:        "◆ remembering",
@@ -217,6 +227,17 @@ func toolReadOnly(name string) bool {
 	return ok && t.ReadOnly
 }
 
+var fileEditingTools = map[string]bool{
+	"write_file":      true,
+	"replace_in_file": true,
+	"rename_file":     true,
+	"delete_file":     true,
+}
+
+func toolEditsFiles(name string) bool {
+	return fileEditingTools[name]
+}
+
 func toolQuiet(name string) bool {
 	t, ok := toolsByName[name]
 	return ok && t.Quiet
@@ -225,19 +246,20 @@ func toolQuiet(name string) bool {
 var excluded = []string{"save_memory", "delete_memory", "list_memories"}
 
 func (p *PushPuppet) buildTools() []provider.ToolDef {
-	out := make([]provider.ToolDef, len(tools)-len(excluded))
-	i := 0
+	out := make([]provider.ToolDef, 0, len(tools))
 	for _, t := range tools {
 		if slices.Contains(excluded, t.Name) {
 			slog.Info("tool ignored", "tool", t.Name)
 			continue
 		}
-		out[i] = provider.ToolDef{
+		if t.Name == "verify" && p.verifier == nil {
+			continue
+		}
+		out = append(out, provider.ToolDef{
 			Name:        t.Name,
 			Description: t.Description,
 			Params:      t.Params,
-		}
-		i++
+		})
 	}
 	return out
 }
@@ -251,6 +273,7 @@ var toolSymbols = map[string]string{
 	"list_dir":        "≡",
 	"search_files":    "⌕",
 	"exec_command":    "⚡",
+	"verify":          "✓",
 	"save_memory":     "◆",
 	"delete_memory":   "◆",
 	"list_memories":   "◆",

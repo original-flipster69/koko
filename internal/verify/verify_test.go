@@ -126,29 +126,43 @@ func TestRunnerStageCwdAndOutput(t *testing.T) {
 	}
 }
 
-func TestTriggerFastSelection(t *testing.T) {
+func TestTriggerFastOnlySkipsSlow(t *testing.T) {
 	root := t.TempDir()
 	trig := NewTrigger(NewRunner(root, 0), Pipeline{Stages: []Stage{
 		{Name: "fast", Command: "true", Fast: true, Timeout: time.Minute},
 		{Name: "slow", Command: "false", Fast: false, Timeout: time.Minute},
 	}})
-	obs, ran := trig.VerifyFast(context.Background())
+	obs, ran := trig.Verify(context.Background(), true)
 	if !ran {
-		t.Fatal("VerifyFast should report it ran")
+		t.Fatal("fast verify should report it ran")
 	}
 	if !strings.Contains(obs, "PASS") {
 		t.Errorf("fast-only run should pass (slow failing stage skipped); got: %q", obs)
 	}
 }
 
-func TestTriggerRunsAllWhenNoFastStage(t *testing.T) {
+func TestTriggerFullRunsAllStages(t *testing.T) {
 	root := t.TempDir()
 	trig := NewTrigger(NewRunner(root, 0), Pipeline{Stages: []Stage{
-		{Name: "build", Command: "false", Fast: false, Timeout: time.Minute},
+		{Name: "fast", Command: "true", Fast: true, Timeout: time.Minute},
+		{Name: "slow", Command: "false", Fast: false, Timeout: time.Minute},
 	}})
-	obs, _ := trig.VerifyFast(context.Background())
+	obs, ran := trig.Verify(context.Background(), false)
+	if !ran {
+		t.Fatal("full verify should report it ran")
+	}
 	if !strings.Contains(obs, "FAIL") {
-		t.Errorf("with no fast stage, all stages run; expected FAIL, got: %q", obs)
+		t.Errorf("full run must include the failing slow stage; got: %q", obs)
+	}
+}
+
+func TestTriggerFastOnlyNoFastStages(t *testing.T) {
+	root := t.TempDir()
+	trig := NewTrigger(NewRunner(root, 0), Pipeline{Stages: []Stage{
+		{Name: "test", Command: "false", Fast: false, Timeout: time.Minute},
+	}})
+	if _, ran := trig.Verify(context.Background(), true); ran {
+		t.Error("fast verify with no fast stages must report it did not run")
 	}
 }
 
