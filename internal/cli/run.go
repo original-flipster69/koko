@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/original-flipster69/koko/internal/audit"
 	"github.com/original-flipster69/koko/internal/config"
 	"github.com/original-flipster69/koko/internal/ignore"
 	"github.com/original-flipster69/koko/internal/memories"
@@ -28,7 +27,6 @@ import (
 
 const (
 	playsDir  = "plays"
-	auditFile = "audit.jsonl"
 	logFile   = "koko.log"
 	memoDir   = "memories"
 
@@ -76,12 +74,6 @@ func Run(opts Flags) error {
 	if err != nil {
 		return fmt.Errorf("failed to load plays: %v", err)
 	}
-
-	auditLog, err := audit.NewLog(filepath.Join(kokoRoot, auditFile))
-	if err != nil {
-		return fmt.Errorf("failed to open audit log: %v", err)
-	}
-	defer auditLog.Close()
 
 	log, err := os.OpenFile(filepath.Join(kokoRoot, logFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err == nil {
@@ -131,7 +123,7 @@ func Run(opts Flags) error {
 	}
 
 	cpuSec, memMB, fileMB := cfg.Sandbox.Exec.Limits()
-	a := pushpuppet.New(llm, sb, os.Stdout, confirm, auditLog, pushpuppet.Options{
+	a := pushpuppet.New(llm, sb, os.Stdout, confirm, pushpuppet.Options{
 		Memory:           memoStore,
 		CmdPolicy:        cmdPolicy,
 		Ignore:           ignoreMatcher,

@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/original-flipster69/koko/internal/audit"
 	"github.com/original-flipster69/koko/internal/diff"
 	"github.com/original-flipster69/koko/internal/editor"
 	"github.com/original-flipster69/koko/internal/ignore"
@@ -49,7 +48,6 @@ type PushPuppet struct {
 	tools            []provider.ToolDef
 	output           io.Writer
 	confirm          confirmFunc
-	auditLog         *audit.Log
 	thinkingVerbs    []string
 	maxSessionTokens int
 	streamTimeout    time.Duration
@@ -232,7 +230,7 @@ type Options struct {
 	ExecMaxFileMB    int
 }
 
-func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confirmFunc, auditLog *audit.Log, opts Options) *PushPuppet {
+func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confirmFunc, opts Options) *PushPuppet {
 	ed := editor.New(sb)
 	pp := &PushPuppet{
 		provider:         p,
@@ -240,7 +238,6 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		sandbox:          sb,
 		output:           out,
 		confirm:          confirm,
-		auditLog:         auditLog,
 		ignore:           opts.Ignore,
 		memory:           opts.Memory,
 		cmdPolicy:        opts.CmdPolicy,
@@ -449,7 +446,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 				fmt.Fprintf(p.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
 			}
 			result := p.execTool(ctx, tc)
-			p.auditLog.Record(tc.Name, tc.Args, result)
 			isError := strings.HasPrefix(result, "error:")
 			if toolAutoVerify(tc.Name) && !isError {
 				edited = true
