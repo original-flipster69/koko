@@ -121,7 +121,7 @@ install_config() {
     echo "Keeping existing config at ${CONFIG_FILE}."
     return
   fi
-  BLUEPRINT_URL="https://raw.githubusercontent.com/${REPO}/${TAG}/config.example.toml"
+  BLUEPRINT_URL="https://raw.githubusercontent.com/${REPO}/${TAG}/docs/examples/config.toml"
   mkdir -p "$CONFIG_DIR"
   if curl -fsSL -o "$CONFIG_FILE" "$BLUEPRINT_URL"; then
     echo "Wrote starter config to ${CONFIG_FILE}."
