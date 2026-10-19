@@ -469,9 +469,29 @@ func looksBinary(data []byte) bool {
 }
 
 func previewForError(content string) string {
-	const maxBytes = 4096
-	if len(content) <= maxBytes {
+	const maxLines = 20
+	const maxBytes = 2000
+	lines := strings.Split(content, "\n")
+	if len(lines) <= maxLines*2+1 {
 		return content
 	}
-	return content[:maxBytes] + "\n...(truncated, file is larger — call read_file for the full content)"
+	// Return first maxLines + last maxLines + ellipsis
+	var b strings.Builder
+	for i := 0; i < maxLines && i < len(lines); i++ {
+		b.WriteString(lines[i])
+		b.WriteString("\n")
+	}
+	if len(lines) > maxLines*2 {
+		b.WriteString("...")
+		b.WriteString("\n")
+		for i := len(lines) - maxLines; i < len(lines); i++ {
+			b.WriteString(lines[i])
+			b.WriteString("\n")
+		}
+	}
+	result := b.String()
+	if len(result) > maxBytes {
+		result = result[:maxBytes] + "\n..."
+	}
+	return result + "\n--- (truncated; call read_file for full content)"
 }

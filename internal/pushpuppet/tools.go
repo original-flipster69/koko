@@ -238,17 +238,9 @@ func toolAutoVerify(name string) bool {
 func toolQuiet(name string) bool {
 	t, ok := toolsByName[name]
 	return ok && t.Quiet
-}
-
-var excluded = []string{"save_memory", "delete_memory", "list_memories"}
-
-func (p *PushPuppet) buildTools() []provider.ToolDef {
-	out := make([]provider.ToolDef, 0, len(tools))
-	for _, t := range tools {
-		if slices.Contains(excluded, t.Name) {
-			slog.Info("tool ignored", "tool", t.Name)
-			continue
-		}
+}	func (p *PushPuppet) buildTools() []provider.ToolDef {
+		out := make([]provider.ToolDef, 0, len(tools))
+		for _, t := range tools {
 		if t.Name == "verify" && p.verifier == nil {
 			continue
 		}

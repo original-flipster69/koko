@@ -65,6 +65,7 @@ type PushPuppet struct {
 	pendingImgs     []provider.Img
 	TotalInput      int
 	TotalOutput     int
+	pendingInput    chan string
 }
 
 func (p *PushPuppet) SetOutput(w io.Writer) {
@@ -204,10 +205,12 @@ func (p *PushPuppet) TogglePlanMode() bool {
 	return p.planMode
 }
 
-func (p *PushPuppet) PlanMode() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.planMode
+func (p *PushPuppet) QueueInput(input string) {
+	select {
+	case p.pendingInput <- input:
+	default:
+		slog.Warn("pending input queue full, dropping input")
+	}
 }
 
 type Verifier interface {
@@ -250,6 +253,7 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		execCPUSecs:      opts.ExecCPUSeconds,
 		execMemoryMB:     opts.ExecMemoryMB,
 		execMaxFileMB:    opts.ExecMaxFileMB,
+		pendingInput:    make(chan string, 10),
 	}
 	if c, ok := p.(provider.TokenCounter); ok {
 		pp.counter = c
@@ -333,19 +337,16 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 	p.history = append(p.history, provider.Msg{
 		Role:    provider.User,
 		Content: userInput,
-	})
-
-	rounds := 0
-	finishedNaturally := false
-	for range maxToolRounds {
-		rounds++
-		if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) >= p.maxSessionTokens {
-			return fmt.Errorf("session token budget exhausted (%d/%d) — start a new session or raise max_session_tokens", p.TotalInput+p.TotalOutput, p.maxSessionTokens)
-		}
-		if p.toolCallCount >= maxSessionToolCalls {
-			return fmt.Errorf("session tool-call ceiling reached (%d) — start a new session", maxSessionToolCalls)
-		}
-		p.trimHistory(ctx)
+	})		rounds := 0
+		finishedNaturally := false
+		for range maxToolRounds {
+			rounds++
+			if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) >= p.maxSessionTokens {
+				return fmt.Errorf("session token budget exhausted (%d/%d) — start a new session or raise max_session_tokens", p.TotalInput+p.TotalOutput, p.maxSessionTokens)
+			}
+			if p.toolCallCount >= maxSessionToolCalls {
+				return fmt.Errorf("session tool-call ceiling reached (%d) — start a new session", maxSessionToolCalls)
+			}
 		var spinner *ui.Spinner
 		if !p.suppressSpinner {
 			spinner = ui.NewLabeledSpinner(p.ThinkingVerb(), p.scheme)
@@ -437,7 +438,75 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 
 		edited := false
 		toolMsgs := make([]provider.Msg, 0, len(toolCalls))
+
+		// Separate tool calls into parallelizable (read-only) and sequential (write/delete/exec)
+		var parallelTools []provider.ToolCall
+		var sequentialTools []provider.ToolCall
 		for _, tc := range toolCalls {
+			if t, ok := toolsByName[tc.Name]; ok && t.ReadOnly {
+				parallelTools = append(parallelTools, tc)
+			} else {
+				sequentialTools = append(sequentialTools, tc)
+			}
+		}
+
+		// Execute parallel tools concurrently
+		var parallelResults []struct {
+			tc     provider.ToolCall
+			result string
+		}
+		var wg sync.WaitGroup
+		parallelResults = make([]struct {
+			tc     provider.ToolCall
+			result string
+		}, len(parallelTools))
+
+		for i, tc := range parallelTools {
+			wg.Add(1)
+			go func(idx int, toolCall provider.ToolCall) {
+				defer wg.Done()
+				parallelResults[idx] = struct {
+					tc     provider.ToolCall
+					result string
+				}{
+					tc:     toolCall,
+					result: p.execTool(ctx, toolCall),
+				}
+			}(i, tc)
+		}
+		wg.Wait()
+
+		// Process parallel results
+		for _, pr := range parallelResults {
+			tc := pr.tc
+			result := pr.result
+			isError := strings.HasPrefix(result, "error:")
+			if toolAutoVerify(tc.Name) && !isError {
+				edited = true
+			}
+			if strings.HasPrefix(result, "unknown tool:") {
+				isError = true
+			}
+			if quiet := toolQuiet(tc.Name); quiet && isError {
+				fmt.Fprintf(p.output, "\n%s%s%s\n", p.scheme.Primary, toolVerb(tc.Name), ui.Reset)
+				fmt.Fprintf(p.output, "%s╰──── %v%s\n\n", ui.Dim, tc.ArgsFormat(), ui.Reset)
+			}
+			if !toolQuiet(tc.Name) || isError {
+				fmt.Fprintln(p.output, p.formatToolResult(tc.Name, result))
+				if isError {
+					fmt.Fprintln(p.output)
+				}
+			}
+			toolMsgs = append(toolMsgs, provider.Msg{
+				Role:       provider.Tool,
+				ToolCallID: tc.ID,
+				ToolName:   tc.Name,
+				Content:    truncateForHistory(result),
+			})
+		}
+
+		// Execute sequential tools
+		for _, tc := range sequentialTools {
 			slog.Info("executing tool", "tool", tc.Name)
 			p.toolCallCount++
 			quiet := toolQuiet(tc.Name)
@@ -474,24 +543,36 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			toolMsgs[len(toolMsgs)-1].Imgs = p.pendingImgs
 			p.pendingImgs = nil
 		}
-		p.history = append(p.history, toolMsgs...)
+		p.history = append(p.history, toolMsgs...)			if edited && p.verifier != nil {
+				if obs, ran := p.verifier.Verify(ctx, true); ran {
+					fmt.Fprintf(p.output, "\n%s\n%s%s%s\n", p.scheme.Info("verify", "koko ran the project's verification pipeline"), ui.Dim, obs, ui.Reset)
+					p.history = append(p.history, provider.Msg{
+						Role:    provider.User,
+						Content: "[automated verification — you did not request this and cannot skip it; react to the result]\n" + obs,
+					})
+				}
+			}
+			p.trimHistory(ctx)
+		}		if !finishedNaturally {
+			fmt.Fprintf(p.output, "\n%s\n", p.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
+		}
 
-		if edited && p.verifier != nil {
-			if obs, ran := p.verifier.Verify(ctx, true); ran {
-				fmt.Fprintf(p.output, "\n%s\n%s%s%s\n", p.scheme.Info("verify", "koko ran the project's verification pipeline"), ui.Dim, obs, ui.Reset)
-				p.history = append(p.history, provider.Msg{
-					Role:    provider.User,
-					Content: "[automated verification — you did not request this and cannot skip it; react to the result]\n" + obs,
-				})
+		// Process any pending user input before starting the next round
+		select {
+		case input := <-p.pendingInput:
+			p.history = append(p.history, provider.Msg{
+				Role:    provider.User,
+				Content: input,
+			})
+			finishedNaturally = false // Continue processing
+		default:
+			// No pending input, exit if finished naturally
+			if finishedNaturally {
+				break
 			}
 		}
-	}
 
-	if !finishedNaturally {
-		fmt.Fprintf(p.output, "\n%s\n", p.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
-	}
-
-	return nil
+		return nil
 }
 
 var maxLengthArgs = 60

@@ -78,11 +78,14 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 	if realTotal <= maxHistoryTokens {
 		return
 	}
-	target := maxHistoryTokens * 3 / 4
+	target := maxHistoryTokens * 3 / 5 // Trim to 60% of max to avoid thrashing
 
 	scale := 1.0
 	if estTotal := estimateMessagesTokens(p.history); estTotal > 0 {
 		scale = float64(realTotal) / float64(estTotal)
+		if scale > 1.0 {
+			scale = 1.0
+		}
 	}
 
 	cutEnd := 0
