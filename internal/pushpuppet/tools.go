@@ -2,6 +2,7 @@ package pushpuppet
 
 import (
 	"context"
+	"slices"
 
 	"github.com/original-flipster69/koko/internal/provider"
 )
@@ -236,24 +237,26 @@ func toolAutoVerify(name string) bool {
 func toolQuiet(name string) bool {
 	t, ok := toolsByName[name]
 	return ok && t.Quiet
-}	func (p *PushPuppet) buildTools() []provider.ToolDef {
-		out := make([]provider.ToolDef, 0, len(tools))
-		for _, t := range tools {
-			// Memory tools are only available if memories are configured
-			if slices.Contains([]string{"save_memory", "delete_memory", "list_memories"}, t.Name) && p.memory == nil {
-				continue
-			}
-			if t.Name == "verify" && p.verifier == nil {
-				continue
-			}
-			out = append(out, provider.ToolDef{
-				Name:        t.Name,
-				Description: t.Description,
-				Params:      t.Params,
-			})
+}
+
+func (p *PushPuppet) buildTools() []provider.ToolDef {
+	out := make([]provider.ToolDef, 0, len(tools))
+	for _, t := range tools {
+		// Memory tools are only available if memories are configured
+		if slices.Contains([]string{"save_memory", "delete_memory", "list_memories"}, t.Name) && p.memory == nil {
+			continue
 		}
-		return out
+		if t.Name == "verify" && p.verifier == nil {
+			continue
+		}
+		out = append(out, provider.ToolDef{
+			Name:        t.Name,
+			Description: t.Description,
+			Params:      t.Params,
+		})
 	}
+	return out
+}
 
 var toolSymbols = map[string]string{
 	"read_file":       "ℹ︎",

@@ -67,62 +67,94 @@ func (p *PushPuppet) Compact() (int, int) {
 		{Role: provider.User, Content: summary},
 		{Role: provider.Assistant, Content: compactAck},
 	}
-	p.lastInputTokens = 0
-	newTokens := p.measureTokens(context.Background())
-	p.lastInputTokens = newTokens
-	return oldTokens, newTokens
+	// Only re-count if we have a counter (avoid unnecessary API calls)
+	if p.counter != nil {
+		p.lastInputTokens = p.measureTokens(context.Background())
+	} else {
+		p.lastInputTokens = estimateMessagesTokens(p.history)
+	}
+	return oldTokens, p.lastInputTokens
 }
 
 func (p *PushPuppet) trimHistory(ctx context.Context) {
-	realTotal := p.estimateTokens()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Use lastInputTokens if available (avoid re-counting)
+	realTotal := p.lastInputTokens
+	if realTotal == 0 {
+		realTotal = estimateMessagesTokens(p.history)
+	}
+
 	if realTotal <= maxHistoryTokens {
 		return
 	}
+
 	target := maxHistoryTokens * 3 / 5 // Trim to 60% of max to avoid thrashing
 
-	scale := 1.0
-	if estTotal := estimateMessagesTokens(p.history); estTotal > 0 {
-		scale = float64(realTotal) / float64(estTotal)
-		if scale > 1.0 {
-			scale = 1.0
-		}
-	}
-
-	cutEnd := 0
-	droppedReal := 0.0
-	for i := 2; i <= len(p.history)-2; i++ {
-		droppedReal += float64(msgTokens(p.history[i-1])) * scale
-		if p.history[i].Role != provider.User {
-			continue
-		}
-		cutEnd = i
-		if float64(realTotal)-droppedReal <= float64(target) {
-			break
-		}
-	}
-
-	if cutEnd == 0 {
+	// Calculate how many tokens to drop
+	tokensToDrop := realTotal - target
+	if tokensToDrop <= 0 {
 		return
 	}
 
-	systemMsg := p.history[0]
-	dropped := p.history[1:cutEnd]
-	summary := summarizeMessages(dropped)
-	kept := p.history[cutEnd:]
+	// Trim messages until we're under the target
+	newHist := make([]provider.Msg, 0, len(p.history))
+	newHist = append(newHist, p.history[0]) // Keep system prompt
+	droppedTokens := 0
 
-	newHist := make([]provider.Msg, 0, len(kept)+3)
-	newHist = append(newHist, systemMsg)
-	newHist = append(newHist, provider.Msg{Role: provider.User, Content: summary})
-	newHist = append(newHist, provider.Msg{Role: provider.Assistant, Content: trimAck})
-	newHist = append(newHist, kept...)
-	p.history = newHist
-	p.lastInputTokens = p.measureTokens(ctx)
-	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept), "real_before", realTotal, "scale", scale)
+	// Iterate from oldest to newest (skip system prompt at index 0)
+	for i := 1; i < len(p.history); i++ {
+		msg := p.history[i]
+		msgTokenEstimate := msgTokens(msg)
+		if droppedTokens+msgTokenEstimate > tokensToDrop {
+			// Keep this message and all remaining
+			newHist = append(newHist, p.history[i:]...)
+			break
+		} else {
+			droppedTokens += msgTokenEstimate
+		}
+	}
+
+	// If we dropped any messages, add a summary
+	if len(newHist) < len(p.history) {
+		dropped := p.history[1 : len(p.history)-len(newHist)+1]
+		summary := summarizeMessages(dropped)
+		// Insert summary after system prompt
+		newHistWithSummary := make([]provider.Msg, 0, len(newHist)+2)
+		newHistWithSummary = append(newHistWithSummary, newHist[0])
+		newHistWithSummary = append(newHistWithSummary, provider.Msg{
+			Role:    provider.User,
+			Content: summary,
+		})
+		newHistWithSummary = append(newHistWithSummary, provider.Msg{
+			Role:    provider.Assistant,
+			Content: trimAck,
+		})
+		newHistWithSummary = append(newHistWithSummary, newHist[1:]...)
+		p.history = newHistWithSummary
+	} else {
+		p.history = newHist
+	}
+
+	// Invalidate lastInputTokens to force re-count next time
+	p.lastInputTokens = 0
+	// Re-count only if we have a counter (avoid unnecessary API calls)
+	if p.counter != nil {
+		p.lastInputTokens = p.measureTokens(ctx)
+	}
+	slog.Info("history trimmed", "dropped_tokens", droppedTokens, "real_before", realTotal, "target", target)
 }
 
 func (p *PushPuppet) estimateTokens() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.lastInputTokens > 0 {
 		return p.lastInputTokens
+	}
+	// Use provider-specific estimator if available
+	if p.tokenEstimator != nil {
+		return p.tokenEstimator(p.history)
 	}
 	return estimateMessagesTokens(p.history)
 }
@@ -135,7 +167,26 @@ func estimateMessagesTokens(msgs []provider.Msg) int {
 	return total
 }
 
-func msgTokens(m provider.Msg) int {
+// estimateClaudeTokens uses a more accurate heuristic for Claude models (~4 tokens per 3 characters).
+func estimateClaudeTokens(msgs []provider.Msg) int {
+	total := 0
+	for _, m := range msgs {
+		total += claudeMsgTokens(m)
+	}
+	return total
+}
+
+// estimateMistralTokens uses a heuristic for Mistral models (similar to Claude).
+func estimateMistralTokens(msgs []provider.Msg) int {
+	return estimateClaudeTokens(msgs) // Mistral's tokenizer is similar to Claude's
+}
+
+// estimateOllamaTokens uses a heuristic for Ollama models (similar to Claude).
+func estimateOllamaTokens(msgs []provider.Msg) int {
+	return estimateClaudeTokens(msgs) // Ollama's tokenizer is similar for most models
+}
+
+func claudeMsgTokens(m provider.Msg) int {
 	n := len([]rune(m.Content))
 	for _, tc := range m.ToolCalls {
 		n += len(tc.Name)
@@ -143,7 +194,14 @@ func msgTokens(m provider.Msg) int {
 			n += len(k) + len([]rune(v))
 		}
 	}
-	return n*10/35 + 4
+	// Claude's tokenizer: ~4 tokens per 3 characters (empirical)
+	return (n * 4) / 3
+}
+
+// msgTokens is a legacy function for backward compatibility.
+// Use claudeMsgTokens or provider-specific estimators instead.
+func msgTokens(m provider.Msg) int {
+	return claudeMsgTokens(m)
 }
 
 func truncateForHistory(result string) string {

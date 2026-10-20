@@ -66,6 +66,7 @@ type PushPuppet struct {
 	TotalInput      int
 	TotalOutput     int
 	pendingInput    chan string
+	tokenEstimator   func([]provider.Msg) int // Provider-specific token estimator
 }
 
 func (p *PushPuppet) SetOutput(w io.Writer) {
@@ -115,6 +116,17 @@ func (p *PushPuppet) SetProvider(prov provider.Provider) {
 		p.counter = c
 	} else {
 		p.counter = nil
+	}
+	// Set provider-specific token estimator
+	switch prov.Name() {
+	case "claude":
+		p.tokenEstimator = estimateClaudeTokens
+	case "mistral":
+		p.tokenEstimator = estimateMistralTokens
+	case "ollama":
+		p.tokenEstimator = estimateOllamaTokens
+	default:
+		p.tokenEstimator = estimateMessagesTokens
 	}
 }
 
@@ -198,6 +210,10 @@ func (p *PushPuppet) Scheme() ui.Scheme {
 	return p.scheme
 }
 
+func (p *PushPuppet) PlanMode() bool {
+	return p.planMode
+}
+
 func (p *PushPuppet) TogglePlanMode() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -253,16 +269,26 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 		execCPUSecs:      opts.ExecCPUSeconds,
 		execMemoryMB:     opts.ExecMemoryMB,
 		execMaxFileMB:    opts.ExecMaxFileMB,
-		pendingInput:    make(chan string, 10),
+		pendingInput:     make(chan string, 10),
 	}
 	if c, ok := p.(provider.TokenCounter); ok {
 		pp.counter = c
 	}
+	// Set provider-specific token estimator
+	switch p.Name() {
+	case "claude":
+		pp.tokenEstimator = estimateClaudeTokens
+	case "mistral":
+		pp.tokenEstimator = estimateMistralTokens
+	case "ollama":
+		pp.tokenEstimator = estimateOllamaTokens
+	default:
+		pp.tokenEstimator = estimateMessagesTokens
+	}
 	pp.tools = pp.buildTools()
 
 	systemPrompt := `You are koko, the security-focused coding assistant. You read and edit files
-  in a sandboxed workspace using the provided tools. File operations outside
-  allowed directories will be rejected.
+in a sandboxed workspace using the provided tools. File operations outside allowed directories will be rejected.
 
 WORKING METHOD
 - Make changes through tools, not prose. Briefly state what you're about to do.
@@ -337,16 +363,27 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 	p.history = append(p.history, provider.Msg{
 		Role:    provider.User,
 		Content: userInput,
-	})		rounds := 0
-		finishedNaturally := false
-		for range maxToolRounds {
-			rounds++
-			if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) >= p.maxSessionTokens {
-				return fmt.Errorf("session token budget exhausted (%d/%d) — start a new session or raise max_session_tokens", p.TotalInput+p.TotalOutput, p.maxSessionTokens)
-			}
-			if p.toolCallCount >= maxSessionToolCalls {
-				return fmt.Errorf("session tool-call ceiling reached (%d) — start a new session", maxSessionToolCalls)
-			}
+	})
+
+	// Check if we're approaching maxSessionTokens (warn at 80%)
+	if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) > p.maxSessionTokens*8/10 {
+		slog.Warn("approaching session token limit", "input", p.TotalInput, "output", p.TotalOutput, "limit", p.maxSessionTokens)
+		// Auto-compact if history is long and we haven't compacted recently
+		if len(p.history) > 5 && p.lastInputTokens == 0 {
+			p.Compact()
+		}
+	}
+
+	rounds := 0
+	finishedNaturally := false
+	for range maxToolRounds {
+		rounds++
+		if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) >= p.maxSessionTokens {
+			return fmt.Errorf("session token budget exhausted (%d/%d) — start a new session or raise max_session_tokens", p.TotalInput+p.TotalOutput, p.maxSessionTokens)
+		}
+		if p.toolCallCount >= maxSessionToolCalls {
+			return fmt.Errorf("session tool-call ceiling reached (%d) — start a new session", maxSessionToolCalls)
+		}
 		var spinner *ui.Spinner
 		if !p.suppressSpinner {
 			spinner = ui.NewLabeledSpinner(p.ThinkingVerb(), p.scheme)
@@ -409,32 +446,39 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			toolCalls = p.parseInlineToolCalls(resp.Content)
 		}
 
-		slog.Info("round complete", "round", rounds, "content_len", len(resp.Content), "tool_calls", len(toolCalls))
-
-		if len(toolCalls) == 0 {
-			fmt.Fprintln(p.output)
-			if resp.StopReason == "max_tokens" || resp.StopReason == "length" {
-				fmt.Fprintf(p.output, "%s\n", p.scheme.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
+		slog.Info("round complete", "round", rounds, "content_len", len(resp.Content), "tool_calls", len(toolCalls))			if len(toolCalls) == 0 {
+				fmt.Fprintln(p.output)
+				if resp.StopReason == "max_tokens" || resp.StopReason == "length" {
+					fmt.Fprintf(p.output, "%s\n", p.scheme.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
+				}
+				if resp.Content != "" {
+					// Truncate extremely long assistant messages to avoid token bloat
+					content := resp.Content
+					if len(content) > maxToolResultSize*4 {
+						content = content[:maxToolResultSize*4] + "\n...(response truncated)"
+					}
+					p.history = append(p.history, provider.Msg{
+						Role:    provider.Assistant,
+						Content: content,
+					})
+				}
+				finishedNaturally = true
+				break
+			}			if resp.Content != "" {
+				fmt.Fprintln(p.output)
 			}
-			if resp.Content != "" {
-				p.history = append(p.history, provider.Msg{
-					Role:    provider.Assistant,
-					Content: resp.Content,
-				})
+
+			// Truncate assistant content if it's too long
+			assistantContent := resp.Content
+			if len(assistantContent) > maxToolResultSize*4 {
+				assistantContent = assistantContent[:maxToolResultSize*4] + "\n...(response truncated)"
 			}
-			finishedNaturally = true
-			break
-		}
 
-		if resp.Content != "" {
-			fmt.Fprintln(p.output)
-		}
-
-		p.history = append(p.history, provider.Msg{
-			Role:      provider.Assistant,
-			Content:   resp.Content,
-			ToolCalls: toolCalls,
-		})
+			p.history = append(p.history, provider.Msg{
+				Role:       provider.Assistant,
+				Content:    assistantContent,
+				ToolCalls:  toolCalls,
+			})
 
 		edited := false
 		toolMsgs := make([]provider.Msg, 0, len(toolCalls))
@@ -543,36 +587,38 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			toolMsgs[len(toolMsgs)-1].Imgs = p.pendingImgs
 			p.pendingImgs = nil
 		}
-		p.history = append(p.history, toolMsgs...)			if edited && p.verifier != nil {
-				if obs, ran := p.verifier.Verify(ctx, true); ran {
-					fmt.Fprintf(p.output, "\n%s\n%s%s%s\n", p.scheme.Info("verify", "koko ran the project's verification pipeline"), ui.Dim, obs, ui.Reset)
-					p.history = append(p.history, provider.Msg{
-						Role:    provider.User,
-						Content: "[automated verification — you did not request this and cannot skip it; react to the result]\n" + obs,
-					})
-				}
-			}
-			p.trimHistory(ctx)
-		}		if !finishedNaturally {
-			fmt.Fprintf(p.output, "\n%s\n", p.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
-		}
-
-		// Process any pending user input before starting the next round
-		select {
-		case input := <-p.pendingInput:
-			p.history = append(p.history, provider.Msg{
-				Role:    provider.User,
-				Content: input,
-			})
-			finishedNaturally = false // Continue processing
-		default:
-			// No pending input, exit if finished naturally
-			if finishedNaturally {
-				break
+		p.history = append(p.history, toolMsgs...)
+		if edited && p.verifier != nil {
+			if obs, ran := p.verifier.Verify(ctx, true); ran {
+				fmt.Fprintf(p.output, "\n%s\n%s%s%s\n", p.scheme.Info("verify", "koko ran the project's verification pipeline"), ui.Dim, obs, ui.Reset)
+				p.history = append(p.history, provider.Msg{
+					Role:    provider.User,
+					Content: "[automated verification — you did not request this and cannot skip it; react to the result]\n" + obs,
+				})
 			}
 		}
+		p.trimHistory(ctx)
+	}
+	if !finishedNaturally {
+		fmt.Fprintf(p.output, "\n%s\n", p.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
+	}
 
-		return nil
+	// Process any pending user input before starting the next round
+	select {
+	case input := <-p.pendingInput:
+		p.history = append(p.history, provider.Msg{
+			Role:    provider.User,
+			Content: input,
+		})
+		finishedNaturally = false // Continue processing
+	default:
+		// No pending input, exit if finished naturally
+		if finishedNaturally {
+			break
+		}
+	}
+
+	return nil
 }
 
 var maxLengthArgs = 60
