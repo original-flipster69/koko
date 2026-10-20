@@ -2,8 +2,6 @@ package pushpuppet
 
 import (
 	"context"
-	"log/slog"
-	"slices"
 
 	"github.com/original-flipster69/koko/internal/provider"
 )
@@ -241,17 +239,21 @@ func toolQuiet(name string) bool {
 }	func (p *PushPuppet) buildTools() []provider.ToolDef {
 		out := make([]provider.ToolDef, 0, len(tools))
 		for _, t := range tools {
-		if t.Name == "verify" && p.verifier == nil {
-			continue
+			// Memory tools are only available if memories are configured
+			if slices.Contains([]string{"save_memory", "delete_memory", "list_memories"}, t.Name) && p.memory == nil {
+				continue
+			}
+			if t.Name == "verify" && p.verifier == nil {
+				continue
+			}
+			out = append(out, provider.ToolDef{
+				Name:        t.Name,
+				Description: t.Description,
+				Params:      t.Params,
+			})
 		}
-		out = append(out, provider.ToolDef{
-			Name:        t.Name,
-			Description: t.Description,
-			Params:      t.Params,
-		})
+		return out
 	}
-	return out
-}
 
 var toolSymbols = map[string]string{
 	"read_file":       "ℹ︎",
