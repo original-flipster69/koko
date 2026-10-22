@@ -446,7 +446,8 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			toolCalls = p.parseInlineToolCalls(resp.Content)
 		}
 
-		slog.Info("round complete", "round", rounds, "content_len", len(resp.Content), "tool_calls", len(toolCalls))			if len(toolCalls) == 0 {
+		slog.Info("round complete", "round", rounds, "content_len", len(resp.Content), "tool_calls", len(toolCalls))
+		if len(toolCalls) == 0 {
 				fmt.Fprintln(p.output)
 				if resp.StopReason == "max_tokens" || resp.StopReason == "length" {
 					fmt.Fprintf(p.output, "%s\n", p.scheme.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
@@ -464,7 +465,8 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 				}
 				finishedNaturally = true
 				break
-			}			if resp.Content != "" {
+			}
+			if resp.Content != "" {
 				fmt.Fprintln(p.output)
 			}
 

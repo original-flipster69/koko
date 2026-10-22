@@ -250,7 +250,11 @@ func (m *MarkdownStream) highlightCode(lang, code string) string {
 
 func (m *MarkdownStream) renderLine(line string) string {
 	trimmed := strings.TrimLeft(line, " \t")
-	indent := line[:len(line)-len(trimmed)]
+	indentLen := len(line) - len(trimmed)
+	if indentLen < 0 {
+		indentLen = 0
+	}
+	indent := line[:indentLen]
 
 	if h := headingLevel(trimmed); h > 0 {
 		text := stripInlineMarkers(strings.TrimSpace(trimmed[h:]))

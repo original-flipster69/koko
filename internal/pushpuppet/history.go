@@ -21,7 +21,9 @@ const (
 func (p *PushPuppet) ClearHistory() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.history = p.history[:1]
+	if len(p.history) > 0 {
+		p.history = p.history[:1]
+	}
 }
 
 func (p *PushPuppet) HistoryLen() int {
