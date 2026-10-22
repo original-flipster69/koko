@@ -24,7 +24,6 @@ func (p *PushPuppet) ClearHistory() {
 	if len(p.history) > 0 {
 		p.history = p.history[:1]
 	}
-	// Reset token counters when history is cleared
 	p.TotalInput = 0
 	p.TotalOutput = 0
 	p.lastInputTokens = 0
@@ -57,9 +56,8 @@ func (p *PushPuppet) LoadSession(dir string) error {
 	newHist = append(newHist, p.history[0])
 	newHist = append(newHist, msgs...)
 	p.history = newHist
-	// Initialize token counters for loaded session
 	p.TotalInput = estimateMessagesTokens(p.history)
-	p.TotalOutput = 0 // Output tokens are not stored in session, so reset
+	p.TotalOutput = 0
 	p.lastInputTokens = p.TotalInput
 	return nil
 }
@@ -77,13 +75,11 @@ func (p *PushPuppet) Compact() (int, int) {
 		{Role: provider.User, Content: summary},
 		{Role: provider.Assistant, Content: compactAck},
 	}
-	// Only re-count if we have a counter (avoid unnecessary API calls)
 	if p.counter != nil {
 		p.lastInputTokens = p.measureTokens(context.Background())
 	} else {
 		p.lastInputTokens = estimateMessagesTokens(p.history)
 	}
-	// Update TotalInput to reflect the compacted history
 	p.TotalInput = p.lastInputTokens
 	return oldTokens, p.lastInputTokens
 }
@@ -92,7 +88,6 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Use lastInputTokens if available (avoid re-counting)
 	realTotal := p.lastInputTokens
 	if realTotal == 0 {
 		realTotal = estimateMessagesTokens(p.history)
@@ -102,25 +97,21 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 		return
 	}
 
-	target := maxHistoryTokens * 3 / 5 // Trim to 60% of max to avoid thrashing
+	target := maxHistoryTokens * 3 / 5
 
-	// Calculate how many tokens to drop
 	tokensToDrop := realTotal - target
 	if tokensToDrop <= 0 {
 		return
 	}
 
-	// Trim messages until we're under the target
 	newHist := make([]provider.Msg, 0, len(p.history))
-	newHist = append(newHist, p.history[0]) // Keep system prompt
+	newHist = append(newHist, p.history[0])
 	droppedTokens := 0
 
-	// Iterate from oldest to newest (skip system prompt at index 0)
 	for i := 1; i < len(p.history); i++ {
 		msg := p.history[i]
 		msgTokenEstimate := provider.MsgTokens(msg)
 		if droppedTokens+msgTokenEstimate > tokensToDrop {
-			// Keep this message and all remaining
 			newHist = append(newHist, p.history[i:]...)
 			break
 		} else {
@@ -128,11 +119,9 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 		}
 	}
 
-	// If we dropped any messages, add a summary
 	if len(newHist) < len(p.history) {
 		dropped := p.history[1 : len(p.history)-len(newHist)+1]
 		summary := summarizeMessages(dropped)
-		// Insert summary after system prompt
 		newHistWithSummary := make([]provider.Msg, 0, len(newHist)+2)
 		newHistWithSummary = append(newHistWithSummary, newHist[0])
 		newHistWithSummary = append(newHistWithSummary, provider.Msg{
@@ -149,9 +138,7 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 		p.history = newHist
 	}
 
-	// Invalidate lastInputTokens to force re-count next time
 	p.lastInputTokens = 0
-	// Also update TotalInput to reflect the trimmed history
 	if p.counter != nil {
 		p.lastInputTokens = p.measureTokens(ctx)
 		p.TotalInput = p.lastInputTokens
@@ -167,7 +154,6 @@ func (p *PushPuppet) estimateTokens() int {
 	if p.lastInputTokens > 0 {
 		return p.lastInputTokens
 	}
-	// Use provider-specific estimator if available
 	if p.tokenEstimator != nil {
 		return p.tokenEstimator(p.history)
 	}

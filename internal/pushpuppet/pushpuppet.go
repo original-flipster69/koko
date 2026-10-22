@@ -65,7 +65,7 @@ type PushPuppet struct {
 	TotalInput      int
 	TotalOutput     int
 	pendingInput    chan string
-	tokenEstimator  provider.TokenEstimator // Provider-specific token estimator
+	tokenEstimator  provider.TokenEstimator
 }
 
 func (p *PushPuppet) SetOutput(w io.Writer) {
@@ -116,17 +116,16 @@ func (p *PushPuppet) SetProvider(prov provider.Provider) {
 	} else {
 		p.counter = nil
 	}
-	// Set provider-specific token estimator
 	switch prov.Name() {
-	case "claude":
-		p.tokenEstimator = provider.EstimateClaudeTokens
-	case "mistral":
-		p.tokenEstimator = provider.EstimateMistralTokens
-	case "ollama":
-		p.tokenEstimator = provider.EstimateOllamaTokens
-	default:
-		p.tokenEstimator = provider.EstimateMessagesTokens
-	}
+		case "claude":
+			p.tokenEstimator = provider.EstimateClaudeTokens
+		case "mistral":
+			p.tokenEstimator = provider.EstimateMistralTokens
+		case "ollama":
+			p.tokenEstimator = provider.EstimateOllamaTokens
+		default:
+			p.tokenEstimator = provider.EstimateMessagesTokens
+		}
 }
 
 func (p *PushPuppet) Model() string {
@@ -273,7 +272,6 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 	if c, ok := p.(provider.TokenCounter); ok {
 		pp.counter = c
 	}
-	// Set provider-specific token estimator
 	switch p.Name() {
 	case "claude":
 		pp.tokenEstimator = provider.EstimateClaudeTokens
@@ -364,10 +362,8 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		Content: userInput,
 	})
 
-	// Check if we're approaching maxSessionTokens (warn at 80%)
 	if p.maxSessionTokens > 0 && (p.TotalInput+p.TotalOutput) > p.maxSessionTokens*8/10 {
 		slog.Warn("approaching session token limit", "input", p.TotalInput, "output", p.TotalOutput, "limit", p.maxSessionTokens)
-		// Auto-compact if history is long and we haven't compacted recently
 		if len(p.history) > 5 && p.lastInputTokens == 0 {
 			p.Compact()
 		}
@@ -434,8 +430,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		if err != nil {
 			return fmt.Errorf("LLM error: %w", err)
 		}
-		// Update token counts - use the actual current session tokens, not accumulate
-		// resp.Usage.InputTokens includes all history, so we use measureTokens for accuracy
 		if p.counter != nil {
 			p.TotalInput = p.measureTokens(ctx)
 		} else {
@@ -458,7 +452,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 				fmt.Fprintf(p.output, "%s\n", p.scheme.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
 			}
 			if resp.Content != "" {
-				// Truncate extremely long assistant messages to avoid token bloat
 				content := resp.Content
 				if len(content) > maxToolResultSize*4 {
 					content = content[:maxToolResultSize*4] + "\n...(response truncated)"
@@ -475,7 +468,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			fmt.Fprintln(p.output)
 		}
 
-		// Truncate assistant content if it's too long
 		assistantContent := resp.Content
 		if len(assistantContent) > maxToolResultSize*4 {
 			assistantContent = assistantContent[:maxToolResultSize*4] + "\n...(response truncated)"
@@ -490,7 +482,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		edited := false
 		toolMsgs := make([]provider.Msg, 0, len(toolCalls))
 
-		// Separate tool calls into parallelizable (read-only) and sequential (write/delete/exec)
 		var parallelTools []provider.ToolCall
 		var sequentialTools []provider.ToolCall
 		for _, tc := range toolCalls {
@@ -501,7 +492,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			}
 		}
 
-		// Execute parallel tools concurrently
 		var parallelResults []struct {
 			tc     provider.ToolCall
 			result string
@@ -527,7 +517,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		}
 		wg.Wait()
 
-		// Process parallel results
 		for _, pr := range parallelResults {
 			tc := pr.tc
 			result := pr.result
@@ -556,7 +545,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 			})
 		}
 
-		// Execute sequential tools
 		for _, tc := range sequentialTools {
 			slog.Info("executing tool", "tool", tc.Name)
 			p.toolCallCount++
@@ -610,16 +598,14 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		fmt.Fprintf(p.output, "\n%s\n", p.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
 	}
 
-	// Process any pending user input before starting the next round
 	select {
 	case input := <-p.pendingInput:
 		p.history = append(p.history, provider.Msg{
 			Role:    provider.User,
 			Content: input,
 		})
-		finishedNaturally = false // Continue processing
+		finishedNaturally = false
 	default:
-		// No pending input, exit if finished naturally
 		if finishedNaturally {
 			break
 		}
