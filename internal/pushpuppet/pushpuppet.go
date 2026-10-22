@@ -431,7 +431,8 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		if spinner != nil {
 			spinner.Stop()
 		}
-		fmt.Fprint(p.output, md.Flush())			if err != nil {
+		fmt.Fprint(p.output, md.Flush())
+		if err != nil {
 				return fmt.Errorf("LLM error: %w", err)
 			}
 			// Update token counts - use the actual current session tokens, not accumulate
