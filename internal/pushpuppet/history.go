@@ -24,6 +24,10 @@ func (p *PushPuppet) ClearHistory() {
 	if len(p.history) > 0 {
 		p.history = p.history[:1]
 	}
+	// Reset token counters when history is cleared
+	p.TotalInput = 0
+	p.TotalOutput = 0
+	p.lastInputTokens = 0
 }
 
 func (p *PushPuppet) HistoryLen() int {
@@ -53,6 +57,10 @@ func (p *PushPuppet) LoadSession(dir string) error {
 	newHist = append(newHist, p.history[0])
 	newHist = append(newHist, msgs...)
 	p.history = newHist
+	// Initialize token counters for loaded session
+	p.TotalInput = estimateMessagesTokens(p.history)
+	p.TotalOutput = 0 // Output tokens are not stored in session, so reset
+	p.lastInputTokens = p.TotalInput
 	return nil
 }
 
@@ -75,6 +83,8 @@ func (p *PushPuppet) Compact() (int, int) {
 	} else {
 		p.lastInputTokens = estimateMessagesTokens(p.history)
 	}
+	// Update TotalInput to reflect the compacted history
+	p.TotalInput = p.lastInputTokens
 	return oldTokens, p.lastInputTokens
 }
 
@@ -141,9 +151,12 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 
 	// Invalidate lastInputTokens to force re-count next time
 	p.lastInputTokens = 0
-	// Re-count only if we have a counter (avoid unnecessary API calls)
+	// Also update TotalInput to reflect the trimmed history
 	if p.counter != nil {
 		p.lastInputTokens = p.measureTokens(ctx)
+		p.TotalInput = p.lastInputTokens
+	} else {
+		p.TotalInput = estimateMessagesTokens(p.history)
 	}
 	slog.Info("history trimmed", "dropped_tokens", droppedTokens, "real_before", realTotal, "target", target)
 }

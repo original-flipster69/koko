@@ -431,15 +431,20 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		if spinner != nil {
 			spinner.Stop()
 		}
-		fmt.Fprint(p.output, md.Flush())
-		if err != nil {
-			return fmt.Errorf("LLM error: %w", err)
-		}
-		p.TotalInput += resp.Usage.InputTokens
-		p.TotalOutput += resp.Usage.OutputTokens
-		if resp.Usage.InputTokens > 0 {
-			p.lastInputTokens = resp.Usage.InputTokens
-		}
+		fmt.Fprint(p.output, md.Flush())			if err != nil {
+				return fmt.Errorf("LLM error: %w", err)
+			}
+			// Update token counts - use the actual current session tokens, not accumulate
+			// resp.Usage.InputTokens includes all history, so we use measureTokens for accuracy
+			if p.counter != nil {
+				p.TotalInput = p.measureTokens(ctx)
+			} else {
+				p.TotalInput = estimateMessagesTokens(p.history)
+			}
+			p.TotalOutput += resp.Usage.OutputTokens
+			if resp.Usage.InputTokens > 0 {
+				p.lastInputTokens = resp.Usage.InputTokens
+			}
 
 		toolCalls := resp.ToolCalls
 		if len(toolCalls) == 0 {
