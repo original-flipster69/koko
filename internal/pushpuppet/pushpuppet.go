@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,7 +65,7 @@ type PushPuppet struct {
 	TotalInput      int
 	TotalOutput     int
 	pendingInput    chan string
-	tokenEstimator   func([]provider.Msg) int // Provider-specific token estimator
+	tokenEstimator  func([]provider.Msg) int // Provider-specific token estimator
 }
 
 func (p *PushPuppet) SetOutput(w io.Writer) {
@@ -338,7 +337,7 @@ func (p *PushPuppet) measureTokens(ctx context.Context) int {
 }
 
 const (
-	maxToolRounds       = 30
+	maxToolRounds       = 50
 	maxSessionToolCalls = 1000
 
 	searchTimeout         = 30 * time.Second
@@ -433,19 +432,19 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 		}
 		fmt.Fprint(p.output, md.Flush())
 		if err != nil {
-				return fmt.Errorf("LLM error: %w", err)
-			}
-			// Update token counts - use the actual current session tokens, not accumulate
-			// resp.Usage.InputTokens includes all history, so we use measureTokens for accuracy
-			if p.counter != nil {
-				p.TotalInput = p.measureTokens(ctx)
-			} else {
-				p.TotalInput = estimateMessagesTokens(p.history)
-			}
-			p.TotalOutput += resp.Usage.OutputTokens
-			if resp.Usage.InputTokens > 0 {
-				p.lastInputTokens = resp.Usage.InputTokens
-			}
+			return fmt.Errorf("LLM error: %w", err)
+		}
+		// Update token counts - use the actual current session tokens, not accumulate
+		// resp.Usage.InputTokens includes all history, so we use measureTokens for accuracy
+		if p.counter != nil {
+			p.TotalInput = p.measureTokens(ctx)
+		} else {
+			p.TotalInput = estimateMessagesTokens(p.history)
+		}
+		p.TotalOutput += resp.Usage.OutputTokens
+		if resp.Usage.InputTokens > 0 {
+			p.lastInputTokens = resp.Usage.InputTokens
+		}
 
 		toolCalls := resp.ToolCalls
 		if len(toolCalls) == 0 {
@@ -454,39 +453,39 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 
 		slog.Info("round complete", "round", rounds, "content_len", len(resp.Content), "tool_calls", len(toolCalls))
 		if len(toolCalls) == 0 {
-				fmt.Fprintln(p.output)
-				if resp.StopReason == "max_tokens" || resp.StopReason == "length" {
-					fmt.Fprintf(p.output, "%s\n", p.scheme.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
-				}
-				if resp.Content != "" {
-					// Truncate extremely long assistant messages to avoid token bloat
-					content := resp.Content
-					if len(content) > maxToolResultSize*4 {
-						content = content[:maxToolResultSize*4] + "\n...(response truncated)"
-					}
-					p.history = append(p.history, provider.Msg{
-						Role:    provider.Assistant,
-						Content: content,
-					})
-				}
-				finishedNaturally = true
-				break
+			fmt.Fprintln(p.output)
+			if resp.StopReason == "max_tokens" || resp.StopReason == "length" {
+				fmt.Fprintf(p.output, "%s\n", p.scheme.Info("truncated", "response hit the max-token limit — send 'continue' to resume"))
 			}
 			if resp.Content != "" {
-				fmt.Fprintln(p.output)
+				// Truncate extremely long assistant messages to avoid token bloat
+				content := resp.Content
+				if len(content) > maxToolResultSize*4 {
+					content = content[:maxToolResultSize*4] + "\n...(response truncated)"
+				}
+				p.history = append(p.history, provider.Msg{
+					Role:    provider.Assistant,
+					Content: content,
+				})
 			}
+			finishedNaturally = true
+			break
+		}
+		if resp.Content != "" {
+			fmt.Fprintln(p.output)
+		}
 
-			// Truncate assistant content if it's too long
-			assistantContent := resp.Content
-			if len(assistantContent) > maxToolResultSize*4 {
-				assistantContent = assistantContent[:maxToolResultSize*4] + "\n...(response truncated)"
-			}
+		// Truncate assistant content if it's too long
+		assistantContent := resp.Content
+		if len(assistantContent) > maxToolResultSize*4 {
+			assistantContent = assistantContent[:maxToolResultSize*4] + "\n...(response truncated)"
+		}
 
-			p.history = append(p.history, provider.Msg{
-				Role:       provider.Assistant,
-				Content:    assistantContent,
-				ToolCalls:  toolCalls,
-			})
+		p.history = append(p.history, provider.Msg{
+			Role:      provider.Assistant,
+			Content:   assistantContent,
+			ToolCalls: toolCalls,
+		})
 
 		edited := false
 		toolMsgs := make([]provider.Msg, 0, len(toolCalls))
@@ -627,28 +626,6 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 	}
 
 	return nil
-}
-
-var maxLengthArgs = 60
-
-func formatArgs(args map[string]string) string {
-	keys := make([]string, 0, len(args))
-	for k := range args {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var b strings.Builder
-	for _, k := range keys {
-		if b.Len() > 0 {
-			b.WriteString(", ")
-		}
-		v := args[k]
-		if len(v) > maxLengthArgs {
-			v = v[:maxLengthArgs] + "…"
-		}
-		fmt.Fprintf(&b, "%s=%q", k, v)
-	}
-	return b.String()
 }
 
 func (p *PushPuppet) formatToolResult(name string, result string) string {
