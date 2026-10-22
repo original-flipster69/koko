@@ -398,12 +398,6 @@ func (e *Editor) List(path sandbox.ValidPath) (string, []os.DirEntry, error) {
 	return resolved, entries, nil
 }
 
-// Walk traverses the sandbox tree depth-first, validating every directory
-// through the sandbox before reading it and skipping any entry that fails
-// validation (denied, outside the sandbox, or unresolvable). For each
-// validated entry it calls visit with the path relative to the sandbox root.
-// Returning filepath.SkipDir from visit prunes a directory; filepath.SkipAll
-// stops the walk.
 func (e *Editor) Walk(visit func(rel string, isDir bool) error) error {
 	root := e.sandbox.Root()
 	vp, err := e.sandbox.ValidatePath(root)
@@ -475,7 +469,6 @@ func previewForError(content string) string {
 	if len(lines) <= maxLines*2+1 {
 		return content
 	}
-	// Return first maxLines + last maxLines + ellipsis
 	var b strings.Builder
 	for i := 0; i < maxLines && i < len(lines); i++ {
 		b.WriteString(lines[i])
