@@ -118,7 +118,7 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 	// Iterate from oldest to newest (skip system prompt at index 0)
 	for i := 1; i < len(p.history); i++ {
 		msg := p.history[i]
-		msgTokenEstimate := msgTokens(msg)
+		msgTokenEstimate := provider.MsgTokens(msg)
 		if droppedTokens+msgTokenEstimate > tokensToDrop {
 			// Keep this message and all remaining
 			newHist = append(newHist, p.history[i:]...)
@@ -171,52 +171,11 @@ func (p *PushPuppet) estimateTokens() int {
 	if p.tokenEstimator != nil {
 		return p.tokenEstimator(p.history)
 	}
-	return estimateMessagesTokens(p.history)
+	return provider.EstimateMessagesTokens(p.history)
 }
 
 func estimateMessagesTokens(msgs []provider.Msg) int {
-	total := 0
-	for _, m := range msgs {
-		total += msgTokens(m)
-	}
-	return total
-}
-
-// estimateClaudeTokens uses a more accurate heuristic for Claude models (~4 tokens per 3 characters).
-func estimateClaudeTokens(msgs []provider.Msg) int {
-	total := 0
-	for _, m := range msgs {
-		total += claudeMsgTokens(m)
-	}
-	return total
-}
-
-// estimateMistralTokens uses a heuristic for Mistral models (similar to Claude).
-func estimateMistralTokens(msgs []provider.Msg) int {
-	return estimateClaudeTokens(msgs) // Mistral's tokenizer is similar to Claude's
-}
-
-// estimateOllamaTokens uses a heuristic for Ollama models (similar to Claude).
-func estimateOllamaTokens(msgs []provider.Msg) int {
-	return estimateClaudeTokens(msgs) // Ollama's tokenizer is similar for most models
-}
-
-func claudeMsgTokens(m provider.Msg) int {
-	n := len([]rune(m.Content))
-	for _, tc := range m.ToolCalls {
-		n += len(tc.Name)
-		for k, v := range tc.Args {
-			n += len(k) + len([]rune(v))
-		}
-	}
-	// Claude's tokenizer: ~4 tokens per 3 characters (empirical)
-	return (n * 4) / 3
-}
-
-// msgTokens is a legacy function for backward compatibility.
-// Use claudeMsgTokens or provider-specific estimators instead.
-func msgTokens(m provider.Msg) int {
-	return claudeMsgTokens(m)
+	return provider.EstimateMessagesTokens(msgs)
 }
 
 func truncateForHistory(result string) string {

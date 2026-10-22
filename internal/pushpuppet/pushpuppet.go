@@ -65,7 +65,7 @@ type PushPuppet struct {
 	TotalInput      int
 	TotalOutput     int
 	pendingInput    chan string
-	tokenEstimator  func([]provider.Msg) int // Provider-specific token estimator
+	tokenEstimator  provider.TokenEstimator // Provider-specific token estimator
 }
 
 func (p *PushPuppet) SetOutput(w io.Writer) {
@@ -119,13 +119,13 @@ func (p *PushPuppet) SetProvider(prov provider.Provider) {
 	// Set provider-specific token estimator
 	switch prov.Name() {
 	case "claude":
-		p.tokenEstimator = estimateClaudeTokens
+		p.tokenEstimator = provider.EstimateClaudeTokens
 	case "mistral":
-		p.tokenEstimator = estimateMistralTokens
+		p.tokenEstimator = provider.EstimateMistralTokens
 	case "ollama":
-		p.tokenEstimator = estimateOllamaTokens
+		p.tokenEstimator = provider.EstimateOllamaTokens
 	default:
-		p.tokenEstimator = estimateMessagesTokens
+		p.tokenEstimator = provider.EstimateMessagesTokens
 	}
 }
 
@@ -276,13 +276,13 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 	// Set provider-specific token estimator
 	switch p.Name() {
 	case "claude":
-		pp.tokenEstimator = estimateClaudeTokens
+		pp.tokenEstimator = provider.EstimateClaudeTokens
 	case "mistral":
-		pp.tokenEstimator = estimateMistralTokens
+		pp.tokenEstimator = provider.EstimateMistralTokens
 	case "ollama":
-		pp.tokenEstimator = estimateOllamaTokens
+		pp.tokenEstimator = provider.EstimateOllamaTokens
 	default:
-		pp.tokenEstimator = estimateMessagesTokens
+		pp.tokenEstimator = provider.EstimateMessagesTokens
 	}
 	pp.tools = pp.buildTools()
 
