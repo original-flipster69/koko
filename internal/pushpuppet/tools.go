@@ -2,7 +2,6 @@ package pushpuppet
 
 import (
 	"context"
-	"log/slog"
 	"slices"
 
 	"github.com/original-flipster69/koko/internal/provider"
@@ -240,13 +239,11 @@ func toolQuiet(name string) bool {
 	return ok && t.Quiet
 }
 
-var excluded = []string{"save_memory", "delete_memory", "list_memories"}
-
 func (p *PushPuppet) buildTools() []provider.ToolDef {
 	out := make([]provider.ToolDef, 0, len(tools))
 	for _, t := range tools {
-		if slices.Contains(excluded, t.Name) {
-			slog.Info("tool ignored", "tool", t.Name)
+		// Memory tools are only available if memories are configured
+		if slices.Contains([]string{"save_memory", "delete_memory", "list_memories"}, t.Name) && p.memory == nil {
 			continue
 		}
 		if t.Name == "verify" && p.verifier == nil {

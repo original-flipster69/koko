@@ -102,7 +102,11 @@ func groupHunks(ops []editOp) []hunk {
 		}
 		if trailing > contextLines {
 			excess := trailing - contextLines
-			cur.lines = cur.lines[:len(cur.lines)-excess]
+			trim := len(cur.lines) - excess
+			if trim < 0 {
+				trim = 0
+			}
+			cur.lines = cur.lines[:trim]
 		}
 		hunks = append(hunks, *cur)
 		cur = nil

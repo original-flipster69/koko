@@ -45,7 +45,6 @@ thinking_verbs = ["projecting"]
 	if len(applied) != 3 {
 		t.Errorf("applied: got %v", applied)
 	}
-	_ = homeModel
 }
 
 func TestApplyProjectConfigIgnoresSecurityKeys(t *testing.T) {

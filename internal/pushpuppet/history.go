@@ -21,7 +21,12 @@ const (
 func (p *PushPuppet) ClearHistory() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.history = p.history[:1]
+	if len(p.history) > 0 {
+		p.history = p.history[:1]
+	}
+	p.TotalInput = 0
+	p.TotalOutput = 0
+	p.lastInputTokens = 0
 }
 
 func (p *PushPuppet) HistoryLen() int {
@@ -51,6 +56,9 @@ func (p *PushPuppet) LoadSession(dir string) error {
 	newHist = append(newHist, p.history[0])
 	newHist = append(newHist, msgs...)
 	p.history = newHist
+	p.TotalInput = estimateMessagesTokens(p.history)
+	p.TotalOutput = 0
+	p.lastInputTokens = p.TotalInput
 	return nil
 }
 
@@ -67,80 +75,93 @@ func (p *PushPuppet) Compact() (int, int) {
 		{Role: provider.User, Content: summary},
 		{Role: provider.Assistant, Content: compactAck},
 	}
-	p.lastInputTokens = 0
-	newTokens := p.measureTokens(context.Background())
-	p.lastInputTokens = newTokens
-	return oldTokens, newTokens
+	if p.counter != nil {
+		p.lastInputTokens = p.measureTokens(context.Background())
+	} else {
+		p.lastInputTokens = estimateMessagesTokens(p.history)
+	}
+	p.TotalInput = p.lastInputTokens
+	return oldTokens, p.lastInputTokens
 }
 
 func (p *PushPuppet) trimHistory(ctx context.Context) {
-	realTotal := p.estimateTokens()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	realTotal := p.lastInputTokens
+	if realTotal == 0 {
+		realTotal = estimateMessagesTokens(p.history)
+	}
+
 	if realTotal <= maxHistoryTokens {
 		return
 	}
-	target := maxHistoryTokens * 3 / 4
 
-	scale := 1.0
-	if estTotal := estimateMessagesTokens(p.history); estTotal > 0 {
-		scale = float64(realTotal) / float64(estTotal)
-	}
+	target := maxHistoryTokens * 3 / 5
 
-	cutEnd := 0
-	droppedReal := 0.0
-	for i := 2; i <= len(p.history)-2; i++ {
-		droppedReal += float64(msgTokens(p.history[i-1])) * scale
-		if p.history[i].Role != provider.User {
-			continue
-		}
-		cutEnd = i
-		if float64(realTotal)-droppedReal <= float64(target) {
-			break
-		}
-	}
-
-	if cutEnd == 0 {
+	tokensToDrop := realTotal - target
+	if tokensToDrop <= 0 {
 		return
 	}
 
-	systemMsg := p.history[0]
-	dropped := p.history[1:cutEnd]
-	summary := summarizeMessages(dropped)
-	kept := p.history[cutEnd:]
+	newHist := make([]provider.Msg, 0, len(p.history))
+	newHist = append(newHist, p.history[0])
+	droppedTokens := 0
 
-	newHist := make([]provider.Msg, 0, len(kept)+3)
-	newHist = append(newHist, systemMsg)
-	newHist = append(newHist, provider.Msg{Role: provider.User, Content: summary})
-	newHist = append(newHist, provider.Msg{Role: provider.Assistant, Content: trimAck})
-	newHist = append(newHist, kept...)
-	p.history = newHist
-	p.lastInputTokens = p.measureTokens(ctx)
-	slog.Info("history trimmed with summary", "dropped_messages", len(dropped), "kept_messages", len(kept), "real_before", realTotal, "scale", scale)
+	for i := 1; i < len(p.history); i++ {
+		msg := p.history[i]
+		msgTokenEstimate := provider.MsgTokens(msg)
+		if droppedTokens+msgTokenEstimate > tokensToDrop {
+			newHist = append(newHist, p.history[i:]...)
+			break
+		} else {
+			droppedTokens += msgTokenEstimate
+		}
+	}
+
+	if len(newHist) < len(p.history) {
+		dropped := p.history[1 : len(p.history)-len(newHist)+1]
+		summary := summarizeMessages(dropped)
+		newHistWithSummary := make([]provider.Msg, 0, len(newHist)+2)
+		newHistWithSummary = append(newHistWithSummary, newHist[0])
+		newHistWithSummary = append(newHistWithSummary, provider.Msg{
+			Role:    provider.User,
+			Content: summary,
+		})
+		newHistWithSummary = append(newHistWithSummary, provider.Msg{
+			Role:    provider.Assistant,
+			Content: trimAck,
+		})
+		newHistWithSummary = append(newHistWithSummary, newHist[1:]...)
+		p.history = newHistWithSummary
+	} else {
+		p.history = newHist
+	}
+
+	p.lastInputTokens = 0
+	if p.counter != nil {
+		p.lastInputTokens = p.measureTokens(ctx)
+		p.TotalInput = p.lastInputTokens
+	} else {
+		p.TotalInput = estimateMessagesTokens(p.history)
+	}
+	slog.Info("history trimmed", "dropped_tokens", droppedTokens, "real_before", realTotal, "target", target)
 }
 
 func (p *PushPuppet) estimateTokens() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.lastInputTokens > 0 {
 		return p.lastInputTokens
 	}
-	return estimateMessagesTokens(p.history)
+	if p.tokenEstimator != nil {
+		return p.tokenEstimator(p.history)
+	}
+	return provider.EstimateTokens(p.history)
 }
 
 func estimateMessagesTokens(msgs []provider.Msg) int {
-	total := 0
-	for _, m := range msgs {
-		total += msgTokens(m)
-	}
-	return total
-}
-
-func msgTokens(m provider.Msg) int {
-	n := len([]rune(m.Content))
-	for _, tc := range m.ToolCalls {
-		n += len(tc.Name)
-		for k, v := range tc.Args {
-			n += len(k) + len([]rune(v))
-		}
-	}
-	return n*10/35 + 4
+	return provider.EstimateTokens(msgs)
 }
 
 func truncateForHistory(result string) string {

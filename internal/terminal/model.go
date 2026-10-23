@@ -241,6 +241,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			if m.pushPuppetBusy {
+				return m, nil
+			}
+
 			input := strings.TrimSpace(m.input.Value())
 			if input == "" {
 				return m, nil
@@ -371,12 +375,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if !m.pushPuppetBusy || m.confirmMode {
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(msg)
-		cmds = append(cmds, cmd)
-		m.resizeInput()
-	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	cmds = append(cmds, cmd)
+	m.resizeInput()
 
 	return m, tea.Batch(cmds...)
 }
