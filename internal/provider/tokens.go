@@ -36,16 +36,3 @@ func EstimateOllamaTokens(msgs []Msg) int {
 func EstimateMessagesTokens(msgs []Msg) int {
 	return EstimateClaudeTokens(msgs)
 }
-
-func GetTokenEstimator(providerName string) TokenEstimator {
-	switch providerName {
-	case "claude":
-		return EstimateClaudeTokens
-	case "mistral":
-		return EstimateMistralTokens
-	case "ollama":
-		return EstimateOllamaTokens
-	default:
-		return EstimateMessagesTokens
-	}
-}
