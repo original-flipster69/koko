@@ -112,19 +112,18 @@ func (p *PushPuppet) SetProvider(prov provider.Provider) {
 	defer p.mu.Unlock()
 	p.provider = prov
 	if c, ok := prov.(provider.TokenCounter); ok {
-		p.counter = c
-	} else {
-		p.counter = nil
-	}
-	switch prov.Name() {
+		p.counter = c		} else {
+			p.counter = nil
+		}
+		switch prov.Name() {
 		case "claude":
-			p.tokenEstimator = provider.EstimateClaudeTokens
+			p.tokenEstimator = provider.EstimateTokens
 		case "mistral":
-			p.tokenEstimator = provider.EstimateMistralTokens
+			p.tokenEstimator = provider.EstimateTokens
 		case "ollama":
-			p.tokenEstimator = provider.EstimateOllamaTokens
+			p.tokenEstimator = provider.EstimateTokens
 		default:
-			p.tokenEstimator = provider.EstimateMessagesTokens
+			p.tokenEstimator = provider.EstimateTokens
 		}
 }
 
@@ -274,13 +273,13 @@ func New(p provider.Provider, sb *sandbox.Sandbox, out io.Writer, confirm confir
 	}
 	switch p.Name() {
 	case "claude":
-		pp.tokenEstimator = provider.EstimateClaudeTokens
+		pp.tokenEstimator = provider.EstimateTokens
 	case "mistral":
-		pp.tokenEstimator = provider.EstimateMistralTokens
+		pp.tokenEstimator = provider.EstimateTokens
 	case "ollama":
-		pp.tokenEstimator = provider.EstimateOllamaTokens
+		pp.tokenEstimator = provider.EstimateTokens
 	default:
-		pp.tokenEstimator = provider.EstimateMessagesTokens
+		pp.tokenEstimator = provider.EstimateTokens
 	}
 	pp.tools = pp.buildTools()
 

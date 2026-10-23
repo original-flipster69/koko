@@ -157,11 +157,11 @@ func (p *PushPuppet) estimateTokens() int {
 	if p.tokenEstimator != nil {
 		return p.tokenEstimator(p.history)
 	}
-	return provider.EstimateMessagesTokens(p.history)
+	return provider.EstimateTokens(p.history)
 }
 
 func estimateMessagesTokens(msgs []provider.Msg) int {
-	return provider.EstimateMessagesTokens(msgs)
+	return provider.EstimateTokens(msgs)
 }
 
 func truncateForHistory(result string) string {

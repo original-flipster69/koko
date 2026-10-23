@@ -3,10 +3,10 @@ package provider
 type TokenEstimator func([]Msg) int
 
 func MsgTokens(m Msg) int {
-	return claudeMsgTokens(m)
+	return msgTokens(m)
 }
 
-func claudeMsgTokens(m Msg) int {
+func msgTokens(m Msg) int {
 	n := len([]rune(m.Content))
 	for _, tc := range m.ToolCalls {
 		n += len(tc.Name)
@@ -17,22 +17,10 @@ func claudeMsgTokens(m Msg) int {
 	return (n * 4) / 3
 }
 
-func EstimateClaudeTokens(msgs []Msg) int {
+func EstimateTokens(msgs []Msg) int {
 	total := 0
 	for _, m := range msgs {
-		total += claudeMsgTokens(m)
+		total += msgTokens(m)
 	}
 	return total
-}
-
-func EstimateMistralTokens(msgs []Msg) int {
-	return EstimateClaudeTokens(msgs)
-}
-
-func EstimateOllamaTokens(msgs []Msg) int {
-	return EstimateClaudeTokens(msgs)
-}
-
-func EstimateMessagesTokens(msgs []Msg) int {
-	return EstimateClaudeTokens(msgs)
 }
