@@ -28,12 +28,11 @@ max_tokens = 4242
 thinking_verbs = ["projecting"]
 `)
 	cfg := defaultConf()
-	homeModel := cfg.Llm.Model
 	applied, err := cfg.ApplyProjectConfig(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if homeModel != "project-model" {
+	if cfg.Llm.Model != "project-model" {
 		t.Errorf("model not overridden: got %q", cfg.Llm.Model)
 	}
 	if cfg.Llm.MaxTokens != 4242 {
