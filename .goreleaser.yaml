@@ -36,8 +36,9 @@ checksum:
   algorithm: sha256
 
 release:
-  owner: original-flipster69
-  name: koko
+  gitea:
+    owner: original-flipster69
+    name: koko
   draft: false
   prerelease: auto
 
