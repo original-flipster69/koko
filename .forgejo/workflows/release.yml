@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: codeberg-tiny
+    runs-on: codeberg-medium
     steps:
       - uses: actions/checkout@v4
         with:
