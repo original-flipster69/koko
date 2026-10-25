@@ -132,7 +132,18 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 			Role:    provider.Assistant,
 			Content: trimAck,
 		})
-		newHistWithSummary = append(newHistWithSummary, newHist[1:]...)
+		// Append remaining messages, ensuring we start with a user message
+		// Skip any leading assistant messages in newHist[1:]
+		startIdx := 1
+		for startIdx < len(newHist) && newHist[startIdx].Role == provider.Assistant {
+			startIdx++
+		}
+		if startIdx < len(newHist) {
+			newHistWithSummary = append(newHistWithSummary, newHist[startIdx:]...)
+		} else {
+			// If no user message found, append all remaining messages
+			newHistWithSummary = append(newHistWithSummary, newHist[1:]...)
+		}
 		p.history = newHistWithSummary
 	} else {
 		p.history = newHist
