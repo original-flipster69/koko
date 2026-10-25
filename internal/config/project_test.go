@@ -33,7 +33,7 @@ thinking_verbs = ["projecting"]
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Llm.Model != "project-model" {
+	if homeModel != "project-model" {
 		t.Errorf("model not overridden: got %q", cfg.Llm.Model)
 	}
 	if cfg.Llm.MaxTokens != 4242 {
