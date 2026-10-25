@@ -179,6 +179,11 @@ install_binary() {
     echo "Installing to ${INSTALL_DIR} (requires sudo)..."
     sudo mv "${TMPDIR}/${BINARY_FILE}" "${INSTALL_DIR}/${BINARY_FILE}"
   fi
+  
+  # Remove macOS quarantine flag to avoid Gatekeeper warnings
+  if [ "$OS" = "darwin" ]; then
+    xattr -d com.apple.quarantine "${INSTALL_DIR}/${BINARY_FILE}" 2>/dev/null || true
+  fi
 }
 
 install_config() {
