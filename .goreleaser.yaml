@@ -36,8 +36,14 @@ checksum:
   algorithm: sha256
 
 release:
-  github:
-    owner: original-flipster69
-    name: koko
+  owner: original-flipster69
+  name: koko
   draft: false
   prerelease: auto
+
+changelog:
+  sort: asc
+
+gitea_urls:
+  api: https://codeberg.org/api/v1
+  download: https://codeberg.org
