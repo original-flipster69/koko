@@ -133,7 +133,6 @@ func (p *PushPuppet) trimHistory(ctx context.Context) {
 			Content: trimAck,
 		})
 		// Append remaining messages, ensuring we start with a user message
-		// Skip any leading assistant messages in newHist[1:]
 		startIdx := 1
 		for startIdx < len(newHist) && newHist[startIdx].Role == provider.Assistant {
 			startIdx++
