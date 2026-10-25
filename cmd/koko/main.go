@@ -25,11 +25,18 @@ func main() {
 	llmUrl := flag.String("llm-url", "", "URL for LLM API (useful for local LLMs)")
 	sandbox := flag.String("sandbox", "", "Sandbox root directory (defaults to cwd)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
+	verbose := flag.Bool("verbose", false, "Enable verbose (debug) logging")
+	flag.BoolVar(verbose, "v", false, "Enable verbose (debug) logging")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println(version)
 		return
+	}
+
+	logLevel := "info"
+	if *verbose {
+		logLevel = "debug"
 	}
 
 	if err := cli.Run(cli.Flags{
@@ -38,6 +45,7 @@ func main() {
 		LlmURL:   *llmUrl,
 		Sandbox:  *sandbox,
 		Version:  version,
+		LogLevel: logLevel,
 	}); err != nil {
 		fmt.Fprintln(os.Stderr, ui.DefaultScheme().Error(err.Error()))
 		os.Exit(1)

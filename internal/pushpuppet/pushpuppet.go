@@ -112,19 +112,20 @@ func (p *PushPuppet) SetProvider(prov provider.Provider) {
 	defer p.mu.Unlock()
 	p.provider = prov
 	if c, ok := prov.(provider.TokenCounter); ok {
-		p.counter = c		} else {
-			p.counter = nil
-		}
-		switch prov.Name() {
-		case "claude":
-			p.tokenEstimator = provider.EstimateTokens
-		case "mistral":
-			p.tokenEstimator = provider.EstimateTokens
-		case "ollama":
-			p.tokenEstimator = provider.EstimateTokens
-		default:
-			p.tokenEstimator = provider.EstimateTokens
-		}
+		p.counter = c
+	} else {
+		p.counter = nil
+	}
+	switch prov.Name() {
+	case "claude":
+		p.tokenEstimator = provider.EstimateTokens
+	case "mistral":
+		p.tokenEstimator = provider.EstimateTokens
+	case "ollama":
+		p.tokenEstimator = provider.EstimateTokens
+	default:
+		p.tokenEstimator = provider.EstimateTokens
+	}
 }
 
 func (p *PushPuppet) Model() string {
@@ -351,7 +352,6 @@ const (
 
 func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	slog.Info("user input received", "length", len(userInput), "plan_mode", p.planMode)
 	if p.planMode {
 		userInput = "[PLAN MODE — read-only] Investigate using read_file, list_dir, search_files, and list_memories. Do NOT attempt to modify anything. When you have a concrete plan, call exit_plan_mode with the plan as markdown (steps, files to change, high-level approach). The user will approve or reject it.\n\n" + userInput
@@ -589,26 +589,14 @@ func (p *PushPuppet) Run(ctx context.Context, userInput string) error {
 					Role:    provider.User,
 					Content: "[automated verification — you did not request this and cannot skip it; react to the result]\n" + obs,
 				})
-			}
+			}			}
 		}
-		p.trimHistory(ctx)
-	}
 	if !finishedNaturally {
 		fmt.Fprintf(p.output, "\n%s\n", p.scheme.Info("limit", fmt.Sprintf("reached %d tool rounds — send another message to continue", maxToolRounds)))
 	}
 
-	select {
-	case input := <-p.pendingInput:
-		p.history = append(p.history, provider.Msg{
-			Role:    provider.User,
-			Content: input,
-		})
-		finishedNaturally = false
-	default:
-		if finishedNaturally {
-			break
-		}
-	}
+	p.mu.Unlock()
+	p.trimHistory(ctx)
 
 	return nil
 }

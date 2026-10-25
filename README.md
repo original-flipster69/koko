@@ -171,20 +171,41 @@ Sessions are auto-saved whenever a turn is finished.
 
 ## Installation
 
-**One-liner (macOS / Linux, amd64 / arm64):**
+**One-liner (macOS / Linux / Windows, amd64 / arm64 / 386):**
 
 ```
 curl -fsSL https://raw.githubusercontent.com/original-flipster69/koko/main/install.sh | sh
 ```
 
-The script downloads the latest GitHub release matching your platform, verifies its SHA-256 checksum against `checksums.txt`, and installs the binary to `/usr/local/bin/koko` (uses `sudo` if the directory isn't writable).
+**For Windows (native CMD):**
+Download and run [install.cmd](install.cmd) directly, or use:
 
-Override the install location with `KOKO_INSTALL_DIR`, or pin a version with `KOKO_VERSION`:
+```cmd
+curl -fsSL -o install.cmd https://raw.githubusercontent.com/original-flipster69/koko/main/install.cmd
+install.cmd [OPTIONS]
+```
+
+The script downloads the latest release matching your platform from **Codeberg** (default mirror), verifies its SHA-256 checksum against `checksums.txt`, and installs the binary to `/usr/local/bin/koko` (uses `sudo` if the directory isn't writable).
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--version <version>` | Install a specific version (e.g., `v0.1.0`) | `latest` |
+| `--mirror <mirror>` | Select mirror: `github` or `codeberg` | `codeberg` |
+| `--help` | Show help message | - |
+
+### Environment Variables
+
+Override defaults via environment variables:
 
 ```
 KOKO_INSTALL_DIR=$HOME/.local/bin sh install.sh
 KOKO_VERSION=v0.1.0 sh install.sh
+KOKO_MIRROR=github sh install.sh
 ```
+
+**Note for Windows:** The binary is installed as `koko.exe` and requires `curl` and `tar` (available via Git Bash, WSL, or native Windows builds).
 
 **Via Go:**
 
@@ -212,6 +233,7 @@ koko [flags]
 | `-model` | Model name | `mistral-medium-3-5` |
 | `-llm-url` | API URL (for local or custom endpoints) | Provider default |
 | `-sandbox` | Sandbox root directory | Current working directory |
+| `-verbose`, `-v` | Enable verbose (debug) logging | `info` |
 | `-config` | Config file path | `~/.koko/config.toml` |
 
 ## Configuration
