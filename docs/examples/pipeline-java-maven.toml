@@ -1,4 +1,4 @@
-# Verification pipeline — copy to <project>/.koko/pipeline.toml
+# Java Maven verification pipeline — copy to <project>/.koko/pipeline-go.toml
 #
 # koko runs this AFTER the agent edits files. It is the project's
 # definition-of-done: the agent reacts to the result but cannot run,
@@ -15,25 +15,37 @@
 #   timeout — Go duration (default 2m)
 
 [[stage]]
-name = "fmt"
-cmd = "gofmt -l ."
-fast = true
-timeout = "30s"
-
-[[stage]]
-name = "build"
-cmd = "go build ./..."
+name = "compile"
+cmd = "mvn compile -q"
 fast = true
 timeout = "120s"
 
 [[stage]]
-name = "vet"
-cmd = "go vet ./..."
+name = "test-compile"
+cmd = "mvn test-compile -q"
 fast = true
 timeout = "120s"
 
 [[stage]]
-name = "test"
-cmd = "go test ./..."
+name = "unit-tests"
+cmd = "mvn test -q"
+fast = false
+timeout = "300s"
+
+[[stage]]
+name = "checkstyle"
+cmd = "mvn checkstyle:check -q"
+fast = true
+timeout = "60s"
+
+[[stage]]
+name = "spotbugs"
+cmd = "mvn spotbugs:check -q"
+fast = false
+timeout = "180s"
+
+[[stage]]
+name = "package"
+cmd = "mvn package -DskipTests -q"
 fast = false
 timeout = "300s"
