@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	playsDir  = "plays"
-	logFile   = "koko.log"
-	memoDir   = "memories"
+	playsDir = "plays"
+	logFile  = "koko.log"
+	memoDir  = "memories"
 
 	llmStreamTimeout = 5 * time.Minute
 )
@@ -39,6 +39,7 @@ type Flags struct {
 	LlmURL   string
 	Sandbox  string
 	Version  string
+	LogLevel string
 }
 
 func Run(opts Flags) error {
@@ -77,7 +78,16 @@ func Run(opts Flags) error {
 
 	log, err := os.OpenFile(filepath.Join(kokoRoot, logFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err == nil {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(log, &slog.HandlerOptions{Level: slog.LevelInfo})))
+		level := slog.LevelInfo
+		switch strings.ToLower(opts.LogLevel) {
+		case "debug":
+			level = slog.LevelDebug
+		case "warn":
+			level = slog.LevelWarn
+		case "error":
+			level = slog.LevelError
+		}
+		slog.SetDefault(slog.New(slog.NewJSONHandler(log, &slog.HandlerOptions{Level: level})))
 		defer log.Close()
 	}
 
@@ -286,14 +296,15 @@ func register(cmds map[string]command, list ...cmdDef) {
 // (everything except :help, which is registered separately because it needs the
 // finished command map). name()/desc()/args() ignore the injected deps, so it
 // can be called with zero values purely to enumerate commands.
-func commandList(sb *sandbox.Sandbox, memo *memories.Store, plays *plays.Registry, cfg *config.Config, kokoRoot, cfgPath, sandboxRoot string, flags Flags, apply func(config.Config) (applied, restart []string)) []cmdDef {		return []cmdDef{
-			koko{}, clear{}, undo{}, tokens{}, compact{}, plan{}, vision{},
-			run{sb},
-			memoriesCmd{memo},
-			playsCmd{plays},
-			model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
-			reload{cfgPath, flags, apply}, cageCmd{kokoRoot, sandboxRoot},
-		}
+func commandList(sb *sandbox.Sandbox, memo *memories.Store, plays *plays.Registry, cfg *config.Config, kokoRoot, cfgPath, sandboxRoot string, flags Flags, apply func(config.Config) (applied, restart []string)) []cmdDef {
+	return []cmdDef{
+		koko{}, clear{}, undo{}, tokens{}, compact{}, plan{}, vision{},
+		run{sb},
+		memoriesCmd{memo},
+		playsCmd{plays},
+		model{}, effort{}, configCmd{cfg, kokoRoot}, save{kokoRoot}, resume{kokoRoot},
+		reload{cfgPath, flags, apply}, cageCmd{kokoRoot, sandboxRoot},
+	}
 }
 
 func kokoDir() string {
