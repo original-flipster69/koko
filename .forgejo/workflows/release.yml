@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: codeberg-medium
+    runs-on: codeberg-small
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,7 +23,8 @@ jobs:
 
       - uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: '~> v2'
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_FORCE_TOKEN: gitea
