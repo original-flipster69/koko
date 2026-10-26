@@ -71,10 +71,10 @@ type StyleConfig struct {
 }
 
 type Config struct {
-	Llm     LlmConfig     `toml:"llm"`
-	Sandbox SandboxConfig `toml:"sandbox"`
-	Ignore  IgnoreConfig  `toml:"ignore"`
-	Style   StyleConfig   `toml:"style"`
+	Llm      LlmConfig      `toml:"llm"`
+	Sandbox  SandboxConfig  `toml:"sandbox"`
+	Ignore   IgnoreConfig   `toml:"ignore"`
+	Style    StyleConfig    `toml:"style"`
 }
 
 func defaultConf() *Config {
@@ -104,13 +104,12 @@ func defaultConf() *Config {
 		},
 		Ignore: IgnoreConfig{
 			Mode: Gitignore,
-		},
-		Style: StyleConfig{
-			ThinkingVerbs: []string{
-				"banana munching", "marinating", "concocting", "brewing",
+		},			Style: StyleConfig{
+				ThinkingVerbs: []string{
+					"banana munching", "marinating", "concocting", "brewing",
+				},
 			},
-		},
-	}
+		}
 }
 
 func Load(path string) (*Config, error) {
@@ -137,6 +136,63 @@ const (
 
 func ProjectConfigPath(sandboxRoot string) string {
 	return filepath.Join(sandboxRoot, ProjectConfigDir, ConfFile)
+}
+
+func Path(kokoDir string) string {
+	return filepath.Join(kokoDir, ConfFile)
+}
+
+// DetectLanguage identifies the primary language/framework of a project
+func DetectLanguage(projectRoot string) string {
+	// Check for common language indicators
+	files := []string{
+		"pom.xml",           // Java Maven
+		"build.gradle",      // Java Gradle / Kotlin / Groovy
+		"package.json",      // Node.js
+		"requirements.txt",  // Python
+		"pyproject.toml",    // Python
+		"Cargo.toml",        // Rust
+		"go.mod",           // Go
+		"Gemfile",          // Ruby
+		"composer.json",    // PHP
+		"Makefile",         // C/C++
+		".csproj",          // C#
+	}
+
+	for _, file := range files {
+		path := filepath.Join(projectRoot, file)
+		if _, err := os.Stat(path); err == nil {
+			return languageFromFile(file)
+		}
+	}
+
+	return ""
+}
+
+func languageFromFile(filename string) string {
+	switch filename {
+	case "pom.xml":
+		return "java-maven"
+	case "build.gradle":
+		return "java-gradle"
+	case "package.json":
+		return "nodejs"
+	case "requirements.txt", "pyproject.toml":
+		return "python"
+	case "Cargo.toml":
+		return "rust"
+	case "go.mod":
+		return "go"
+	case "Gemfile":
+		return "ruby"
+	case "composer.json":
+		return "php"
+	case "Makefile":
+		return "c-cpp"
+	case ".csproj":
+		return "csharp"
+	}
+	return ""
 }
 
 func (c *Config) ApplyProjectConfig(sandboxRoot string) ([]string, error) {
@@ -339,10 +395,6 @@ func apiKeyEnvName(p Provider) string {
 		return "MISTRAL_API_KEY"
 	}
 	return ""
-}
-
-func Path(kokoDir string) string {
-	return filepath.Join(kokoDir, ConfFile)
 }
 
 type Diff struct {

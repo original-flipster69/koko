@@ -60,6 +60,11 @@ suppress_elevated_warning = false
 # Skip the privacy warning shown when using a non-local (remote) provider.
 suppress_privacy_warning = false
 
+# Default pipelines: Place language-specific pipeline files (e.g., go.toml, java-maven.toml)
+# in ~/.koko/pipelines/ directory. When a project doesn't have a .koko/pipeline.toml,
+# koko will automatically detect the language and look for a matching pipeline file.
+# Supported language identifiers: java-maven, java-gradle, nodejs, python, rust, go, ruby, php, c-cpp, csharp
+
 [sandbox.exec]
 # Resource profile for shell commands. One of:
 #   strict     (30s cpu,  512MB mem, 100MB file)

@@ -1,0 +1,27 @@
+# Go verification pipeline
+# This can be used as a default pipeline for Go projects
+# Save this in ~/.koko/pipelines/go.toml and reference it in config.toml
+
+[[stage]]
+name = "fmt"
+cmd = "gofmt -l ."
+fast = true
+timeout = "30s"
+
+[[stage]]
+name = "build"
+cmd = "go build ./..."
+fast = true
+timeout = "120s"
+
+[[stage]]
+name = "vet"
+cmd = "go vet ./..."
+fast = true
+timeout = "120s"
+
+[[stage]]
+name = "test"
+cmd = "go test ./..."
+fast = false
+timeout = "300s"

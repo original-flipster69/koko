@@ -114,10 +114,9 @@ func Run(opts Flags) error {
 		if projectCtx != "" {
 			projectCtx += "\n\n"
 		}
-		projectCtx += "Stored memories (use list_memories to read bodies, save_memory/delete_memory to modify):\n" + idx
-	}
+		projectCtx += "Stored memories (use list_memories to read bodies, save_memory/delete_memory to modify):\n" + idx		}
 
-	verifier := loadVerifier(sb.Root(), kokoRoot)
+		verifier := loadVerifier(sb.Root(), kokoRoot, cfg)
 
 	var outFilters []pushpuppet.OutboundFilter
 	if cfg.Sandbox.ScrubPII {
@@ -349,14 +348,25 @@ func confirmElevated(r io.Reader, w io.Writer) bool {
 	return answer == "y" || answer == "yes"
 }
 
-func loadVerifier(projectRoot, kokoRoot string) pushpuppet.Verifier {
+func loadVerifier(projectRoot, kokoRoot string, cfg *config.Config) pushpuppet.Verifier {
+	// First, try to load project-specific pipeline
 	pipelinePath := filepath.Join(projectRoot, config.ProjectConfigDir, "pipeline.toml")
 	pipeline, err := verify.Load(pipelinePath)
+	pipelineSource := filepath.Join(config.ProjectConfigDir, "pipeline.toml")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "warning: ignoring %s: %v\n", pipelinePath, err)
 		}
-		return nil
+		// If project pipeline doesn't exist, try language-specific default
+		language := config.DetectLanguage(projectRoot)
+		pipeline, err = loadLanguagePipeline(projectRoot, cfg, kokoRoot)
+		pipelineSource = fmt.Sprintf("language default (%s) from ~/.koko/pipelines/%s.toml", language, language)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "warning: ignoring language pipeline: %v\n", err)
+			}
+			return nil
+		}
 	}
 
 	trust := verify.NewTrustStore(kokoRoot)
@@ -366,7 +376,7 @@ func loadVerifier(projectRoot, kokoRoot string) pushpuppet.Verifier {
 		return nil
 	}
 	if !approved {
-		if !confirmPipeline(os.Stdin, os.Stdout, pipeline.Commands()) {
+		if !confirmPipeline(os.Stdin, os.Stdout, pipeline.Commands(), pipelineSource) {
 			return nil
 		}
 		if err := trust.Approve(projectRoot, pipeline.Hash); err != nil {
@@ -378,8 +388,31 @@ func loadVerifier(projectRoot, kokoRoot string) pushpuppet.Verifier {
 	return verify.NewTrigger(verify.NewRunner(projectRoot, 0), pipeline)
 }
 
-func confirmPipeline(r io.Reader, w io.Writer, cmds []string) bool {
-	fmt.Fprintf(w, "\nThis project defines a verification pipeline (%s).\n", filepath.Join(config.ProjectConfigDir, "pipeline.toml"))
+func loadLanguagePipeline(projectRoot string, cfg *config.Config, kokoRoot string) (verify.Pipeline, error) {
+	language := config.DetectLanguage(projectRoot)
+	if language == "" {
+		return verify.Pipeline{}, os.ErrNotExist
+	}
+
+	// Look for a pipeline file named after the language in the pipelines directory
+	pipelineDir := filepath.Join(kokoRoot, "pipelines")
+	pipelinePath := filepath.Join(pipelineDir, language+".toml")
+	
+	// If the file doesn't exist, try without hyphens (e.g., java-maven -> javamaven)
+	if _, err := os.Stat(pipelinePath); os.IsNotExist(err) {
+		// Try alternative naming: replace hyphens with underscores
+		altLanguage := strings.ReplaceAll(language, "-", "_")
+		altPath := filepath.Join(pipelineDir, altLanguage+".toml")
+		if _, err := os.Stat(altPath); err == nil {
+			pipelinePath = altPath
+		}
+	}
+
+	return verify.Load(pipelinePath)
+}
+
+func confirmPipeline(r io.Reader, w io.Writer, cmds []string, pipelineSource string) bool {
+	fmt.Fprintf(w, "\nThis project defines a verification pipeline (%s).\n", pipelineSource)
 	fmt.Fprintf(w, "After the agent edits files, koko will run these commands on your machine:\n\n")
 	for _, c := range cmds {
 		fmt.Fprintf(w, "  $ %s\n", c)

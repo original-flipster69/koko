@@ -1,0 +1,39 @@
+# Java Maven verification pipeline
+# This can be used as a default pipeline for Java Maven projects
+# Save this in ~/.koko/pipelines/java-maven.toml and reference it in config.toml
+
+[[stage]]
+name = "compile"
+cmd = "mvn compile -q"
+fast = true
+timeout = "120s"
+
+[[stage]]
+name = "test-compile"
+cmd = "mvn test-compile -q"
+fast = true
+timeout = "120s"
+
+[[stage]]
+name = "unit-tests"
+cmd = "mvn test -q"
+fast = false
+timeout = "300s"
+
+[[stage]]
+name = "checkstyle"
+cmd = "mvn checkstyle:check -q"
+fast = true
+timeout = "60s"
+
+[[stage]]
+name = "spotbugs"
+cmd = "mvn spotbugs:check -q"
+fast = false
+timeout = "180s"
+
+[[stage]]
+name = "package"
+cmd = "mvn package -DskipTests -q"
+fast = false
+timeout = "300s"
